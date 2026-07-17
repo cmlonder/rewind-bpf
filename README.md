@@ -1,40 +1,60 @@
 # RewindBPF
 
-RewindBPF is an **AI Agent Safety Runtime** designed to run autonomous agents inside reversible, policy-controlled filesystem transactions on Linux.
+RewindBPF is an **AI Agent Safety Runtime** for running autonomous agents inside reversible, policy-controlled Linux filesystem transactions.
 
-Core idea:
+It protects the agent operator from destructive changes and unauthorized sensitive-file access without requiring changes to the agent itself.
+
+## Current status
+
+This repository is an early bootstrap. The CLI is scaffolded, while OverlayFS, eBPF, namespace, and policy enforcement are being implemented incrementally in a disposable Linux environment.
+
+Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
+
+## Safety warning
+
+Do not run kernel, mount, privileged-container, or destructive tests directly on a personal host. RewindBPF integration tests must run in a disposable Ubuntu VM or an explicitly created test image. Do not bind-mount a real home directory, real project, `.env`, SSH keys, or personal data into a destructive test.
+
+Docker Desktop on macOS is useful for userspace tests because it runs containers inside a Linux VM. It is not the default integration-test boundary for OverlayFS/eBPF. The recommended layout is:
 
 ```text
-Start the agent
-    ↓
-Prepare a mount namespace + OverlayFS
-    ↓
-Observe filesystem/process events with eBPF
-    ↓
-Enforce sensitive-read policies with Landlock/BPF LSM
-    ↓
-Commit on success, rollback on failure
+macOS host → disposable Ubuntu VM → optional Docker for tooling
 ```
 
-This project is not an AI agent, Codex skill, or IDE extension. The core product is a Linux daemon, CLI, eBPF program, and OverlayFS-based sandbox. MCP, plugin, or IDE adapters can be added later.
+## Planned user workflow
 
-## Status
+Once the runtime stages are implemented, the primary workflow will be:
 
-This repository is the bootstrap scaffold. Runtime behavior is not implemented yet; the architecture decisions and seven-day MVP plan are documented in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
+```bash
+rewind run --workspace ./project --policy ./policy.yaml -- agent-command
+rewind status
+rewind events <run_id>
+rewind rollback <run_id>
+rewind commit <run_id>
+```
 
-## Planned components
+The agent will see a merged workspace backed by an OverlayFS lower/upper pair. Rollback discards the temporary upper layer. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
 
-- `rewind`: user-facing CLI
-- `rewindd`: sandbox, process, policy, and rollback manager
-- `ebpf/`: C + libbpf/CO-RE kernel programs
-- OverlayFS: copy-on-write filesystem transaction layer
-- Landlock/BPF LSM: user-defined filesystem access policies
-- VM/namespaces: agent isolation
-- `benchmarks/`: baseline, overhead, and rollback measurements
+Example policy:
 
-## Development
+```yaml
+read:
+  mode: enforce
+  deny:
+    - "**/.env"
+    - "**/*.pem"
+    - "**/*.key"
+    - "/home/*/.ssh/**"
+  allow:
+    - "/workspace/.env.example"
 
-Requirements: Go, a Linux VM, OverlayFS, and a kernel with eBPF/BTF support.
+write:
+  mode: rollback
+  scope: workspace
+```
+
+## Bootstrap CLI
+
+The current CLI only exposes the planned command surface and does not yet perform kernel operations:
 
 ```bash
 make build
@@ -42,4 +62,31 @@ make test
 ./bin/rewind --help
 ```
 
-Kernel integration must be developed in an isolated Ubuntu VM rather than directly on a macOS host. See the project plan for scope, security boundaries, benchmark design, and test scenarios.
+## Repository layout
+
+```text
+cmd/rewind/       CLI entry point
+docs/             technical architecture and project plan
+ebpf/             planned C/libbpf kernel programs
+policies/         safe example policies
+benchmarks/       benchmark design and future results
+tests/            integration-test safety notes
+```
+
+## Development prerequisites
+
+- Go 1.22 or newer
+- Linux VM for kernel integration
+- OverlayFS, BPF/BTF, and Landlock support in the VM kernel
+- Docker is optional for userspace tooling, not required for the first Go build
+
+## Verification
+
+```bash
+go test ./...
+go vet ./...
+make build
+git diff --check
+```
+
+For the full business context, security model, flow diagrams, benchmark matrix, safety gates, and implementation status, read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
