@@ -327,11 +327,11 @@ Primary invariant:
 
 ## 14. Safe execution roadmap
 
-No mount, eBPF load, privileged container, host bind mount, or destructive command should run on the personal host without an explicit safety review first.
+No mount, eBPF load, host bind mount, or destructive command should run on the personal host without an explicit safety review first.
 
 ### Stage 0 — Environment decision
 
-Only read-only checks: host architecture, Docker status, Go version, virtualization options, and Git status. Decide whether to use an Ubuntu VM, Docker inside the VM, or both.
+Only read-only checks: host architecture, Go version, virtualization options, and Git status. Confirm the disposable Ubuntu VM path before kernel work.
 
 ### Stage 1 — Safe fixtures and policy contract
 

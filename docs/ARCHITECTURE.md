@@ -205,11 +205,11 @@ Policy design rules:
 
 ### 7.1 Personal macOS host
 
-The host is development-only. We must not run OverlayFS, eBPF, privileged container, destructive filesystem, or host-wide bind-mount experiments directly on it.
+The host is development-only. We must not run OverlayFS, eBPF, destructive filesystem, or host-wide bind-mount experiments directly on it.
 
-### 7.2 Docker on macOS
+### 7.2 Direct Ubuntu VM
 
-Docker Desktop runs Linux containers inside a managed Linux VM. It is useful for Go userspace tests, fixtures, and tooling, but Docker is not required for the kernel MVP. Direct execution inside the disposable Ubuntu VM is the default because it keeps the kernel, capabilities, mounts, and safety boundary explicit. A privileged container is not the default kernel lab because it complicates capabilities and nested mount behavior.
+The kernel MVP runs directly inside an Ubuntu VM managed by UTM on the macOS host. This keeps the Linux kernel, capabilities, mounts, and safety boundary explicit.
 
 Recommended layout:
 
@@ -219,7 +219,7 @@ macOS host
         └── direct RewindBPF OverlayFS/eBPF integration tests
 ```
 
-Compose remains available as an optional reproducible tooling/CI layer. Never bind-mount the real project or personal home directory into a destructive test. Copy synthetic fixtures into the VM or container instead.
+Never bind-mount the real project or personal home directory into a destructive test. Copy synthetic fixtures into the VM instead.
 
 ### 7.3 Full filesystem mode
 
@@ -286,9 +286,9 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 |---|---|---|
 | Bootstrap repository | Complete | Initial Go module, CLI, Makefile, policy example |
 | English project documentation | Complete | README, plan, architecture, benchmark, eBPF, test docs |
-| Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3; Docker Desktop client 27.4.0; Docker context `desktop-linux` |
+| Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
-| Stage 2 disposable Linux lab | Definition ready; execution gated | UTM Ubuntu VM is required; direct VM execution is primary; Compose is optional |
+| Stage 2 disposable Linux lab | Definition ready; execution gated | UTM Ubuntu VM is required; direct VM execution is the only path |
 | Stage 3 OverlayFS rollback | Not started | Safety gate required |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
@@ -308,7 +308,7 @@ After each implementation stage:
 Before any risky test, stop and present:
 
 - exact command(s)
-- exact VM/container/path scope
+- exact VM/filesystem scope
 - required privileges
 - expected side effects
 - rollback/recovery path
@@ -335,16 +335,20 @@ make build
 rewind policy check policies/example.yaml
 ```
 
-The CLI smoke test uses a randomly created temporary directory containing only synthetic data. It does not load eBPF, mount filesystems, use privileged containers, or touch the personal project tree.
+The CLI smoke test uses a randomly created temporary directory containing only synthetic data. It does not load eBPF, mount filesystems, or touch the personal project tree.
 
-## 14. Reproducible lab options
+## 14. Reproducible VM setup
 
-The primary lab is a direct Ubuntu VM installation. `infra/compose.yaml` is optional and defines two profiles for users who want containerized tooling:
+The primary lab is a direct Ubuntu VM installation created in UTM.
 
-- `userspace`: non-privileged Go/tooling container for safe local checks.
-- `kernel`: intentionally privileged container for OverlayFS, namespace, and eBPF integration inside the disposable Ubuntu VM.
+Recommended VM settings:
 
-Compose cannot create the UTM VM itself. The VM remains the outer safety boundary. The direct path keeps the toolchain on the VM; the optional Compose path makes userspace tooling and named test volumes reproducible. The Compose kernel profile uses no host bind mounts and runs with `network_mode: none` by default, but is not the approved first kernel path.
+- Ubuntu Server 24.04 ARM64
+- 4 virtual CPUs
+- 8 GB RAM
+- 40 GB virtual disk
+- NAT/shared networking
+- no host shared folders
 
 Approved first execution sequence:
 

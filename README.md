@@ -12,9 +12,9 @@ Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITE
 
 ## Safety warning
 
-Do not run kernel, mount, privileged-container, or destructive tests directly on a personal host. RewindBPF integration tests must run in a disposable Ubuntu VM or an explicitly created test image. Do not bind-mount a real home directory, real project, `.env`, SSH keys, or personal data into a destructive test.
+Do not run kernel, mount, or destructive tests directly on a personal host. RewindBPF integration tests must run in a disposable Ubuntu VM or an explicitly created test image. Do not bind-mount a real home directory, real project, `.env`, SSH keys, or personal data into a destructive test.
 
-Docker is not required for the kernel MVP. Docker Desktop on macOS is optional for userspace tests. The approved integration-test boundary is a disposable Ubuntu VM where RewindBPF runs directly. The recommended layout is:
+The approved integration-test boundary is a disposable Ubuntu VM where RewindBPF runs directly. The recommended layout is:
 
 ```text
 macOS host → disposable Ubuntu VM → RewindBPF directly
@@ -84,9 +84,7 @@ tests/            integration-test safety notes
 - Go 1.22 or newer
 - Linux VM for kernel integration
 - OverlayFS, BPF/BTF, and Landlock support in the VM kernel
-- Docker/Compose are optional tooling and are not required for the kernel MVP
-
-The reproducible environment options are documented in [infra/README.md](infra/README.md). Direct VM execution is the primary path; Compose is optional and is not a replacement for the VM safety boundary.
+The disposable VM setup and safety boundary are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The MVP runs directly inside that VM.
 
 ## Verification
 
