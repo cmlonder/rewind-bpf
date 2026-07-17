@@ -1,0 +1,10 @@
+.git
+.gitignore
+bin
+benchmarks/results
+runtime
+tmp
+logs
+*.qcow2
+*.img
+*.iso

@@ -86,6 +86,8 @@ tests/            integration-test safety notes
 - OverlayFS, BPF/BTF, and Landlock support in the VM kernel
 - Docker is optional for userspace tooling, not required for the first Go build
 
+The reproducible lab definition is in [infra/README.md](infra/README.md). Compose is intended to run inside the disposable Ubuntu VM; it is not a replacement for the VM safety boundary.
+
 ## Verification
 
 ```bash

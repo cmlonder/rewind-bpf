@@ -2,7 +2,7 @@
 
 **Document status:** Living document
 
-**Current stage:** Stage 1 — safe fixtures, manifests, and policy contract
+**Current stage:** Stage 2 — reproducible Linux lab definition (not started)
 
 **Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
@@ -289,7 +289,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | English project documentation | Complete | README, plan, architecture, benchmark, eBPF, test docs |
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3; Docker Desktop client 27.4.0; Docker context `desktop-linux` |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
-| Stage 2 disposable Linux lab | Blocked on explicit environment decision | No VM provisioning performed |
+| Stage 2 disposable Linux lab | Definition ready; execution gated | UTM Ubuntu VM is required; Compose profiles are defined but not started |
 | Stage 3 OverlayFS rollback | Not started | Safety gate required |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
@@ -337,3 +337,27 @@ rewind policy check policies/example.yaml
 ```
 
 The CLI smoke test uses a randomly created temporary directory containing only synthetic data. It does not load eBPF, mount filesystems, use privileged containers, or touch the personal project tree.
+
+## 14. Reproducible lab definition
+
+`infra/compose.yaml` defines two profiles:
+
+- `userspace`: non-privileged Go/tooling container for safe local checks.
+- `kernel`: intentionally privileged container for OverlayFS, namespace, and eBPF integration inside the disposable Ubuntu VM.
+
+Compose cannot create the UTM VM itself. The VM remains the outer safety boundary; Compose makes the inner toolchain and named test volumes reproducible. The kernel profile uses no host bind mounts and runs with `network_mode: none` by default.
+
+The approved execution sequence is:
+
+```text
+UTM Ubuntu VM
+  → install Docker Engine/Compose
+  → copy repository into VM
+  → compose config (read-only validation)
+  → safety review
+  → compose build
+  → separate approval
+  → privileged compose up
+```
+
+The first Stage 2 action is only `docker compose ... config`. No container is started until the exact VM and command scope are reviewed.
