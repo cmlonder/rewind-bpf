@@ -1,0 +1,39 @@
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Go
+bin/
+dist/
+*.test
+*.out
+coverage.out
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+
+# Runtime data
+.rewind/
+runtime/
+tmp/
+logs/
+benchmarks/results/
+
+# VM/build artifacts
+.vagrant/
+*.qcow2
+*.img
+*.iso
+*.raw
+
+# Generated eBPF artifacts
+ebpf/*.o
+ebpf/*.skel.h
+ebpf/vmlinux.h

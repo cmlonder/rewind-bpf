@@ -1,0 +1,20 @@
+# RewindBPF read policy example.
+# This file is intentionally non-secret and safe to commit.
+
+read:
+  mode: enforce # off | audit | enforce
+  deny:
+    - "**/.env"
+    - "**/*.pem"
+    - "**/*.key"
+    - "/home/*/.ssh/**"
+    - "/data/pii/**"
+  allow:
+    - "/workspace/.env.example"
+
+write:
+  mode: rollback
+  scope: workspace
+
+network:
+  mode: audit # off | audit | enforce
