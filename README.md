@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-This repository is an early bootstrap. The CLI is scaffolded, while OverlayFS, eBPF, namespace, and policy enforcement are being implemented incrementally in a disposable Linux environment.
+Stage 1 is complete: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, and CLI smoke checks are available. OverlayFS, eBPF, namespace, and policy enforcement are being implemented incrementally in a disposable Linux environment.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -52,15 +52,21 @@ write:
   scope: workspace
 ```
 
-## Bootstrap CLI
+## Safe local commands
 
-The current CLI only exposes the planned command surface and does not yet perform kernel operations:
+These commands do not perform kernel operations. They are safe to run on a development host because fixtures are synthetic and manifests operate on the directory explicitly supplied by the user:
 
 ```bash
 make build
 make test
 ./bin/rewind --help
+./bin/rewind fixture create /tmp/rewind-fixture
+./bin/rewind manifest create /tmp/rewind-fixture /tmp/rewind-manifest.json
+./bin/rewind manifest verify /tmp/rewind-fixture /tmp/rewind-manifest.json
+./bin/rewind policy check policies/example.yaml
 ```
+
+The runtime commands (`run`, `status`, `events`, `rollback`, and `commit`) currently expose the planned interface only; they will remain disabled until the Linux VM integration stages are completed.
 
 ## Repository layout
 

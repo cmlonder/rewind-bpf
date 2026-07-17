@@ -1,8 +1,10 @@
 # RewindBPF — Technical Architecture and Business Flows
 
-**Document status:** Living document  
-**Current stage:** Stage 0 — read-only environment inventory  
-**Last verified:** 2026-07-18  
+**Document status:** Living document
+
+**Current stage:** Stage 1 — safe fixtures, manifests, and policy contract
+
+**Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
 
 ## 1. Product and business purpose
@@ -285,8 +287,8 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 |---|---|---|
 | Bootstrap repository | Complete | Initial Go module, CLI, Makefile, policy example |
 | English project documentation | Complete | README, plan, architecture, benchmark, eBPF, test docs |
-| Stage 0 environment inventory | In progress | macOS arm64; Go 1.24.3; Docker Desktop client 27.4.0; Docker context `desktop-linux` |
-| Stage 1 fixtures/policy contract | Planned | No kernel operations yet |
+| Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3; Docker Desktop client 27.4.0; Docker context `desktop-linux` |
+| Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Blocked on explicit environment decision | No VM provisioning performed |
 | Stage 3 OverlayFS rollback | Not started | Safety gate required |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
@@ -314,3 +316,24 @@ Before any risky test, stop and present:
 - whether the test can touch the personal host
 
 No destructive test is implicit permission to touch the personal computer.
+
+## 13. Current Stage 1 implementation
+
+Stage 1 is intentionally host-safe and kernel-free:
+
+- `internal/fixture` creates synthetic workspace, fake secret, and fake PII files.
+- `internal/manifest` records portable file structure, mode, size, symlink target, and SHA-256 content hashes.
+- `internal/policy` parses YAML, validates `off/audit/enforce`, supports recursive `**` globs, and evaluates allow-over-deny decisions.
+- `internal/runid` creates unique run identifiers for later lifecycle state.
+- The CLI supports `fixture create`, `manifest create`, `manifest verify`, and `policy check`.
+
+Verified Stage 1 commands:
+
+```bash
+go test ./...
+go vet ./...
+make build
+rewind policy check policies/example.yaml
+```
+
+The CLI smoke test uses a randomly created temporary directory containing only synthetic data. It does not load eBPF, mount filesystems, use privileged containers, or touch the personal project tree.
