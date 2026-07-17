@@ -1,70 +1,70 @@
-# RewindBPF — Proje Kararları, Mimari ve MVP Planı
+# RewindBPF — Project Decisions, Architecture, and MVP Plan
 
-## 1. Proje özeti
+## 1. Project summary
 
-RewindBPF, işletim sistemi üzerinde kontrolsüz çalışan AI ajanlarının dosya bütünlüğünü bozmasını, hassas dosyaları okumasını ve izin verilmeyen kaynaklara erişmesini sınırlayan bir **AI Agent Safety Runtime**’dır.
+RewindBPF is an **AI Agent Safety Runtime** that limits an autonomous agent’s ability to corrupt filesystem integrity, read sensitive files, access unauthorized resources, or exhaust system resources.
 
-Ana ürün iddiası:
+Product thesis:
 
-> Ajanı her çalıştırmada izole bir filesystem transaction içinde başlatırız. eBPF davranışı ölçer, OverlayFS değişiklikleri hapseder, politika katmanı hassas erişimleri sınırlar; hata durumunda transaction tek hamlede geri alınır.
+> Start every agent run inside an isolated filesystem transaction. eBPF observes behavior, OverlayFS contains changes, policy controls sensitive access, and a failed transaction can be discarded in one operation.
 
-Mühendislik mottosu:
+Engineering motto:
 
-> Sıcak yolu ucuz tut, pahalı işi tembel (copy-on-write) yap.
+> Keep the hot path cheap; make expensive work lazy and copy-on-write.
 
-## 2. Problem ve çözüm
+## 2. Problem and solution
 
-AI ajanlarına terminal yetkisi verildiğinde önceden bilinmeyen yıkıcı işlemler yapabilirler:
+When an AI agent has terminal access, its destructive behavior cannot be fully predicted:
 
-- Dosya ve dizin silebilir veya üzerine yazabilir.
-- Hassas dosyaları (`.env`, SSH anahtarları, PII dizinleri) okuyabilir.
-- Yetki yükseltmeye, mount/ptrace yapmaya veya host’tan kaçmaya çalışabilir.
-- Yetkisiz ağ bağlantısıyla veri dışarı çıkarabilir.
-- Sonsuz process, CPU, RAM veya disk kullanımıyla sistemi kullanılmaz hale getirebilir.
+- It can delete or overwrite files and directories.
+- It can read secrets such as `.env` files, SSH keys, or PII directories.
+- It can attempt privilege escalation, `mount`, or `ptrace` operations.
+- It can make unauthorized network connections and exfiltrate data.
+- It can exhaust CPU, memory, process IDs, or disk space.
 
-Klasik işlem öncesi `cp` yedekleri her işlemde I/O ve latency üretir. RewindBPF’nin çözümü, ajan başlamadan önce OverlayFS katmanı kurmak ve değişiklikleri fiziksel kopyalama yerine copy-on-write ile üst katmana yönlendirmektir.
+Traditional pre-operation `cp` backups add I/O and latency to every operation. RewindBPF creates the OverlayFS layer before the agent starts and routes changes to a copy-on-write upper layer instead.
 
-## 3. En kritik mimari düzeltme
+## 3. Critical architecture correction
 
-eBPF olayı gördükten sonra snapshot almıyoruz. `unlink` veya `write` başladıktan sonra userspace daemon’ın OverlayFS kurması güvenli değildir.
+We do not create a snapshot after eBPF observes a destructive event. By the time a userspace daemon reacts to `unlink` or `write`, the operation may already have started.
 
-Doğru akış:
+Correct flow:
 
 ```text
-Agent başlamadan önce:
-  lowerdir = orijinal, tercihen salt-okunur katman
-  upperdir = geçici değişiklik katmanı
-  workdir  = OverlayFS çalışma alanı
-  merged   = ajanın gördüğü çalışma alanı
+Before the agent starts:
+  lowerdir = original, preferably read-only layer
+  upperdir = temporary change layer
+  workdir  = OverlayFS work directory
+  merged   = workspace visible to the agent
 
-Agent çalışırken:
-  okumalar lower/upper birleşiminden gelir
-  yazmalar ve silmeler upperdir’a gider
-  eBPF olayları gözlemler ve politika olaylarını üretir
+While the agent runs:
+  reads come from the lower/upper union
+  writes and deletes go to upperdir
+  eBPF observes events and produces policy signals
 
 Rollback:
-  agent durdurulur
-  merged unmount edilir
-  upperdir atılır
-  lowerdir tekrar görünür hale gelir
+  stop the agent
+  unmount merged
+  discard upperdir
+  expose lowerdir again
 ```
 
-OverlayFS, alt katmanı gerçekten değiştirmeden silmeleri whiteout kayıtlarıyla ve yazmaları copy-up ile temsil eder. Üst katmanın atılması rollback’in temel mekanizmasıdır. OverlayFS bir yedekleme sistemi değildir; önceden kurulmuş geçici bir çalışma katmanıdır.
+OverlayFS represents deletes with whiteouts and writes with copy-up without modifying the lower layer. Discarding the upper layer is the core rollback mechanism. OverlayFS is not a backup system; it is a pre-created temporary working layer.
 
-## 4. Ürün tanımı ve çalışma modları
+## 4. Product definition and operating modes
 
-Çekirdek ürün, Linux üzerinde çalışan bir runtime uygulamasıdır; bir AI agent değildir.
+The core product is a Linux runtime application, not an AI agent.
 
 ```text
 rewind          CLI
 rewindd         userspace daemon
-ebpf/*.bpf.c    kernel sensör/policy programları
+ebpf/*.bpf.c    kernel sensor/policy programs
 OverlayFS       filesystem transaction
-Landlock/LSM    erişim kontrolü
-namespace/VM    izolasyon
+Landlock/LSM    access control
+namespace/VM   isolation
 ```
 
-Örnek kullanım hedefi:
+Target usage:
 
 ```bash
 rewind run --workspace ./project --policy policy.yaml -- agent-command
@@ -74,29 +74,29 @@ rewind rollback run_42
 rewind commit run_42
 ```
 
-Çalışma alanı kapsamları:
+Filesystem scopes:
 
-- `workspace`: yalnızca proje/workspace korunur; ilk geliştirme modu.
-- `system`: disposable Linux VM içinde normal filesystem’in tamamı transaction sınırına alınır.
+- `workspace`: protect only the project/workspace; this is the first development mode.
+- `system`: protect the normal filesystem inside a disposable Linux VM.
 
-“Tüm host filesystem’i koruma” MVP’den çıkarılmıyor; ancak güvenli ve tekrarlanabilir demosu disposable VM içinde yapılacak. Canlı host üzerindeki `/proc`, `/sys`, device state, kernel state, açık file descriptor’lar ve ağ durumu OverlayFS rollback kapsamı değildir.
+“Protect the entire host filesystem” is not removed from the MVP, but its safe and reproducible demonstration is performed inside a disposable VM. A live host’s `/proc`, `/sys`, device state, kernel state, open file descriptors, and network state are not fully reversible through OverlayFS.
 
-## 5. Güvenlik katmanları
+## 5. Security layers
 
-### 5.1 Dosya bütünlüğü
+### 5.1 Filesystem integrity
 
-OverlayFS ile aşağıdaki değişiklikler geri alınır:
+OverlayFS should make these changes reversible:
 
 - `write`, `pwrite`, `truncate`, `ftruncate`, `fallocate`
 - `unlink`, `rmdir`, `rename`
-- Yeni dosya/dizin, symlink veya link oluşturma
-- Metadata değişiklikleri (MVP kapsamına göre)
+- New files, directories, symlinks, or links
+- Metadata changes, according to the MVP scope
 
-eBPF hedeflenen process/cgroup için `execve`, `openat/openat2`, `write`, `unlinkat`, `renameat2`, `truncate/ftruncate` gibi olayları gözlemler. Tek bir `sys_enter_write` hook’u tüm yazma yollarını kapsamaz; bu nedenle gözlem kapsamı açıkça belgelenir.
+eBPF observes target process/cgroup events such as `execve`, `openat/openat2`, `write`, `unlinkat`, `renameat2`, and `truncate/ftruncate`. A single `sys_enter_write` hook does not cover every write path; the observation boundary must be documented.
 
-### 5.2 Okuma gizliliği
+### 5.2 Read confidentiality
 
-`.env` yalnızca örnek pattern’dir. Kullanıcı pattern tabanlı politika tanımlar:
+`.env` is only an example. Users define glob-based policies:
 
 ```yaml
 read:
@@ -111,218 +111,240 @@ read:
     - "/workspace/.env.example"
 ```
 
-Modlar:
+Modes:
 
-- `off`: okuma koruması kapalı.
-- `audit`: erişim loglanır, işlem engellenmez.
-- `enforce`: erişim reddedilir ve event üretilir.
+- `off`: read protection is disabled.
+- `audit`: access is logged but not blocked.
+- `enforce`: access is denied and an event is emitted.
 
-Kullanıcı pattern’i glob olarak yazar; policy compiler bunu filesystem hiyerarşisi ve erişim kurallarına dönüştürür. Path string’ini her syscall’da regex ile eşleştirmek yerine Landlock ve/veya BPF LSM enforcement kullanılmalıdır. eBPF tracepoint’i audit ve telemetry için uygundur; tek başına güvenilir deny mekanizması olarak sunulmaz.
+Users write glob patterns; a policy compiler turns them into filesystem hierarchy and access rules. Avoid running expensive regex matching on every read syscall. Use Landlock and/or BPF LSM for enforcement. eBPF tracepoints are useful for audit and telemetry but should not be presented as the sole deny mechanism.
 
-İlk MVP path tabanlı erişim kontrolü yapar. Dosya içeriğinden otomatik PII sınıflandırması ve redaction sonraki aşamadır.
+The first MVP provides path-based access control. Automatic content-based PII classification and redaction are future work.
 
-### 5.3 Ayrıcalık, ağ ve kaynak politikaları
+### 5.3 Privilege, network, and resource policies
 
-Gelecek veya sınırlı MVP politikaları:
+Future or limited-MVP policies:
 
-| Risk | Uygun katman |
+| Risk | Suitable layer |
 |---|---|
-| `mount`, `ptrace`, setuid, BPF erişimi | BPF LSM + seccomp |
-| Yetkisiz network bağlantısı | Network namespace + cgroup eBPF |
-| Fork bombası, CPU/RAM/PID tüketimi | cgroups |
-| Host path veya kernel arayüzü erişimi | namespaces + Landlock |
-| Süreç zinciri ve komut soy ağacı | eBPF `execve` telemetry |
+| `mount`, `ptrace`, setuid, BPF access | BPF LSM + seccomp |
+| Unauthorized network connections | Network namespace + cgroup eBPF |
+| Fork bombs and CPU/RAM/PID exhaustion | cgroups |
+| Host paths or kernel interfaces | namespaces + Landlock |
+| Process lineage and command ancestry | eBPF `execve` telemetry |
 
-eBPF bütün güvenlik işlerini tek başına yapmaz; kernel hook’ları, namespace, Landlock, seccomp ve cgroups tamamlayıcı katmanlardır.
+eBPF does not perform every security function by itself. Kernel hooks, namespaces, Landlock, seccomp, and cgroups are complementary layers.
 
-## 6. Teknik stack
+## 6. Technical stack
 
-- **Linux VM:** Ubuntu/Debian, OverlayFS ve BPF/BTF destekli kernel.
-- **Filesystem:** ext4 ile tekrarlanabilir ilk deney ortamı.
-- **eBPF:** C + libbpf/CO-RE; kernel sensörlerinin ve mümkünse BPF LSM hook’larının taşınabilir yüklenmesi.
-- **Daemon:** Go; process, mount namespace, policy, ring buffer, JSON ve CLI orkestrasyonu.
-- **Policy:** YAML/JSON giriş, glob pattern, `off/audit/enforce` modları.
-- **CLI:** İlk MVP’de web UI yok; terminal timeline ve komutlar yeterli.
-- **Benchmark:** `hyperfine`, `fio`, `fs_mark`, `perf stat`, custom Go workload runner.
-- **Doğrulama:** Hash/metadata manifest, JSON event log ve CSV/JSON benchmark çıktısı.
+- **Linux VM:** Ubuntu/Debian with OverlayFS and BPF/BTF support.
+- **Filesystem:** ext4 for the first reproducible environment.
+- **eBPF:** C + libbpf/CO-RE for portable kernel sensors and, where supported, BPF LSM hooks.
+- **Daemon:** Go for process management, mount namespaces, policy handling, ring buffers, JSON, and CLI orchestration.
+- **Policy:** YAML/JSON input, glob patterns, and `off/audit/enforce` modes.
+- **CLI:** no web UI in the first MVP; terminal timeline and commands are sufficient.
+- **Benchmarks:** `hyperfine`, `fio`, `fs_mark`, `perf stat`, and a custom Go workload runner.
+- **Verification:** hash/metadata manifests, JSON event logs, and CSV/JSON benchmark output.
 
-Rust + Aya uygulanabilir bir alternatiftir; 7 günlük MVP’de Go + C/libbpf daha düşük entegrasyon riski taşır.
+Rust + Aya is a valid alternative; Go + C/libbpf is the lower-risk choice for a seven-day MVP.
 
-## 7. Benchmark stratejisi
+## 7. Benchmark strategy
 
-### 7.1 Karşılaştırma grupları
+### 7.1 Comparison groups
 
-| Grup | Filesystem | eBPF | Daemon | Amaç |
+| Group | Filesystem | eBPF | Daemon | Purpose |
 |---|---|---:|---:|---|
-| B0 | Native ext4 | Yok | Yok | Saf baseline |
-| B1 | Native ext4 | Var | Yok | Sadece eBPF maliyeti |
-| B2 | OverlayFS | Yok | Yok | OverlayFS maliyeti |
-| B3 | OverlayFS | Var | Yok | eBPF + OverlayFS |
-| B4 | OverlayFS | Var | Var | Gerçek ürün yolu |
-| B5 | OverlayFS | Var | Var + policy | Pause/kill enforcement maliyeti |
+| B0 | Native ext4 | No | No | Pure baseline |
+| B1 | Native ext4 | Yes | No | eBPF-only cost |
+| B2 | OverlayFS | No | No | OverlayFS cost |
+| B3 | OverlayFS | Yes | No | eBPF + OverlayFS |
+| B4 | OverlayFS | Yes | Yes | Real product path |
+| B5 | OverlayFS | Yes | Yes + policy | Pause/kill enforcement cost |
 
-Ana karşılaştırma B0 ↔ B4’tür; B1 ve B2 maliyetin kaynağını ayrıştırır.
+The primary comparison is B0 ↔ B4. B1 and B2 isolate where overhead comes from.
 
-### 7.2 Deney kontrolü
+### 7.2 Experiment controls
 
-- Önce B0 baseline alınır.
-- 3 warm-up, en az 15 ölçümlü tekrar.
-- Cold-cache ve warm-cache ayrı raporlanır.
-- Aynı VM, kernel, CPU governor, disk, mount seçenekleri ve dataset kullanılır.
-- Background servisler azaltılır; dataset ve workload seed’i sabitlenir.
-- Her sonuçta commit hash, kernel config, dataset manifest ve komut saklanır.
+- Establish B0 before implementation changes.
+- Use three warm-up runs and at least 15 measured repetitions.
+- Report cold-cache and warm-cache results separately.
+- Keep VM, kernel, CPU governor, disk, mount options, and dataset fixed.
+- Minimize background services and keep workload seeds deterministic.
+- Store the command, commit hash, kernel configuration, and dataset manifest for every result.
 
-### 7.3 Workload’lar
+### 7.3 Workloads
 
-- Read-heavy: `rg`, `find`, `git status`, küçük/büyük dosya okuma, derleme/test.
-- Write-heavy: 10.000 küçük dosya, append, büyük dosya overwrite, truncate, rename.
-- Metadata-heavy: create/unlink, recursive rename, chmod/chown, symlink/hardlink.
-- Mixed agent: create → modify → rename → delete → `rm -rf src/` → new files.
-- Concurrency: 1, 2 ve 4 paralel agent.
-- Policy: deny hit, audit hit, allow hit, event flood.
+- Read-heavy: `rg`, `find`, `git status`, small/large file reads, builds, and tests.
+- Write-heavy: 10,000 small files, append, large-file overwrite, truncate, and rename.
+- Metadata-heavy: create/unlink, recursive rename, chmod/chown, symlink, and hardlink.
+- Mixed agent: create → modify → rename → delete → `rm -rf src/` → create new files.
+- Concurrency: one, two, and four parallel agents.
+- Policy: deny hit, audit hit, allow hit, and event flood.
 
-### 7.4 Metrikler
+### 7.4 Metrics
 
-- Toplam süre ve throughput.
-- p50, p95, p99 latency.
-- CPU cycles, CPU yüzdesi, context switch, page fault.
-- Read/write I/O bytes, peak RSS.
-- eBPF event latency ve dropped event sayısı.
-- Copy-up süresi ve `upperdir` boyutu.
-- Görünür kurtarma süresi ve tam cleanup süresi.
-
-Formüller:
+- Total duration and throughput.
+- p50, p95, and p99 latency.
+- CPU cycles, CPU utilization, context switches, and page faults.
+- Read/write I/O bytes and peak RSS.
+- eBPF event latency and dropped events.
+- Copy-up time and upperdir size.
+- Visible recovery time and full cleanup time.
 
 ```text
 overhead (%) = ((variant_time - baseline_time) / baseline_time) × 100
 space amplification = upperdir_bytes / logical_changed_bytes
 ```
 
-İlk hedefler hipotezdir, garanti değildir: read-heavy işlerde düşük tek haneli overhead, mixed işlerde kabul edilebilir overhead, demo workspace’inde 1 saniyeye yakın görünür rollback ve normal workload’ta sıfır event loss.
+Initial targets are hypotheses, not guarantees: low single-digit overhead for read-heavy work, acceptable overhead for mixed work, near-one-second visible rollback for the demo workspace, and zero event loss under normal workload.
 
-## 8. Doğruluk ve güvenlik testleri
+## 8. Correctness and security tests
 
-Her testten önce lower layer manifest’i oluşturulur. Rollback sonrasında içerik, dosya yapısı, mode, UID/GID, symlink hedefi, xattr ve boyut/timestamp karşılaştırılır.
+Create a lower-layer manifest before every test. Compare content, file structure, mode, UID/GID, symlink targets, xattrs, size, and timestamps after rollback.
 
-Temel senaryolar:
+Core scenarios:
 
-1. Dosya değiştirme → eski içerik geri gelir.
-2. Dosya silme → dosya geri gelir.
-3. Recursive `rm -rf src/` → tüm ağaç geri gelir.
-4. Yeni dosya oluşturma → rollback sonrası yok olur.
-5. Dizin rename → eski isim geri gelir.
-6. Büyük dosya overwrite → eski içerik korunur.
-7. Agent `kill -9` → rollback çalışır.
-8. Daemon kapanması → OverlayFS sınırı korumayı sürdürür; yeni run başlatma fail-closed olur.
-9. Event flood → queue taşması ve event loss görünür.
-10. Kullanıcı pattern’i → `off/audit/enforce` davranışı doğrulanır.
-11. Yasaklı `.env`, `.pem`, SSH veya PII path’i → enforce modunda okunamaz.
-12. Symlink/path traversal → workspace dışına erişim politikaya göre engellenir.
-13. Yetkisiz network → bağlantı policy’ye göre deny/audit olur.
-14. Açık file descriptor, dış writer ve host mount davranışı belgelenir.
-15. Başarılı run → commit/export sonrası beklenen diff korunur.
+1. Modify a file → original content returns.
+2. Delete a file → file returns.
+3. Recursive `rm -rf src/` → the complete tree returns.
+4. Create a new file → it disappears after rollback.
+5. Rename a directory → the old name returns.
+6. Overwrite a large file → original content is preserved.
+7. Kill the agent with `kill -9` → rollback still works.
+8. Stop the daemon → the OverlayFS boundary continues protecting the current run; new runs fail closed.
+9. Flood events → queue overflow and event loss are visible.
+10. User policy → `off/audit/enforce` behavior is verified.
+11. Denied `.env`, `.pem`, SSH, or PII path → read is blocked in enforce mode.
+12. Symlink/path traversal → policy prevents access outside the allowed scope.
+13. Unauthorized network → connection is audited or denied according to policy.
+14. Open file descriptors, external writers, and host mounts are documented.
+15. Successful run → commit/export preserves the expected diff.
 
-Ana invariant:
+Primary invariant:
 
-> Rollback sonrası lower layer değişmemiş olmalı ve koruma alanı dışındaki sentinel dosyalar aynı kalmalıdır.
+> After rollback, the lower layer is unchanged and sentinel files outside the protected scope are unchanged.
 
-## 9. Büyük demo akışı
+## 9. Main demo flow
 
-1. Ajan izole VM/workspace transaction’ında başlatılır.
-2. Normal dosya değişiklikleri eBPF timeline’ında görünür.
-3. Ajan `rm -rf src/` çalıştırır.
-4. OverlayFS alt katmanı sağlam tutar; üst katmanda deletion kayıtları oluşur.
-5. `rewind rollback <run_id>` çalıştırılır.
-6. Proje geri gelir ve hash manifest’i kurtarmayı kanıtlar.
-7. İkinci sahnede ajan `.env` veya kullanıcı tanımlı hassas pattern’i okumaya çalışır.
-8. Erişim `audit` veya `enforce` moduna göre loglanır/reddedilir.
+1. Start the agent inside an isolated VM/workspace transaction.
+2. Show normal file events in the eBPF timeline.
+3. Let the agent execute `rm -rf src/`.
+4. Show that the lower layer remains intact and deletion records exist only in the upper layer.
+5. Run `rewind rollback <run_id>`.
+6. Show the project returning and prove recovery with the hash manifest.
+7. Let the agent attempt to read `.env` or another user-defined sensitive pattern.
+8. Show the access being audited or denied according to policy mode.
 
-## 10. Kapsam ve kapsam dışı
+## 10. Scope and non-goals
 
-### MVP kapsamı
+### MVP scope
 
-- Linux VM ve tekrarlanabilir kurulum.
+- Linux VM and reproducible setup.
 - Workspace OverlayFS transaction.
 - eBPF process/filesystem telemetry.
 - Rollback.
-- Kullanıcı tanımlı read pattern politikası.
-- `.env` gibi örneklerin yanında genel glob desteği.
-- Disposable VM içinde system scope deneyi.
-- B0–B5 benchmark matrisi.
+- User-defined read patterns.
+- General glob support rather than a hardcoded `.env` rule.
+- System-scope experiment inside a disposable VM.
+- B0–B5 benchmark matrix.
 
-### Kapsam dışı veya sonraki aşama
+### Out of scope or later
 
-- Tüm içeriklerde otomatik PII sınıflandırma/redaction.
-- Genel host üzerinde mutlak kernel/cihaz/ağ rollback’i.
-- Karmaşık çatışma çözebilen production-grade merge.
-- Çoklu filesystem ve network filesystem garantisi.
-- Web dashboard ve IDE entegrasyonu.
+- Automatic PII classification/redaction for all file contents.
+- Absolute rollback of live-host kernel, device, or network state.
+- Production-grade conflict-aware merge.
+- Multi-filesystem and network-filesystem guarantees.
+- Web dashboard and IDE integration.
 
-## 11. 7 günlük build planı
+## 11. Seven-day build plan
 
-### Gün 1 — Ortam ve baseline
+### Day 1 — Environment and baseline
 
-- Ubuntu VM, kernel ve araçlar.
-- OverlayFS/eBPF/Landlock capability check.
+- Ubuntu VM, kernel, and tools.
+- OverlayFS/eBPF/Landlock capability checks.
 - Deterministic dataset generator.
 - B0 native filesystem baseline.
 
-### Gün 2 — OverlayFS sandbox
+### Day 2 — OverlayFS sandbox
 
-- lower/upper/work/merged yaşam döngüsü.
+- lower/upper/work/merged lifecycle.
 - Workspace mode.
-- Agent process başlatma ve namespace izolasyonu.
-- Basit rollback.
+- Agent process launch and namespace isolation.
+- Basic rollback.
 
-### Gün 3 — eBPF telemetry
+### Day 3 — eBPF telemetry
 
-- `execve`, `openat`, `unlinkat`, `renameat2`, write/truncate event’leri.
+- `execve`, `openat`, `unlinkat`, `renameat2`, write/truncate events.
 - Ring buffer → Go daemon.
-- PID/cgroup filtreleme ve event JSON logu.
+- PID/cgroup filtering and JSON event logs.
 
-### Gün 4 — Read policy
+### Day 4 — Read policy
 
 - YAML policy parser.
 - Glob → filesystem rule compiler.
-- `off/audit/enforce` modları.
-- Landlock/BPF LSM veya desteklenen kernel enforcement.
+- `off/audit/enforce` modes.
+- Landlock/BPF LSM or supported-kernel enforcement.
 
-### Gün 5 — CLI, lifecycle ve fail-safe
+### Day 5 — CLI, lifecycle, and fail-safe behavior
 
-- `run`, `status`, `events`, `rollback`, `commit` komutları.
-- Crash/daemon failure davranışı.
-- Workspace dışında erişim ve sentinel testleri.
+- `run`, `status`, `events`, `rollback`, `commit` commands.
+- Crash and daemon-failure behavior.
+- Workspace boundary and sentinel tests.
 
-### Gün 6 — Benchmark ve doğruluk
+### Day 6 — Benchmarks and correctness
 
-- B1–B5 ölçümleri.
-- Correctness test matrisi.
-- Hash manifest, event loss ve rollback ölçümü.
-- Grafik ve CSV/JSON artifact’leri.
+- B1–B5 measurements.
+- Correctness test matrix.
+- Hash manifests, event loss, and rollback timing.
+- Graphs and CSV/JSON artifacts.
 
-### Gün 7 — Demo ve sunum
+### Day 7 — Demo and presentation
 
-- Deterministic destructive agent demo.
+- Deterministic destructive-agent demo.
 - Secret-read policy demo.
-- Recovery proof ve latency göstergesi.
-- Teknik iddia, sınırlamalar ve benchmark sonuçlarının son kontrolü.
+- Recovery proof and latency display.
+- Final review of technical claims, limitations, and benchmark results.
 
-## 12. Açık riskler
+## 12. Open risks
 
-- OverlayFS üst ve work dizinleri için filesystem/xattr/d_type gereksinimleri.
-- Root filesystem’i canlı host üzerinde overlay’leme karmaşıktır; system mode VM ile sınırlandırılır.
-- eBPF syscall telemetry tam filesystem semantiği değildir; mmap ve bazı indirect write yolları ayrıca ele alınmalıdır.
-- Event sonrası userspace kararı geçmiş işlemi geri alamaz; koruma önceden mount/policy ile sağlanır.
-- Açık file descriptor’lar ve agent’ın namespace/capability kaçışı açık tehdit modelidir.
-- “Sıfır overhead” yerine ölçülmüş “düşük hot-path overhead” iddiası kullanılmalıdır.
+- OverlayFS upper/work directories have filesystem, xattr, and `d_type` requirements.
+- Overlaying a live host root filesystem is complex; system mode is constrained to a VM.
+- eBPF syscall telemetry is not complete filesystem semantics; mmap and indirect write paths need separate treatment.
+- A userspace decision after an event cannot undo a past operation; protection must be pre-established with mount and policy layers.
+- Open file descriptors and namespace/capability escape are explicit threat-model items.
+- Use “measured low hot-path overhead,” not “zero overhead.”
 
-## 13. Karar özeti
+## 13. Decision summary
 
-- Çekirdek ürün: Linux userspace runtime + eBPF + OverlayFS.
-- eBPF snapshot başlatmaz; telemetry ve gerektiğinde enforcement sağlar.
-- Snapshot her agent run’ından önce hazırdır.
-- Rollback MVP’nin birincil işlevidir; commit basit/ kontrollü diff olarak kalır.
-- Okuma politikası `.env` hardcode değildir; kullanıcı glob pattern’i ve `off/audit/enforce` modları vardır.
-- Tüm host filesystem kapsamı VM içinde MVP’ye dahil edilir; canlı host kernel/device state için mutlak rollback iddiası yoktur.
-- Go + C/libbpf/CO-RE, 7 günlük sprint için seçilen stack’tir.
-- Benchmark önce B0 baseline ile başlar; B1–B5 katmanları sonradan karşılaştırılır.
+- Core product: Linux userspace runtime + eBPF + OverlayFS.
+- eBPF does not create snapshots; it provides telemetry and, where appropriate, enforcement.
+- A snapshot layer exists before every agent run.
+- Rollback is the primary MVP operation; commit remains a simple, controlled diff/export path.
+- Read protection is user-configurable with glob patterns and `off/audit/enforce` modes.
+- Full filesystem scope is included in the MVP inside a disposable VM; no absolute live-host kernel/device rollback claim is made.
+- Go + C/libbpf/CO-RE is the selected seven-day stack.
+- Benchmarking starts with B0 baseline, then compares B1–B5 layers.
+
+## 14. Safe execution roadmap
+
+No mount, eBPF load, privileged container, host bind mount, or destructive command should run on the personal host without an explicit safety review first.
+
+### Stage 0 — Environment decision
+
+Only read-only checks: host architecture, Docker status, Go version, virtualization options, and Git status. Decide whether to use an Ubuntu VM, Docker inside the VM, or both.
+
+### Stage 1 — Safe fixtures and policy contract
+
+Create synthetic fixtures, manifests, run IDs, policy parsing, and CLI contracts. Never use real `.env`, SSH keys, or personal data.
+
+### Stage 2 — Disposable Linux lab
+
+Inside an Ubuntu VM, verify OverlayFS, BPF/BTF, Landlock, and ext4 capabilities. Do not perform destructive operations yet.
+
+### Stage 3 — OverlayFS rollback
+
+Run the first controlled destructive test only against synthetic fixtures inside the disposable VM, after reviewing the exact command and rollback path.
+
+### Stage 4 onward
+
+Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.

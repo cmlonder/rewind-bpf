@@ -1,8 +1,8 @@
 # eBPF component
 
-Bu dizin kernel-space programlarını barındırır. Planlanan ilk program C + libbpf/CO-RE ile yazılacaktır.
+This directory will contain kernel-space programs. The first implementation will use C + libbpf/CO-RE.
 
-İlk gözlem noktaları:
+Initial observation points:
 
 - process `execve`
 - `openat/openat2`
@@ -10,4 +10,4 @@ Bu dizin kernel-space programlarını barındırır. Planlanan ilk program C + l
 - `renameat2`
 - `write`, `pwrite`, `truncate`, `ftruncate`
 
-Programlar yalnızca hedef agent PID/cgroup’larını filtrelemeli ve ring buffer üzerinden küçük event kayıtları göndermelidir. Path string’i üzerinde pahalı kullanıcı politikası eşleştirmesi kernel hot path’ine taşınmamalıdır.
+Programs must filter target agent PIDs/cgroups and emit small event records through a ring buffer. Expensive user policy matching must stay out of the kernel hot path.

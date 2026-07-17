@@ -1,13 +1,13 @@
 # Benchmarks
 
-Benchmark tasarımı ve B0–B5 karşılaştırma grupları [docs/PROJECT_PLAN.md](../docs/PROJECT_PLAN.md) içinde tanımlıdır.
+The benchmark design and B0–B5 comparison groups are defined in [docs/PROJECT_PLAN.md](../docs/PROJECT_PLAN.md).
 
-Planlanan yardımcı araçlar:
+Planned tools:
 
-- `hyperfine`: makro süre
-- `fio`: büyük I/O
-- `fs_mark`: küçük dosya/metadata
-- `perf stat`: CPU ve kernel sayaçları
-- Go workload runner: deterministic agent senaryoları
+- `hyperfine`: macro-level timing
+- `fio`: large-file I/O
+- `fs_mark`: small-file and metadata workloads
+- `perf stat`: CPU and kernel counters
+- Go workload runner: deterministic agent scenarios
 
-Ölçüm çıktıları JSON/CSV olarak `benchmarks/results/` altında tutulur; bu dizin `.gitignore` kapsamındadır.
+Results are stored as JSON/CSV under `benchmarks/results/`; that directory is ignored by Git.

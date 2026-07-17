@@ -1,40 +1,40 @@
 # RewindBPF
 
-RewindBPF, yapay zekâ ajanlarını Linux üzerinde geri alınabilir ve politika kontrollü filesystem transaction’ları içinde çalıştırmak için tasarlanan bir **AI Agent Safety Runtime** prototipidir.
+RewindBPF is an **AI Agent Safety Runtime** designed to run autonomous agents inside reversible, policy-controlled filesystem transactions on Linux.
 
-Temel fikir:
+Core idea:
 
 ```text
-Agent başlatılır
+Start the agent
     ↓
-Mount namespace + OverlayFS hazırlanır
+Prepare a mount namespace + OverlayFS
     ↓
-eBPF filesystem/process olaylarını gözlemler
+Observe filesystem/process events with eBPF
     ↓
-Landlock/BPF LSM okuma politikalarını uygular
+Enforce sensitive-read policies with Landlock/BPF LSM
     ↓
-Başarılıysa commit, hatalıysa rollback
+Commit on success, rollback on failure
 ```
 
-Bu proje bir AI agent, Codex skill’i veya IDE extension’ı değildir. Çekirdek ürün; bir Linux daemon’ı, CLI, eBPF programı ve OverlayFS tabanlı sandbox’tan oluşan runtime’dır. İleride MCP, plugin veya IDE adaptörleri eklenebilir.
+This project is not an AI agent, Codex skill, or IDE extension. The core product is a Linux daemon, CLI, eBPF program, and OverlayFS-based sandbox. MCP, plugin, or IDE adapters can be added later.
 
-## Durum
+## Status
 
-Bu commit başlangıç boilerplate’idir. Çalışan ürün davranışı henüz eklenmemiştir; mimari kararlar ve 7 günlük MVP planı için [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) dosyasına bakın.
+This repository is the bootstrap scaffold. Runtime behavior is not implemented yet; the architecture decisions and seven-day MVP plan are documented in [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
-## Hedeflenen bileşenler
+## Planned components
 
-- `rewind`: kullanıcı CLI’ı
-- `rewindd`: sandbox, process, policy ve rollback yöneticisi
-- `ebpf/`: C + libbpf/CO-RE kernel programları
-- OverlayFS: değişiklikleri üst katmanda tutan filesystem transaction katmanı
-- Landlock/BPF LSM: kullanıcı tanımlı filesystem erişim politikaları
-- VM/namespace: ajanı host’tan ayıran çalışma ortamı
-- `benchmarks/`: baseline, overhead ve rollback ölçümleri
+- `rewind`: user-facing CLI
+- `rewindd`: sandbox, process, policy, and rollback manager
+- `ebpf/`: C + libbpf/CO-RE kernel programs
+- OverlayFS: copy-on-write filesystem transaction layer
+- Landlock/BPF LSM: user-defined filesystem access policies
+- VM/namespaces: agent isolation
+- `benchmarks/`: baseline, overhead, and rollback measurements
 
-## Geliştirme
+## Development
 
-Gereksinimler: Go, Linux VM, OverlayFS ve eBPF/BTF destekli kernel.
+Requirements: Go, a Linux VM, OverlayFS, and a kernel with eBPF/BTF support.
 
 ```bash
 make build
@@ -42,4 +42,4 @@ make test
 ./bin/rewind --help
 ```
 
-Gerçek kernel entegrasyonu için macOS host yerine izole Ubuntu VM kullanılmalıdır. Ayrıntılı kapsam, güvenlik sınırları, benchmark matrisi ve test senaryoları proje planında tanımlıdır.
+Kernel integration must be developed in an isolated Ubuntu VM rather than directly on a macOS host. See the project plan for scope, security boundaries, benchmark design, and test scenarios.

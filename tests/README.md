@@ -1,5 +1,5 @@
 # Tests
 
-Entegrasyon testleri Linux VM içinde çalıştırılmalıdır. Host filesystem’e yönelik destructive testler yalnızca disposable VM veya açıkça oluşturulmuş test image’ında yapılır.
+Integration tests must run inside a Linux VM. Destructive tests against a filesystem are allowed only inside a disposable VM or an explicitly created test image.
 
-Her rollback testinden önce lower layer için hash/metadata manifest’i çıkarılır ve rollback sonrasında karşılaştırılır.
+Before every rollback test, create a hash/metadata manifest for the lower layer and compare it after rollback.
