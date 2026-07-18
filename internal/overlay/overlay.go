@@ -45,6 +45,29 @@ func NewLayout(root string) (Layout, error) {
 	return layout, nil
 }
 
+// NewLayoutWithLower creates a runtime layout whose lower layer is an
+// explicitly supplied immutable workspace. Keeping the original workspace as
+// lowerdir avoids an upfront copy; rollback only removes upper/work. The
+// caller must still provide a disposable or otherwise protected workspace.
+func NewLayoutWithLower(root, lower string) (Layout, error) {
+	layout, err := NewLayout(root)
+	if err != nil {
+		return Layout{}, err
+	}
+	if strings.TrimSpace(lower) == "" {
+		return Layout{}, fmt.Errorf("overlay lower path cannot be empty")
+	}
+	absLower, err := filepath.Abs(lower)
+	if err != nil {
+		return Layout{}, fmt.Errorf("resolve overlay lower path: %w", err)
+	}
+	layout.Lower = filepath.Clean(absLower)
+	if err := layout.Validate(); err != nil {
+		return Layout{}, err
+	}
+	return layout, nil
+}
+
 func (l Layout) Validate() error {
 	if l.Root == "" {
 		return fmt.Errorf("overlay root cannot be empty")
@@ -53,12 +76,7 @@ func (l Layout) Validate() error {
 	if root == string(filepath.Separator) {
 		return fmt.Errorf("refusing filesystem root as overlay runtime")
 	}
-	paths := map[string]string{
-		"lower":  l.Lower,
-		"upper":  l.Upper,
-		"work":   l.Work,
-		"merged": l.Merged,
-	}
+	paths := map[string]string{"upper": l.Upper, "work": l.Work, "merged": l.Merged}
 	seen := make(map[string]string, len(paths))
 	for name, value := range paths {
 		if value == "" || !filepath.IsAbs(value) {
@@ -77,7 +95,34 @@ func (l Layout) Validate() error {
 		}
 		seen[clean] = name
 	}
+	if l.Lower == "" || !filepath.IsAbs(l.Lower) {
+		return fmt.Errorf("overlay lower path must be absolute")
+	}
+	lower := filepath.Clean(l.Lower)
+	if lower == string(filepath.Separator) || strings.ContainsAny(lower, ",\n\r") {
+		return fmt.Errorf("overlay lower path is unsafe")
+	}
+	if isWithin(root, lower) && lower == root {
+		return fmt.Errorf("overlay lower path cannot equal runtime root")
+	}
+	if isWithin(lower, root) {
+		return fmt.Errorf("overlay runtime root cannot be inside lower path: %s", lower)
+	}
+	for name, value := range paths {
+		clean := filepath.Clean(value)
+		if clean == lower {
+			return fmt.Errorf("overlay lower path overlaps %s path", name)
+		}
+	}
 	return nil
+}
+
+func isWithin(root, candidate string) bool {
+	if root == candidate {
+		return true
+	}
+	rel, err := filepath.Rel(root, candidate)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func (l Layout) Prepare() error {

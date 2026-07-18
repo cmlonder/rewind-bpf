@@ -425,7 +425,8 @@ Keep these responsibilities separate:
 CLI             → parse user intent and render results
 run lifecycle   → run IDs and state transitions; process ownership is a later daemon boundary
 overlay         → lower/upper/work/merged filesystem lifecycle
-policy          → parse, validate, compile, and evaluate rules
+    policy          → parse, validate, compile, and evaluate rules
+    runplan         → compose one inert protected-run plan before execution
 eBPF            → kernel event collection and narrowly scoped hooks
 telemetry       → ring-buffer decoding and userspace event ingestion
 manifest        → content/metadata snapshot and verification
@@ -581,6 +582,19 @@ This proves the Landlock syscall boundary and allowlist semantics in isolation. 
 
 The opt-in OverlayFS integration test `TestOverlaySyntheticMountRollback` also passed in the disposable Ubuntu VM on 2026-07-18. It mounted a temporary lower/upper/work/merged layout, changed a marker through the merged view, rolled the run back, and verified that the lower marker still contained `lower-layer-original`. This proves the Go OverlayFS manager boundary in addition to the earlier manual smoke test.
 
+## 29. Stage 6 protected-run plan
+
+`internal/runplan` composes the pre-execution inputs without performing privileged work:
+
+- validates a non-root workspace and separate runtime root;
+- uses the original workspace directly as OverlayFS `lowerdir`, avoiding an upfront copy;
+- builds the immutable start-of-run manifest;
+- compiles the read policy against the future merged path;
+- creates a Landlock allowlist plan for `enforce` mode; and
+- creates the lifecycle record in `preparing` state.
+
+The package deliberately does not mount OverlayFS, start the agent, attach eBPF, or mutate lifecycle state. Those effects belong to the next coordinator boundary, which can be tested with injected runners before any VM integration. Its host-safe tests prove workspace/runtime containment, manifest composition, denied sensitive paths, and the resulting allowed-file plan.
+
 ### Optional BPF-LSM backend
 
 `ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:
@@ -600,4 +614,4 @@ test -r /sys/kernel/security/lsm && cat /sys/kernel/security/lsm
 bpftool feature probe kernel | grep -A3 -B2 'program types' | grep -i lsm
 ```
 
-`bpf` must appear in the active LSM list. A `bpf` program type reported by `bpftool` alone only proves kernel support; it does not prove that BPF-LSM enforcement is active. The current VM fails this optional gate, so no BPF-LSM program has been loaded. Landlock is the approved VM enforcement path for the next synthetic read test.
+`bpf` must appear in the active LSM list. A `bpf` program type reported by `bpftool` alone only proves kernel support; it does not prove that BPF-LSM enforcement is active. The current VM fails this optional gate, so no BPF-LSM program has been loaded. Landlock is the validated VM enforcement path.

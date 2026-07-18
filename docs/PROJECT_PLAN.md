@@ -352,7 +352,7 @@ Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope,
 
 ### Current continuation: protected-run lifecycle integration
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, and Go OverlayFS manager are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next implementation step is attaching both boundaries to the protected-run lifecycle.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, and inert `internal/runplan` composer are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next implementation step is the effectful coordinator that mounts, starts an isolated helper process, attaches telemetry, and owns rollback.
 
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v

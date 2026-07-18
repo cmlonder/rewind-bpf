@@ -45,6 +45,21 @@ func TestLayoutRejectsUnsafeRootsAndMountCharacters(t *testing.T) {
 	}
 }
 
+func TestLayoutCanUseAnExplicitWorkspaceAsLower(t *testing.T) {
+	runtimeRoot := filepath.Join(t.TempDir(), "run")
+	workspace := filepath.Join(t.TempDir(), "workspace")
+	layout, err := NewLayoutWithLower(runtimeRoot, workspace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if layout.Lower != workspace {
+		t.Fatalf("lower = %q, want %q", layout.Lower, workspace)
+	}
+	if _, err := NewLayoutWithLower(filepath.Join(workspace, "run"), workspace); err == nil {
+		t.Fatal("expected runtime root inside lower path to be rejected")
+	}
+}
+
 func TestMountBuildsExpectedCommandWithoutExecutingIt(t *testing.T) {
 	runner := &fakeRunner{}
 	layout, err := NewLayout(filepath.Join(t.TempDir(), "run"))
