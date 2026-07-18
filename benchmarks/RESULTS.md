@@ -16,6 +16,10 @@ These values are the measurements captured in the disposable Ubuntu 24.04 ARM64 
 
 B4 throughput was approximately 11.1% below B0 and 0.4% above B2. The current result is warm/page-cache exploratory data, not the final cold-cache claim.
 
+## Cold-cache control
+
+Three repetitions with `sync; echo 3 > /proc/sys/vm/drop_caches` before each run produced 43,674 KiB/s read and 18,691 KiB/s write for B0, versus 39,107 KiB/s read and 16,731 KiB/s write for B2. FUSE throughput was approximately 10.5% lower in the cold-cache control, consistent with the warm-cache result. The small three-run sample has higher variance and is reported as a control rather than a production performance guarantee.
+
 ## Telemetry result
 
 The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. The current PID-only sensor does not follow shell-launched child processes; cgroup/descendant scoping is a follow-up hardening item.

@@ -370,6 +370,8 @@ The B4 protected-run measurement used five fio repetitions inside one FUSE-backe
 
 The static footprint measurement is 5,670,919 bytes for the `rewind` binary and 21,352 bytes for the eBPF object. The direct telemetry run record was 746 bytes, and the JSONL event stream averaged 148.5 bytes per event.
 
+The cold-cache control used `sync; echo 3 > /proc/sys/vm/drop_caches` before each of three repetitions. B0 averaged 43,674 KiB/s read and 18,691 KiB/s write; B2 averaged 39,107 KiB/s read and 16,731 KiB/s write, approximately 10.5% lower. This is consistent with the warm-cache comparison and should be presented as a VM control sample, not as a universal performance guarantee.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```

@@ -3,3 +3,5 @@ B0-native-ext4,10334.2,4421.0,41336.6,17683.4,79.2,136.5,180.8,3.344,7.654,14.78
 B2-fuse-only,9143.8,3915.4,36574.8,15661.4,66.2,107.0,148.5,68.096,109.670,150.528,134217728,0,0,,"5 repetitions; separate FUSE tree; buffered fio; 70% read"
 B4-rewind-protected,9181.7,3932.6,36726.2,15729.8,66.7,,,68.710,,,,0,0,64.34,"5 fio repetitions in one protected run; shell wrapper; warm/page-cache exploratory result"
 B4-direct-telemetry,,,,,,,,,,,0,2467528,16620,,"Direct fio PID telemetry validation; 16,403 write, 216 openat, 1 unlinkat"
+B0-native-ext4-cold,10918.6,4672.9,43674.0,18691.0,74.2,126.0,177.8,3.088,7.019,13.952,,,"3 repetitions; sync + drop_caches before each run; buffered fio"
+B2-fuse-only-cold,9776.8,4182.9,39106.7,16731.3,62.0,114.2,169.6,63.573,96.768,140.971,,,"3 repetitions; sync + drop_caches before each run; separate FUSE tree"
