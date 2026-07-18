@@ -103,7 +103,22 @@ make test
 ./bin/rewind policy check policies/example.yaml
 ```
 
-The runtime commands (`run`, `status`, `events`, `rollback`, and `commit`) currently expose the planned interface only; they will remain disabled until the Linux VM integration stages are completed.
+The `run`, `status`, `events`, and `rollback` commands are now wired for the disposable Linux VM. `commit` remains intentionally disabled until diff/export semantics are implemented and verified.
+
+VM-only run shape:
+
+```bash
+rewind run \
+  --workspace /home/vagrant/demo-workspace \
+  --runtime-root /home/vagrant/rewind-runs/run-1 \
+  --policy /home/vagrant/demo-policy.yaml \
+  --record /home/vagrant/rewind-runs/run-1/record.json \
+  --sensor-object /home/vagrant/RewindBPF/ebpf/rewind_trace.bpf.o \
+  --runtime-roots /bin,/usr/bin,/lib,/lib64,/usr/lib \
+  -- /home/vagrant/demo-agent
+```
+
+The command must run inside the disposable Ubuntu VM. It creates an OverlayFS mount, starts the agent through the policy-aware helper, optionally attaches scoped eBPF telemetry, and leaves a successful run mounted until `rewind rollback --record ...` is called. Do not run this on the personal Mac or against a real home directory.
 
 The low-level telemetry smoke command is separate and privileged:
 

@@ -350,9 +350,9 @@ Run the first controlled destructive test only against synthetic fixtures inside
 
 Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.
 
-### Current continuation: protected-run lifecycle integration
+### Current continuation: end-to-end protected-run VM smoke
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, inert `internal/runplan` composer, fake-tested `internal/protectedrun` coordinator, and policy-aware hidden helper are implemented. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next implementation step is wiring these pieces into the user-facing `rewind run` flow.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, inert `internal/runplan` composer, fake-tested `internal/protectedrun` coordinator, policy-aware hidden helper, atomic run store, and `run/status/events/rollback` CLI paths are implemented. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next action is the first end-to-end `rewind run` smoke in the VM using only a generated workspace and static/synthetic agent command.
 
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v

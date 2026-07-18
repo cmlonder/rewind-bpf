@@ -51,6 +51,27 @@ type Handle struct {
 	waited      bool
 }
 
+// RollbackPlan rolls back a persisted run after the original CLI process has
+// exited. No agent process is attached to this path; the caller must provide a
+// plan whose OverlayFS mount is still active.
+func (c Coordinator) RollbackPlan(ctx context.Context, plan *runplan.Plan) error {
+	if plan == nil || c.Overlay == nil {
+		return fmt.Errorf("rollback protected run: plan and overlay are required")
+	}
+	if plan.Run.State == lifecycle.Running {
+		if err := plan.Run.Transition(lifecycle.Failed); err != nil {
+			return err
+		}
+	}
+	if plan.Run.State != lifecycle.Failed && plan.Run.State != lifecycle.Succeeded && plan.Run.State != lifecycle.Paused {
+		return fmt.Errorf("rollback protected run: run %s is %s", plan.Run.ID, plan.Run.State)
+	}
+	if err := c.Overlay.Rollback(ctx, plan.Layout); err != nil {
+		return err
+	}
+	return plan.Run.Transition(lifecycle.RolledBack)
+}
+
 func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []string, sensorObject string) (*Handle, error) {
 	if plan == nil {
 		return nil, fmt.Errorf("start protected run: plan is nil")

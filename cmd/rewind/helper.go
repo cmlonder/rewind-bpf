@@ -19,10 +19,9 @@ func handleHelper(args []string) {
 		fatal(err.Error())
 	}
 	command := flags.Args()
-	if len(command) == 0 || command[0] != "--" || len(command) == 1 {
+	if len(command) == 0 {
 		fatal("usage: rewind helper [--plan-file PATH] -- <agent-command> [args...]")
 	}
-	command = command[1:]
 
 	if *planPath != "" {
 		file, err := os.Open(*planPath)

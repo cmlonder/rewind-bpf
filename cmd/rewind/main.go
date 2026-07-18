@@ -14,9 +14,9 @@ const usage = `RewindBPF — AI Agent Safety Runtime
 
 Usage:
   rewind run [options] -- <agent-command>
-  rewind status
-  rewind events <run_id>
-  rewind rollback <run_id>
+  rewind status --record PATH
+  rewind events --record PATH
+  rewind rollback --record PATH
   rewind commit <run_id>
   rewind sensor attach --object PATH --run-id ID --pid PID   (VM-only telemetry smoke test)
   rewind helper [--plan-file PATH] -- <agent-command>       (internal child helper)
@@ -25,7 +25,7 @@ Usage:
   rewind manifest create <directory> [manifest.json]
   rewind manifest verify <directory> <manifest.json>
 
-Kernel and daemon integration are added incrementally in the MVP build.
+The run command is Linux-only and requires a disposable VM for OverlayFS/eBPF integration.
 `
 
 func main() {
@@ -45,7 +45,15 @@ func main() {
 		handleSensor(os.Args[2:])
 	case "helper":
 		handleHelper(os.Args[2:])
-	case "run", "status", "events", "rollback", "commit":
+	case "run":
+		handleRun(os.Args[2:])
+	case "rollback":
+		handleRollback(os.Args[2:])
+	case "status":
+		handleStatus(os.Args[2:])
+	case "events":
+		handleEvents(os.Args[2:])
+	case "commit":
 		fmt.Printf("rewind: command %q is planned; kernel and daemon integration are not enabled yet\n", os.Args[1])
 	default:
 		fmt.Fprintf(os.Stderr, "rewind: unknown command %q\n\n%s", os.Args[1], usage)
