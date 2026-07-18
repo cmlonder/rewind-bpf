@@ -288,8 +288,8 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | English project documentation | Complete | README, plan, architecture, benchmark, eBPF, test docs |
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
-| Stage 2 disposable Linux lab | Kernel capability audit complete; OverlayFS smoke test gated | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; eBPF tracepoint/ringbuf/LSM present; Landlock unavailable |
-| Stage 3 OverlayFS rollback | Not started | Safety gate required |
+| Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
+| Stage 3 OverlayFS rollback | Smoke test complete; Go lifecycle next | Synthetic lower/upper/work/merged test passed; lower content preserved after unmount |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
@@ -383,4 +383,19 @@ Landlock: not enabled in this kernel LSM list
 BPF LSM:  program type available
 ```
 
-The direct Linux toolchain and BPF capability audit are complete. The OverlayFS module exists but is not currently loaded; a controlled `modprobe` plus synthetic mount smoke test is the next gated action. Landlock is not enabled in this VM kernel, so read enforcement must use BPF LSM or a future kernel with Landlock enabled. No kernel module was loaded, no eBPF program was loaded, and no filesystem was mounted during this verification.
+The direct Linux toolchain and BPF capability audit are complete. The OverlayFS module was loaded only for the controlled synthetic smoke test and the test mount was unmounted afterward. Landlock is not enabled in this VM kernel, so read enforcement must use BPF LSM or a future kernel with Landlock enabled. No eBPF program was loaded during either the capability audit or the smoke test.
+
+## 16. Stage 3 OverlayFS smoke test result
+
+The first controlled filesystem test ran only inside the disposable Ubuntu VM under `/home/vagrant/rewind-lab-smoke`.
+
+Observed behavior:
+
+```text
+merged/marker.txt before write  → lower-layer-original
+merged/marker.txt after write   → upper-layer-change
+lower/marker.txt after write    → lower-layer-original
+lower/marker.txt after unmount  → lower-layer-original
+```
+
+This verifies the core copy-on-write invariant: an agent-visible change is isolated in the upper layer while the lower layer remains unchanged. No personal Mac path or project checkout was mounted. The next implementation step is to move this lifecycle into Go (`prepare`, `mount`, `unmount`, `rollback`) without changing the safety boundary.
