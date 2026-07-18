@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Layout describes the directories owned by one RewindBPF filesystem run.
@@ -141,6 +142,17 @@ type Runner interface {
 	Run(ctx context.Context, command string, args ...string) error
 }
 
+// Backend selects the filesystem implementation used for a protected run.
+// Kernel uses Linux OverlayFS; Fuse uses fuse-overlayfs for VMs where the
+// kernel implementation cannot safely expose copy-up writes to an
+// unprivileged agent.
+type Backend string
+
+const (
+	BackendKernel Backend = "kernel"
+	BackendFuse   Backend = "fuse"
+)
+
 type ExecRunner struct{}
 
 func (ExecRunner) Run(ctx context.Context, command string, args ...string) error {
@@ -152,9 +164,42 @@ func (ExecRunner) Run(ctx context.Context, command string, args ...string) error
 	return nil
 }
 
+type MountProcess interface {
+	Wait() error
+	Kill() error
+}
+
+type ProcessStarter interface {
+	Start(ctx context.Context, command string, args ...string) (MountProcess, error)
+}
+
+type ExecProcessStarter struct{}
+
+func (ExecProcessStarter) Start(ctx context.Context, command string, args ...string) (MountProcess, error) {
+	cmd := exec.CommandContext(ctx, command, args...)
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	return &execMountProcess{cmd: cmd}, nil
+}
+
+type execMountProcess struct {
+	cmd *exec.Cmd
+}
+
+func (p *execMountProcess) Wait() error { return p.cmd.Wait() }
+func (p *execMountProcess) Kill() error {
+	if p == nil || p.cmd == nil || p.cmd.Process == nil {
+		return nil
+	}
+	return p.cmd.Process.Kill()
+}
+
 type Manager struct {
-	Runner Runner
-	Owner  *Owner
+	Runner  Runner
+	Owner   *Owner
+	Backend Backend
+	Starter ProcessStarter
 }
 
 // Owner identifies the unprivileged agent account that must be able to write
@@ -172,6 +217,20 @@ func (m Manager) runner() Runner {
 	return ExecRunner{}
 }
 
+func (m Manager) backend() Backend {
+	if m.Backend == "" {
+		return BackendKernel
+	}
+	return m.Backend
+}
+
+func (m Manager) starter() ProcessStarter {
+	if m.Starter != nil {
+		return m.Starter
+	}
+	return ExecProcessStarter{}
+}
+
 func (m Manager) Mount(ctx context.Context, l Layout) error {
 	if err := l.Prepare(); err != nil {
 		return err
@@ -184,16 +243,65 @@ func (m Manager) Mount(ctx context.Context, l Layout) error {
 			return fmt.Errorf("chown overlay work for agent: %w", err)
 		}
 	}
-	// Use the calling process credentials for subsequent OverlayFS access
-	// checks. The parent may be root for mount/eBPF setup, but the agent child
-	// is deliberately unprivileged and owns the temporary upper/work layers.
-	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,override_creds=off", l.Lower, l.Upper, l.Work)
-	return m.runner().Run(ctx, "mount", "-t", "overlay", "overlay", "-o", options, l.Merged)
+	switch m.backend() {
+	case BackendKernel:
+		options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", l.Lower, l.Upper, l.Work)
+		return m.runner().Run(ctx, "mount", "-t", "overlay", "overlay", "-o", options, l.Merged)
+	case BackendFuse:
+		return m.mountFuse(ctx, l)
+	default:
+		return fmt.Errorf("unsupported overlay backend %q", m.backend())
+	}
+}
+
+func (m Manager) mountFuse(ctx context.Context, l Layout) error {
+	if m.Owner == nil {
+		return fmt.Errorf("fuse overlay backend requires an agent owner")
+	}
+	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,uid=%d,gid=%d,allow_other", l.Lower, l.Upper, l.Work, m.Owner.UID, m.Owner.GID)
+	process, err := m.starter().Start(ctx, "fuse-overlayfs", "-o", options, l.Merged)
+	if err != nil {
+		return fmt.Errorf("start fuse-overlayfs: %w", err)
+	}
+	if err := waitForMount(ctx, m.runner(), l.Merged, process); err != nil {
+		_ = process.Kill()
+		return fmt.Errorf("wait for fuse overlay mount: %w", err)
+	}
+	return nil
+}
+
+func waitForMount(ctx context.Context, runner Runner, mountpoint string, process MountProcess) error {
+	ticker := time.NewTicker(20 * time.Millisecond)
+	defer ticker.Stop()
+	deadline := time.NewTimer(5 * time.Second)
+	defer deadline.Stop()
+	processDone := make(chan error, 1)
+	go func() { processDone <- process.Wait() }()
+	for {
+		if err := runner.Run(ctx, "mountpoint", "-q", mountpoint); err == nil {
+			return nil
+		}
+		select {
+		case err := <-processDone:
+			if err == nil {
+				return fmt.Errorf("fuse-overlayfs exited before mount became ready")
+			}
+			return fmt.Errorf("fuse-overlayfs exited before mount became ready: %w", err)
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("mount did not become ready before timeout")
+		case <-ticker.C:
+		}
+	}
 }
 
 func (m Manager) Unmount(ctx context.Context, l Layout) error {
 	if err := l.Validate(); err != nil {
 		return err
+	}
+	if m.backend() == BackendFuse {
+		return m.runner().Run(ctx, "fusermount3", "-u", l.Merged)
 	}
 	return m.runner().Run(ctx, "umount", l.Merged)
 }

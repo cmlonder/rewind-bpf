@@ -115,10 +115,11 @@ rewind run \
   --record /home/vagrant/rewind-runs/run-1/record.json \
   --sensor-object /home/vagrant/RewindBPF/ebpf/rewind_trace.bpf.o \
   --runtime-roots /bin,/usr/bin,/lib,/usr/lib \
+  --overlay-backend fuse \
   -- /home/vagrant/demo-agent
 ```
 
-The command must run inside the disposable Ubuntu VM. It creates an OverlayFS mount, starts the agent through the policy-aware helper, optionally attaches scoped eBPF telemetry, and leaves a successful run mounted until `rewind rollback --record ...` is called. Do not run this on the personal Mac or against a real home directory.
+The command must run inside the disposable Ubuntu VM. It creates a `fuse-overlayfs` mount, starts the agent through the policy-aware helper, optionally attaches scoped eBPF telemetry, and leaves a successful run mounted until `rewind rollback --record ...` is called. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
 
 The parent may need `sudo` for OverlayFS/eBPF, but the helper drops the agent to the invoking user using `SUDO_UID`/`SUDO_GID`. Before mounting, only the temporary `upper/work` directories are chowned to that user; the original lower workspace is never chowned. A direct root agent is rejected.
 
@@ -170,6 +171,7 @@ tests/            integration-test safety notes
 - Go 1.22 or newer
 - Linux VM for kernel integration
 - OverlayFS and BPF/BTF support in the VM kernel
+- `fuse-overlayfs` (the default protected-run backend; install with `sudo apt-get install -y fuse-overlayfs`)
 - Landlock **or an active BPF LSM** for read enforcement (the current VM reports Landlock active)
 The disposable VM setup and safety boundary are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The MVP runs directly inside that VM.
 

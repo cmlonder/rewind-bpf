@@ -34,12 +34,16 @@ func handleRun(args []string) {
 	recordPath := flags.String("record", "", "run record JSON path")
 	sensorObject := flags.String("sensor-object", "", "optional compiled telemetry object")
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
+	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
 	command := flags.Args()
 	if len(command) == 0 || strings.TrimSpace(*workspace) == "" || strings.TrimSpace(*runtimeRoot) == "" || strings.TrimSpace(*policyPath) == "" || strings.TrimSpace(*recordPath) == "" {
-		fatal("usage: rewind run --workspace PATH --runtime-root PATH --policy PATH --record PATH [--sensor-object PATH] [--runtime-roots PATHS] -- <agent-command>")
+		fatal("usage: rewind run --workspace PATH --runtime-root PATH --policy PATH --record PATH [--sensor-object PATH] [--runtime-roots PATHS] [--overlay-backend fuse|kernel] -- <agent-command>")
+	}
+	if *overlayBackend != string(overlay.BackendFuse) && *overlayBackend != string(overlay.BackendKernel) {
+		fatal(fmt.Sprintf("unsupported overlay backend %q (want fuse or kernel)", *overlayBackend))
 	}
 	value, err := policy.Load(*policyPath)
 	if err != nil {
@@ -65,7 +69,7 @@ func handleRun(args []string) {
 		fatal(fmt.Sprintf("resolve rewind helper: %v", err))
 	}
 	coordinator := protectedrun.Coordinator{
-		Overlay: overlay.Manager{Owner: &owner},
+		Overlay: overlay.Manager{Owner: &owner, Backend: overlay.Backend(*overlayBackend)},
 		Starter: protectedrun.ExecStarter{HelperPath: helper},
 		Sensor:  telemetry,
 	}

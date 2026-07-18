@@ -2,6 +2,7 @@ package overlay
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -74,13 +75,72 @@ func TestMountBuildsExpectedCommandWithoutExecutingIt(t *testing.T) {
 		t.Fatalf("got %d commands, want 1", len(runner.commands))
 	}
 	command := strings.Join(runner.commands[0], " ")
-	for _, expected := range []string{"mount", "-t overlay", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, "override_creds=off", layout.Merged} {
+	for _, expected := range []string{"mount", "-t overlay", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, layout.Merged} {
 		if !strings.Contains(command, expected) {
 			t.Errorf("command %q does not contain %q", command, expected)
 		}
 	}
+	if strings.Contains(command, "override_creds") {
+		t.Fatalf("kernel backend must not pass unsupported override_creds option: %q", command)
+	}
 	if _, err := os.Stat(layout.Merged); err != nil {
 		t.Fatalf("prepare should create merged directory: %v", err)
+	}
+}
+
+type fakeMountProcess struct{}
+
+func (fakeMountProcess) Wait() error { return nil }
+func (fakeMountProcess) Kill() error { return nil }
+
+type fakeProcessStarter struct {
+	command []string
+}
+
+func (f *fakeProcessStarter) Start(_ context.Context, command string, args ...string) (MountProcess, error) {
+	f.command = append([]string{command}, args...)
+	return fakeMountProcess{}, nil
+}
+
+func TestFuseMountBuildsAgentOwnedCommand(t *testing.T) {
+	runner := &fakeRunner{}
+	starter := &fakeProcessStarter{}
+	layout, err := NewLayoutWithLower(filepath.Join(t.TempDir(), "run"), filepath.Join(t.TempDir(), "workspace"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := Manager{
+		Runner:  runner,
+		Starter: starter,
+		Backend: BackendFuse,
+		Owner:   &Owner{UID: os.Getuid(), GID: os.Getgid()},
+	}
+	if err := manager.Mount(context.Background(), layout); err != nil {
+		t.Fatal(err)
+	}
+	command := strings.Join(starter.command, " ")
+	for _, expected := range []string{"fuse-overlayfs", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, fmt.Sprintf("uid=%d", os.Getuid()), fmt.Sprintf("gid=%d", os.Getgid()), "allow_other", layout.Merged} {
+		if !strings.Contains(command, expected) {
+			t.Errorf("command %q does not contain %q", command, expected)
+		}
+	}
+	if len(runner.commands) == 0 || runner.commands[0][0] != "mountpoint" {
+		t.Fatalf("fuse mount should wait for mountpoint readiness, got %#v", runner.commands)
+	}
+}
+
+func TestFuseUnmountUsesFusermount(t *testing.T) {
+	runner := &fakeRunner{}
+	layout, err := NewLayout(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := Manager{Runner: runner, Backend: BackendFuse}
+	if err := manager.Unmount(context.Background(), layout); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.commands) != 1 || runner.commands[0][0] != "fusermount3" {
+		t.Fatalf("got %#v, want fusermount3", runner.commands)
 	}
 }
 
