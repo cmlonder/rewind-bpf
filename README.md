@@ -124,6 +124,17 @@ REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run
 
 It creates synthetic files under a temporary VM directory, applies a read allowlist to a child process, and expects the protected synthetic file to fail with `EACCES`.
 
+The OverlayFS manager also has an opt-in VM-only integration test. It writes one synthetic lower-layer marker, changes it through the merged mount, rolls back, and verifies that only the lower-layer original remains:
+
+```bash
+sudo env REWIND_OVERLAY_INTEGRATION=1 \
+  GOTOOLCHAIN=local \
+  go test ./internal/overlay \
+  -run TestOverlaySyntheticMountRollback -count=1 -v
+```
+
+Run this only inside the disposable Ubuntu VM. It uses `t.TempDir()` under the VM’s temporary filesystem and does not touch the Mac host or a real project. If the VM lacks `CAP_SYS_ADMIN`, the test must be treated as an environment limitation, not as permission to broaden the test scope.
+
 ## Repository layout
 
 ```text

@@ -289,7 +289,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
-| Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
+| Stage 3 OverlayFS rollback | VM integration test prepared; protected-run integration next | Manual VM smoke passed; opt-in Go mount/rollback test now covers only a temporary fixture and is awaiting the next VM run |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
 | Stage 5 read policy | Landlock enforcement smoke complete; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
 | Stage 6 system scope | Not started | Disposable VM only |
@@ -497,7 +497,7 @@ The first kernel source is intentionally telemetry-only:
 - Events default to `allow` because this program does not enforce policy. BPF-LSM enforcement is a separate module and stage.
 - The compact kernel record intentionally omits the string `run_id`; the userspace ring-buffer reader adds the active run context before validation and persistence.
 
-The source has not been compiled or loaded on the personal Mac. The next authorized VM action is compilation against the VM’s BTF using `ebpf/Makefile`; loading and attaching remains a separate privileged safety review.
+The source has not been compiled or loaded on the personal Mac. The VM compilation and attach smoke are complete; loading remains a separate privileged safety review for each new program.
 
 The first VM compile exposed an ARM64 header issue: `event.h` was importing userspace Linux types after `vmlinux.h` had already defined the same kernel ABI types. `event.h` now relies on the generated BTF types instead, avoiding duplicate typedefs. No kernel behavior changed.
 
@@ -539,7 +539,7 @@ Observed userspace events:
 {"run_id":"run_vm_telemetry","pid":4723,"operation":"write","decision":"allow","risk":"high"}
 ```
 
-This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PID filter selected the target process, ring-buffer records were decoded, and userspace enriched each event with the active `run_id`. The current program is telemetry-only; it does not deny reads or writes. Read enforcement is the next stage and must use a separate BPF-LSM policy program because this VM does not have Landlock enabled.
+This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PID filter selected the target process, ring-buffer records were decoded, and userspace enriched each event with the active `run_id`. The current program is telemetry-only; it does not deny reads or writes. Read enforcement is provided by the separate Landlock boundary in the current VM; the optional BPF-LSM policy program remains available for kernels with active `bpf` LSM.
 
 ## 27. Stage 5 manifest-to-kernel policy compiler
 
