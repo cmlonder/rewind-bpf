@@ -292,7 +292,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 3 OverlayFS rollback | Complete for isolated MVP boundary; protected-run integration next | Manual VM smoke and opt-in Go mount/rollback test passed against a temporary fixture; lower layer remained unchanged after rollback |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
 | Stage 5 read policy | Complete for isolated MVP boundary; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
-| Stage 6 protected-run integration | Coordinator and plan complete; real helper/CLI next | Inert plan composer and fail-closed coordinator unit-tested; real process/mount orchestration remains VM-gated |
+| Stage 6 protected-run integration | Coordinator and policy-aware helper prepared; full CLI next | Inert plan composer, fail-closed coordinator, Landlock plan serialization, and hidden helper command unit-tested; real end-to-end run remains VM-gated |
 | Stage 7 benchmarks | Not started | Baseline first |
 
 ## 12. Change protocol
@@ -609,6 +609,8 @@ mount OverlayFS
 ```
 
 The coordinator depends on three narrow interfaces: an OverlayFS manager, a process starter that must apply a non-nil Landlock plan before execution, and an optional telemetry adapter. If process start or telemetry attach fails, the process is killed, telemetry is closed, the lifecycle enters `failed`, and the validated upper/work layers are rolled back. The coordinator tests use fakes only; no process, mount, or eBPF operation runs on the development host.
+
+`internal/protectedrun/ExecStarter` launches the hidden `rewind helper` command. When a Landlock plan is present, it serializes the plan to a mode-`0600` file in the dedicated runtime root, starts the helper, and the helper applies Landlock before `syscall.Exec` replaces it with the agent command. The plan file is removed when the child exits or is killed. This avoids a short unprotected interval and keeps the policy boundary in the child process.
 
 ### Optional BPF-LSM backend
 

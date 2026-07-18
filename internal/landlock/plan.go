@@ -14,10 +14,10 @@ import (
 )
 
 type Plan struct {
-	Root         string
-	AllowedFiles []string
-	AllowedDirs  []string
-	RuntimeRoots []string
+	Root         string   `json:"root"`
+	AllowedFiles []string `json:"allowed_files"`
+	AllowedDirs  []string `json:"allowed_dirs"`
+	RuntimeRoots []string `json:"runtime_roots"`
 }
 
 // BuildPlan turns compiled enforce-mode rules into the allowlist consumed by
