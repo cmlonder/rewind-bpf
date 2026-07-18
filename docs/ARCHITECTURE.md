@@ -495,3 +495,5 @@ The first kernel source is intentionally telemetry-only:
 - Events default to `allow` because this program does not enforce policy. BPF-LSM enforcement is a separate module and stage.
 
 The source has not been compiled or loaded on the personal Mac. The next authorized VM action is compilation against the VM’s BTF using `ebpf/Makefile`; loading and attaching remains a separate privileged safety review.
+
+The first VM compile exposed an ARM64 multiarch include-path requirement for `asm/types.h`. The Makefile now detects the Debian multiarch triplet and adds the corresponding `/usr/include/<triplet>` path automatically. No kernel behavior changed.
