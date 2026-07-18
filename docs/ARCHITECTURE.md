@@ -473,3 +473,14 @@ The package does not start processes, mount filesystems, parse policies, or load
 `internal/event` defines the narrow data contract between eBPF telemetry and userspace. It contains only primitive, serializable fields: run ID, PID, operation, optional path, kernel timestamp, decision, and risk level.
 
 The package validates supported operation/decision/risk values before events are persisted. It does not read ring buffers, evaluate glob policies, or write logs. Kernel programs can therefore remain focused on collecting compact records while the daemon owns enrichment and persistence. Its tests run without loading eBPF or requiring Linux kernel state.
+
+## 21. Competitive positioning
+
+The README contains the user-facing feature matrix. The architectural conclusion is intentionally narrower than “no competitor uses the kernel”:
+
+- `nono` is the closest product overlap: it documents Landlock/Seatbelt kernel isolation, path profiles, and content-addressed undo.
+- Tetragon and KubeArmor demonstrate mature eBPF/BPF-LSM observability and enforcement, but their primary product is runtime security policy, not an agent-session filesystem transaction.
+- AgentFS and nono demonstrate that agent-oriented filesystem history and rollback are already active design spaces.
+- DeltaBox is a relevant research direction for OS-level agent checkpoint/rollback, but it is not the same as a ready-to-run local CLI/runtime.
+
+Therefore RewindBPF’s defensible MVP claim is composition and focus: a Linux OverlayFS transaction prepared before execution, event data tied to a run lifecycle, configurable sensitive-read policy, and one-command discard of the writable layer. Performance and rollback-speed claims remain benchmark hypotheses until the VM benchmark matrix is measured.
