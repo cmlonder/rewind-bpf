@@ -28,6 +28,7 @@ var tracepointBindings = []tracepointBinding{
 	{program: "trace_unlinkat", group: "syscalls", name: "sys_enter_unlinkat"},
 	{program: "trace_renameat2", group: "syscalls", name: "sys_enter_renameat2"},
 	{program: "trace_truncate", group: "syscalls", name: "sys_enter_truncate"},
+	{program: "trace_process_exit", group: "sched", name: "sched_process_exit"},
 }
 
 // Session owns loaded programs, tracepoint links, and the userspace event

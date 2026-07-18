@@ -1,5 +1,6 @@
 #include "vmlinux.h"
 
+#include <bpf/bpf_core_read.h>
 #include <bpf/bpf_helpers.h>
 #include <bpf/bpf_tracing.h>
 
@@ -17,11 +18,38 @@ struct {
 // should always scope events to the agent PID or cgroup.
 const volatile __u32 target_pid;
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 4096);
+	__type(key, __u32);
+	__type(value, __u8);
+} tracked_pids SEC(".maps");
+
 static __always_inline bool target_matches(void)
 {
 	__u32 pid = (__u32)(bpf_get_current_pid_tgid() >> 32);
+	__u8 one = 1;
+	struct task_struct *task;
+	struct task_struct *parent = 0;
+	__u32 parent_pid = 0;
 
-	return target_pid == 0 || target_pid == pid;
+	if (target_pid == 0 || target_pid == pid)
+		return true;
+	if (bpf_map_lookup_elem(&tracked_pids, &pid))
+		return true;
+
+	/* The helper process may launch a shell, which then execs the agent.
+	 * Track that child at exec time and retain the decision for its syscalls. */
+	task = (struct task_struct *)bpf_get_current_task_btf();
+	bpf_core_read(&parent, sizeof(parent), &task->real_parent);
+	if (!parent)
+		return false;
+	bpf_core_read(&parent_pid, sizeof(parent_pid), &parent->tgid);
+	if (parent_pid == target_pid || bpf_map_lookup_elem(&tracked_pids, &parent_pid)) {
+		bpf_map_update_elem(&tracked_pids, &pid, &one, BPF_ANY);
+		return true;
+	}
+	return false;
 }
 
 static __always_inline int emit_event(__u32 operation, __u32 risk,
@@ -54,6 +82,15 @@ int trace_execve(struct trace_event_raw_sys_enter *ctx)
 {
 	return emit_event(REWIND_OP_EXECVE, REWIND_RISK_LOW,
 			  (const char *)ctx->args[0]);
+}
+
+SEC("tracepoint/sched/sched_process_exit")
+int trace_process_exit(void *ctx)
+{
+	__u32 pid = (__u32)(bpf_get_current_pid_tgid() >> 32);
+
+	bpf_map_delete_elem(&tracked_pids, &pid);
+	return 0;
 }
 
 SEC("tracepoint/syscalls/sys_enter_openat")
