@@ -317,6 +317,12 @@ The same fio workload was then run five times on a separate FUSE OverlayFS tree 
 
 The B2 workload left a 134,217,728-byte file in `upper`, matching the 134,217,728-byte native B0 file; measured copy-up amplification for this full-file workload was therefore approximately 1.0x. These are warm/page-cache exploratory results (`direct=0`), not the final overhead claim. Final reporting should include cold-cache and alternating-order repetitions.
 
+### B4 protected-run result and telemetry scope
+
+The full protected path was measured with five fio repetitions inside one Rewind run. Mean read throughput was 36,726 KiB/s / 9,181.7 IOPS and mean write throughput was 15,730 KiB/s / 3,932.6 IOPS. This was approximately 11.1% below B0 and 0.4% above B2, indicating that the steady-state I/O cost was dominated by FUSE rather than the userspace lifecycle/eBPF path. The complete run took 64.34 seconds wall-clock for five 10-second workloads plus ramp/setup. The upper layer was 134,253,346 bytes; the difference from B2 was approximately 35.6 KiB of fio JSON outputs and metadata, not another copy of the 128 MiB data file.
+
+The direct-PID telemetry validation ran fio without a shell wrapper and recorded 16,620 events (16,403 `write`, 216 `openat`, and 1 `unlinkat`) in a 2,467,528-byte JSONL log before rollback. The current sensor filters on one target PID. When an agent launches child processes through a shell, those child events are not captured; cgroup or descendant-PID scoping is a post-MVP hardening item. The benchmark therefore reports direct-PID telemetry as verified and shell-child telemetry as an explicit limitation.
+
 ## 12. Change protocol
 
 After each implementation stage:

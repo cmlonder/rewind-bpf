@@ -366,6 +366,8 @@ The initial B0 native-ext4 baseline is now captured with five fio 3.36 repetitio
 
 The exploratory B2 FUSE-only run used a separate temporary tree and did not alter B0. Its five-run mean was 36,575 KiB/s / 9,143.8 IOPS read and 15,661 KiB/s / 3,915.4 IOPS write, approximately 11.5% below B0 throughput. FUSE write p50 was 68.1 µs. The 128 MiB fio file occupied 134,217,728 bytes in both native storage and the FUSE upper layer (approximately 1.0x amplification for this full-file workload). Because `direct=0`, this comparison is warm/page-cache exploratory data; final B4 reporting must add cold-cache and alternating-order controls.
 
+The B4 protected-run measurement used five fio repetitions inside one FUSE-backed Rewind run. Mean throughput was 36,726 KiB/s / 9,181.7 IOPS read and 15,730 KiB/s / 3,932.6 IOPS write, approximately 11.1% below B0 and 0.4% above B2. The complete run took 64.34 seconds wall-clock. A direct-fio PID telemetry validation recorded 16,620 events (16,403 writes, 216 opens, one unlink) in a 2,467,528-byte log before rollback. The current PID-only sensor does not follow shell-launched child processes; cgroup/descendant scoping remains a hardening task.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```
