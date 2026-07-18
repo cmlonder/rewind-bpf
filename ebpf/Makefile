@@ -1,7 +1,7 @@
 VMLINUX_H ?= vmlinux.h
 BPF_OBJ ?= rewind_trace.bpf.o
 BPF_ARCH ?= arm64
-BPF_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null)
+BPF_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo aarch64-linux-gnu)
 
 BPF_INCLUDE_FLAGS := -I.
 ifneq ($(strip $(BPF_MULTIARCH)),)

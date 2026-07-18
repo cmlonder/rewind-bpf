@@ -1,7 +1,9 @@
 #ifndef REWIND_EVENT_H
 #define REWIND_EVENT_H
 
-#include <linux/types.h>
+// vmlinux.h must be included before this header by the eBPF translation unit.
+// It provides the kernel ABI types (__u32/__u64) without pulling userspace
+// Linux headers into the BPF compilation and causing duplicate typedefs.
 
 #define REWIND_EVENT_PATH_LEN 256
 

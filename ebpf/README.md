@@ -18,8 +18,9 @@ Programs must filter target agent PIDs/cgroups and emit small event records thro
 - `rewind_trace.bpf.c` — tracepoint sensors for process execution, reads/opens, writes, deletes, renames, and truncation.
 - `Makefile` — disposable Linux VM build commands; it generates `vmlinux.h` from the running kernel BTF.
 
-The Makefile detects Ubuntu/Debian multiarch headers (for example,
-`/usr/include/aarch64-linux-gnu`) so ARM64 guests can resolve `asm/types.h`.
+The eBPF translation unit includes the generated `vmlinux.h` before `event.h`.
+This keeps the kernel ABI types sourced from BTF and avoids mixing them with
+userspace Linux headers, which can produce duplicate typedefs on ARM64.
 
 ## VM-only build
 

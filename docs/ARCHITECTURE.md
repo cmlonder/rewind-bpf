@@ -496,4 +496,4 @@ The first kernel source is intentionally telemetry-only:
 
 The source has not been compiled or loaded on the personal Mac. The next authorized VM action is compilation against the VM’s BTF using `ebpf/Makefile`; loading and attaching remains a separate privileged safety review.
 
-The first VM compile exposed an ARM64 multiarch include-path requirement for `asm/types.h`. The Makefile now detects the Debian multiarch triplet and adds the corresponding `/usr/include/<triplet>` path automatically. No kernel behavior changed.
+The first VM compile exposed an ARM64 header issue: `event.h` was importing userspace Linux types after `vmlinux.h` had already defined the same kernel ABI types. `event.h` now relies on the generated BTF types instead, avoiding duplicate typedefs. No kernel behavior changed.
