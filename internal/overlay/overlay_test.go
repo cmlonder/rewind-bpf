@@ -74,7 +74,7 @@ func TestMountBuildsExpectedCommandWithoutExecutingIt(t *testing.T) {
 		t.Fatalf("got %d commands, want 1", len(runner.commands))
 	}
 	command := strings.Join(runner.commands[0], " ")
-	for _, expected := range []string{"mount", "-t overlay", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, layout.Merged} {
+	for _, expected := range []string{"mount", "-t overlay", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, "override_creds=off", layout.Merged} {
 		if !strings.Contains(command, expected) {
 			t.Errorf("command %q does not contain %q", command, expected)
 		}

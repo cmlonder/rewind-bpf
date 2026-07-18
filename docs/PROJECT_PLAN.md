@@ -356,7 +356,7 @@ The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map
 
 The helper refuses to launch an agent as root: when the parent requires `sudo`, it drops to `SUDO_UID`/`SUDO_GID` before Landlock and `exec`. This is a prerequisite for the end-to-end smoke rather than an optional hardening step.
 
-The mount side now gives only the disposable `upper/work` layers to the same unprivileged identity. The lower workspace is never chowned or deleted by the runtime.
+The mount side now gives only the disposable `upper/work` layers to the same unprivileged identity and uses OverlayFS `override_creds=off` so copy-up/whiteout checks use that identity. The lower workspace is never chowned or deleted by the runtime.
 
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v

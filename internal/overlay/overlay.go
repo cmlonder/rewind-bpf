@@ -184,7 +184,10 @@ func (m Manager) Mount(ctx context.Context, l Layout) error {
 			return fmt.Errorf("chown overlay work for agent: %w", err)
 		}
 	}
-	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", l.Lower, l.Upper, l.Work)
+	// Use the calling process credentials for subsequent OverlayFS access
+	// checks. The parent may be root for mount/eBPF setup, but the agent child
+	// is deliberately unprivileged and owns the temporary upper/work layers.
+	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,override_creds=off", l.Lower, l.Upper, l.Work)
 	return m.runner().Run(ctx, "mount", "-t", "overlay", "overlay", "-o", options, l.Merged)
 }
 

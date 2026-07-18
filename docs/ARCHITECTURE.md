@@ -614,7 +614,7 @@ The coordinator depends on three narrow interfaces: an OverlayFS manager, a proc
 
 When the parent runtime is invoked through `sudo`, the helper reads `SUDO_UID`/`SUDO_GID`, drops supplementary groups, GID, and UID before applying Landlock, and then execs the agent. A root helper without those explicit target IDs is rejected; the agent is never intentionally launched as root.
 
-The privileged OverlayFS manager similarly chowns only the validated temporary `upper` and `work` directories to that agent identity before mounting. It never chowns or removes `lowerdir`, so the original workspace remains owned and protected by its existing permissions.
+The privileged OverlayFS manager similarly chowns only the validated temporary `upper` and `work` directories to that agent identity before mounting and passes `override_creds=off`. This makes copy-up/whiteout permission checks use the unprivileged agent credentials rather than the root mounter credentials. It never chowns or removes `lowerdir`, so the original workspace remains owned and protected by its existing permissions.
 
 `internal/runstore` persists the plan, lifecycle record, and telemetry log path atomically with mode `0600`. The CLI can reconstruct a completed run for rollback in a later process. `commit` is still disabled: preserving the lower layer and exporting an intentional diff need a separate conflict-safe implementation.
 
