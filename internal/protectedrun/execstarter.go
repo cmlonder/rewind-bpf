@@ -53,6 +53,11 @@ func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, pl
 	args = append(args, command...)
 	process := exec.CommandContext(ctx, s.HelperPath, args...)
 	process.Dir = cwd
+	// Preserve the agent's terminal streams so helper and policy failures are
+	// visible to the operator instead of collapsing into "exit status 2".
+	process.Stdin = os.Stdin
+	process.Stdout = os.Stdout
+	process.Stderr = os.Stderr
 	if err := process.Start(); err != nil {
 		if planPath != "" {
 			_ = os.Remove(planPath)
