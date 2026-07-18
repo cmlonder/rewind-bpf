@@ -11,3 +11,11 @@ Planned tools:
 - Go workload runner: deterministic agent scenarios
 
 Results are stored as JSON/CSV under `benchmarks/results/`; that directory is ignored by Git.
+
+The checked-in summary ledger is `results_summary.csv`. Generate a dependency-free SVG chart for the README or presentation with:
+
+```bash
+python3 benchmarks/plot_results.py
+```
+
+This writes `benchmarks/results_chart.svg`. The script uses only the Python standard library; no plotting package is required.
