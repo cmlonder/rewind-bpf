@@ -154,6 +154,15 @@ func (ExecRunner) Run(ctx context.Context, command string, args ...string) error
 
 type Manager struct {
 	Runner Runner
+	Owner  *Owner
+}
+
+// Owner identifies the unprivileged agent account that must be able to write
+// the temporary upper/work layers after a root parent performs the mount.
+// Lowerdir is intentionally never chowned by this manager.
+type Owner struct {
+	UID int
+	GID int
 }
 
 func (m Manager) runner() Runner {
@@ -166,6 +175,14 @@ func (m Manager) runner() Runner {
 func (m Manager) Mount(ctx context.Context, l Layout) error {
 	if err := l.Prepare(); err != nil {
 		return err
+	}
+	if m.Owner != nil {
+		if err := os.Chown(l.Upper, m.Owner.UID, m.Owner.GID); err != nil {
+			return fmt.Errorf("chown overlay upper for agent: %w", err)
+		}
+		if err := os.Chown(l.Work, m.Owner.UID, m.Owner.GID); err != nil {
+			return fmt.Errorf("chown overlay work for agent: %w", err)
+		}
 	}
 	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s", l.Lower, l.Upper, l.Work)
 	return m.runner().Run(ctx, "mount", "-t", "overlay", "overlay", "-o", options, l.Merged)

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -55,12 +56,16 @@ func handleRun(args []string) {
 	}
 	eventsPath := filepath.Join(plan.Layout.Root, "events.jsonl")
 	telemetry := &telemetryAdapter{path: eventsPath}
+	owner, err := agentOwner()
+	if err != nil {
+		fatal(err.Error())
+	}
 	helper, err := os.Executable()
 	if err != nil {
 		fatal(fmt.Sprintf("resolve rewind helper: %v", err))
 	}
 	coordinator := protectedrun.Coordinator{
-		Overlay: overlay.Manager{},
+		Overlay: overlay.Manager{Owner: &owner},
 		Starter: protectedrun.ExecStarter{HelperPath: helper},
 		Sensor:  telemetry,
 	}
@@ -80,6 +85,21 @@ func handleRun(args []string) {
 	}
 	fmt.Printf("run succeeded: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
 	fmt.Printf("rollback with: rewind rollback --record %s\n", *recordPath)
+}
+
+func agentOwner() (overlay.Owner, error) {
+	if os.Geteuid() != 0 {
+		return overlay.Owner{UID: os.Getuid(), GID: os.Getgid()}, nil
+	}
+	uid, err := strconv.Atoi(os.Getenv("SUDO_UID"))
+	if err != nil || uid < 1 {
+		return overlay.Owner{}, fmt.Errorf("run requires SUDO_UID for the unprivileged agent")
+	}
+	gid, err := strconv.Atoi(os.Getenv("SUDO_GID"))
+	if err != nil || gid < 1 {
+		return overlay.Owner{}, fmt.Errorf("run requires SUDO_GID for the unprivileged agent")
+	}
+	return overlay.Owner{UID: uid, GID: gid}, nil
 }
 
 func handleRollback(args []string) {
