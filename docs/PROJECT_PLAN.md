@@ -364,6 +364,8 @@ The first full synthetic FUSE run and rollback passed in the disposable VM: read
 
 The initial B0 native-ext4 baseline is now captured with five fio 3.36 repetitions: 4 KiB random mixed I/O (70% read, 30% write), one job, `iodepth=1`, 128 MiB file, 2-second ramp, and 10-second measurement. Mean throughput was 41,337 KiB/s read and 17,683 KiB/s write; mean IOPS was 10,334.2 read and 4,421.0 write. Read p50/p95/p99 completion latency was 79.2/136.5/180.8 µs, and write p50/p95/p99 was 3.344/7.654/14.784 µs. These figures are the reference for B2 and B4 overhead calculations.
 
+The exploratory B2 FUSE-only run used a separate temporary tree and did not alter B0. Its five-run mean was 36,575 KiB/s / 9,143.8 IOPS read and 15,661 KiB/s / 3,915.4 IOPS write, approximately 11.5% below B0 throughput. FUSE write p50 was 68.1 µs. The 128 MiB fio file occupied 134,217,728 bytes in both native storage and the FUSE upper layer (approximately 1.0x amplification for this full-file workload). Because `direct=0`, this comparison is warm/page-cache exploratory data; final B4 reporting must add cold-cache and alternating-order controls.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```

@@ -311,6 +311,12 @@ The first native-ext4 baseline was captured on 2026-07-18 in the disposable VM w
 
 This is the B0 reference only; it is not evidence for the “near-zero overhead” claim. Throughput standard deviation was approximately 2.7% for both read and write. The next controlled measurement is B2 (FUSE OverlayFS without eBPF or the Rewind lifecycle), followed by B4 (the full protected-run path).
 
+### Exploratory B2 FUSE-only result
+
+The same fio workload was then run five times on a separate FUSE OverlayFS tree (`/home/vagrant/rewind-bench-b2.*`) without eBPF, Landlock, or the Rewind lifecycle. Mean read throughput was 36,575 KiB/s / 9,143.8 IOPS and mean write throughput was 15,661 KiB/s / 3,915.4 IOPS. Relative to B0, throughput was approximately 11.5% lower. Write p50 completion latency was 68.1 µs versus 3.344 µs for B0, exposing the FUSE write-path cost.
+
+The B2 workload left a 134,217,728-byte file in `upper`, matching the 134,217,728-byte native B0 file; measured copy-up amplification for this full-file workload was therefore approximately 1.0x. These are warm/page-cache exploratory results (`direct=0`), not the final overhead claim. Final reporting should include cold-cache and alternating-order repetitions.
+
 ## 12. Change protocol
 
 After each implementation stage:
