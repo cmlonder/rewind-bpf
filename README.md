@@ -121,6 +121,14 @@ rewind run \
 
 The command must run inside the disposable Ubuntu VM. It creates a `fuse-overlayfs` mount, starts the agent through the policy-aware helper, optionally attaches scoped eBPF telemetry, and leaves a successful run mounted until `rewind rollback --record ...` is called. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
 
+When the run is launched with `sudo`, inspect and roll it back with `sudo` as well because the current MVP writes the `0600` run record and telemetry log as root:
+
+```bash
+sudo ./bin/rewind status --record /home/vagrant/rewind-runs/run-1/record.json
+sudo ./bin/rewind events --record /home/vagrant/rewind-runs/run-1/record.json
+sudo ./bin/rewind rollback --record /home/vagrant/rewind-runs/run-1/record.json
+```
+
 The parent may need `sudo` for OverlayFS/eBPF, but the helper drops the agent to the invoking user using `SUDO_UID`/`SUDO_GID`. Before mounting, only the temporary `upper/work` directories are chowned to that user; the original lower workspace is never chowned. A direct root agent is rejected.
 
 The low-level telemetry smoke command is separate and privileged:
@@ -152,6 +160,8 @@ sudo env REWIND_OVERLAY_INTEGRATION=1 \
 ```
 
 Run this only inside the disposable Ubuntu VM. It uses `t.TempDir()` under the VM’s temporary filesystem and does not touch the Mac host or a real project. If the VM lacks `CAP_SYS_ADMIN`, the test must be treated as an environment limitation, not as permission to broaden the test scope.
+
+The first full protected-run smoke was verified in the disposable Ubuntu VM on 2026-07-18 using only a generated workspace. The agent was denied access to `synthetic.env`, deleted `src/`, created `generated.txt` in the merged view, emitted eBPF telemetry, and completed with `state=succeeded`. A subsequent rollback unmounted the FUSE view, discarded the generated file, preserved `original-source` in the lower workspace, and recorded `state=rolled_back`.
 
 ## Repository layout
 

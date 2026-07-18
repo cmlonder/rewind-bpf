@@ -358,6 +358,8 @@ The helper refuses to launch an agent as root: when the parent requires `sudo`, 
 
 The mount side now gives only the disposable `upper/work` layers to the same unprivileged identity. The protected-run CLI defaults to the `fuse-overlayfs` backend with explicit agent `uid/gid` mapping because the target VM kernel rejects `override_creds`; the kernel backend remains available as an explicit capability-tested option. The lower workspace is never chowned or deleted by the runtime.
 
+The first full synthetic FUSE run and rollback passed in the disposable VM: read denial, deletion isolation, eBPF telemetry, successful lifecycle recording, unmount, upper/work discard, and lower-layer preservation were all observed. Since the privileged MVP currently writes mode-`0600` metadata as root, VM operators use `sudo` for post-run inspection and rollback.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```

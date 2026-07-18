@@ -619,6 +619,12 @@ The privileged filesystem manager similarly chowns only the validated temporary 
 
 `internal/runstore` persists the plan, lifecycle record, and telemetry log path atomically with mode `0600`. The CLI can reconstruct a completed run for rollback in a later process. `commit` is still disabled: preserving the lower layer and exporting an intentional diff need a separate conflict-safe implementation.
 
+### Verified protected-run smoke (disposable VM)
+
+The first end-to-end FUSE run was verified on 2026-07-18 in the Ubuntu 24.04 ARM64 VM using only generated files. The policy denied `synthetic.env` with `EACCES`, the agent removed `src/` and created `generated.txt` in the merged view, and the eBPF sensor recorded the run. The lower workspace still contained `original-source`. `rewind rollback` then unmounted the FUSE view, discarded the temporary upper/work changes, and transitioned the persisted lifecycle from `succeeded` to `rolled_back`.
+
+Because the current privileged MVP writes the mode-`0600` record and telemetry file as root, the VM operator must use `sudo` for `status`, `events`, and `rollback` after a `sudo rewind run`. A later hardening pass can chown those metadata files to the invoking user without changing the filesystem safety boundary.
+
 ### Optional BPF-LSM backend
 
 `ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:
