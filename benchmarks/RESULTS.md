@@ -22,7 +22,7 @@ Three repetitions with `sync; echo 3 > /proc/sys/vm/drop_caches` before each run
 
 ## Telemetry result
 
-The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. The current PID-only sensor does not follow shell-launched child processes; cgroup/descendant scoping is a follow-up hardening item.
+The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. A follow-up shell-to-`dd` smoke generated 46 events across two PIDs (15 `write`, 30 `openat`, and one `execve`), confirming descendant tracking. Cgroup-level scoping remains a future scale option.
 
 The static footprint was 5,670,919 bytes for the `rewind` binary and 21,352 bytes for the compiled eBPF object. The run record was 746 bytes. The telemetry stream averaged approximately 148.5 bytes per event for this JSONL format.
 
