@@ -10,6 +10,7 @@ import (
 
 	"github.com/cilium/ebpf"
 	"github.com/cilium/ebpf/link"
+	"github.com/cilium/ebpf/rlimit"
 	"github.com/rewindbpf/rewind/internal/telemetry"
 )
 
@@ -57,6 +58,9 @@ func Load(objectPath, runID string, targetPID uint32) (*Session, error) {
 	}
 	if err := spec.RewriteConstants(map[string]interface{}{"target_pid": targetPID}); err != nil {
 		return nil, fmt.Errorf("load eBPF sensors: set target pid: %w", err)
+	}
+	if err := rlimit.RemoveMemlock(); err != nil {
+		return nil, fmt.Errorf("load eBPF sensors: remove memlock limit: %w", err)
 	}
 	collection, err := ebpf.NewCollection(spec)
 	if err != nil {

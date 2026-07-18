@@ -515,6 +515,7 @@ The project pins `github.com/cilium/ebpf` to v0.16.0 because it supports the VMâ
 
 - validates the object path, run ID, and non-zero target PID before touching BPF
 - rewrites the `target_pid` read-only global in the collection
+- removes the process memlock limit required by this kernel-loading path
 - loads `rewind_trace.bpf.o`, attaches the seven declared syscall tracepoints, and creates the run-scoped ring-buffer reader
 - detaches links and closes the collection in a repeat-safe `Close` method
 
