@@ -295,6 +295,20 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 6 protected-run integration | Complete | FUSE-backed end-to-end VM smoke passed: read denial, agent deletion isolation, generated-file creation, eBPF telemetry, successful record, rollback, and lower-layer preservation |
 | Stage 7 benchmarks | In progress | B0 baseline must be captured first; B1–B5 comparison remains VM-gated |
 
+### Initial B0 baseline (disposable VM)
+
+The first native-ext4 baseline was captured on 2026-07-18 in `/home/vagrant/rewind-bench.wwogIn` with fio 3.36 on the Ubuntu 24.04 ARM64 VM (`6.8.0-49-generic`). The workload used one 128 MiB file, 4 KiB random I/O, 70% reads / 30% writes, `iodepth=1`, buffered I/O, a 2-second ramp, and a 10-second measurement window.
+
+| Metric | Read | Write |
+|---|---:|---:|
+| Throughput | 42,366 KiB/s | 18,110 KiB/s |
+| IOPS | 10,591.6 | 4,527.5 |
+| p50 completion latency | 78.3 µs | 3.28 µs |
+| p95 completion latency | 130.6 µs | 6.94 µs |
+| p99 completion latency | 173.1 µs | 12.2 µs |
+
+This is the B0 reference only; it is not evidence for the “near-zero overhead” claim. The next controlled measurement is B2 (FUSE OverlayFS without eBPF or the Rewind lifecycle), followed by B4 (the full protected-run path).
+
 ## 12. Change protocol
 
 After each implementation stage:
