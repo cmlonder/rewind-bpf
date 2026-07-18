@@ -348,3 +348,7 @@ Run the first controlled destructive test only against synthetic fixtures inside
 ### Stage 4 onward
 
 Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.
+
+### Current continuation: BPF-LSM read enforcement gate
+
+The manifest-to-kernel compiler, fixed-size rule-map ABI, BPF-LSM `file_open` source, and userspace loader are implemented and unit-tested. The next action is not an automatic privileged attach. First verify the active LSM list inside the disposable VM; only a kernel with `bpf` active may proceed to a synthetic `.env`/custom-pattern denial test. If that gate is unavailable, record the limitation and use a VM kernel configured for BPF-LSM or keep the MVP read path at telemetry/audit until an approved alternate enforcement layer is added.

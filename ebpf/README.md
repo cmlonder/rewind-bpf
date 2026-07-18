@@ -1,6 +1,6 @@
 # eBPF component
 
-This directory contains the kernel-space telemetry program. The first implementation uses C + libbpf/CO-RE and emits compact records through a ring buffer. It is telemetry-only for now: deny decisions will be added through a separate BPF-LSM policy program after the event path is verified.
+This directory contains the kernel-space telemetry and read-policy programs. The first implementation uses C + libbpf/CO-RE and emits compact records through a ring buffer. Tracepoints remain telemetry-only; the separate BPF-LSM program applies exact-path `audit` or `deny` decisions loaded by userspace.
 
 Initial observation points:
 
@@ -16,6 +16,7 @@ Programs must filter target agent PIDs/cgroups and emit small event records thro
 
 - `event.h` — stable numeric ring-buffer ABI shared with userspace.
 - `rewind_trace.bpf.c` — tracepoint sensors for process execution, reads/opens, writes, deletes, renames, and truncation.
+- `rewind_read_enforcer.bpf.c` — BPF-LSM `file_open` hook with a fixed-size exact-path rule map.
 - `Makefile` — disposable Linux VM build commands; it generates `vmlinux.h` from the running kernel BTF.
 
 The eBPF translation unit includes the generated `vmlinux.h` before `event.h`.
@@ -30,6 +31,7 @@ Run these commands only inside the disposable Ubuntu VM. They generate files und
 cd /path/to/RewindBPF/ebpf
 make vmlinux
 make compile
+make compile-read
 ```
 
-Loading and attaching the object is a separate, privileged safety-gated step. Do not run it on the personal macOS host.
+The commands generate files under this directory and compile objects; they do not load a program or attach a hook. Loading and attaching either object is a separate, privileged safety-gated step. Do not run it on the personal macOS host. The read-enforcer requires an active BPF LSM (`bpf` in `/sys/kernel/security/lsm`); a kernel that merely supports the BPF program type is not sufficient.

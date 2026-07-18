@@ -1,5 +1,6 @@
 VMLINUX_H ?= vmlinux.h
 BPF_OBJ ?= rewind_trace.bpf.o
+BPF_READ_OBJ ?= rewind_read_enforcer.bpf.o
 BPF_ARCH ?= arm64
 BPF_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH 2>/dev/null || echo aarch64-linux-gnu)
 
@@ -8,7 +9,7 @@ ifneq ($(strip $(BPF_MULTIARCH)),)
 BPF_INCLUDE_FLAGS += -I/usr/include/$(BPF_MULTIARCH)
 endif
 
-.PHONY: vmlinux compile clean
+.PHONY: vmlinux compile compile-read clean
 
 vmlinux:
 	bpftool btf dump file /sys/kernel/btf/vmlinux format c > $(VMLINUX_H)
@@ -16,5 +17,8 @@ vmlinux:
 compile: $(VMLINUX_H)
 	clang -O2 -g -target bpf -D__TARGET_ARCH_$(BPF_ARCH) $(BPF_INCLUDE_FLAGS) -c rewind_trace.bpf.c -o $(BPF_OBJ)
 
+compile-read: $(VMLINUX_H)
+	clang -O2 -g -target bpf -D__TARGET_ARCH_$(BPF_ARCH) $(BPF_INCLUDE_FLAGS) -c rewind_read_enforcer.bpf.c -o $(BPF_READ_OBJ)
+
 clean:
-	rm -f $(VMLINUX_H) $(BPF_OBJ)
+	rm -f $(VMLINUX_H) $(BPF_OBJ) $(BPF_READ_OBJ)

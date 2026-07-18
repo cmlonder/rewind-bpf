@@ -291,7 +291,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
-| Stage 5 read policy | Manifest-to-kernel rule compiler complete; BPF-LSM enforcement next | Exact-path compiler unit-tested; VM reports BPF LSM program type, but no enforcement program loaded |
+| Stage 5 read policy | Manifest-to-kernel compiler and BPF-LSM loader prepared; execution gated | Exact-path compiler and fixed-key ABI unit-tested; read-enforcer object compiles in VM; VM reports BPF LSM program type, but its active LSM list is `lockdown,capability`, so no enforcement program has been loaded |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
 
@@ -546,3 +546,24 @@ This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PI
 `internal/policycompile` expands the user-facing read globs against the start-of-run manifest and returns deterministic exact-path rules. This keeps glob matching and filesystem traversal in userspace; the future BPF-LSM program will receive bounded fixed-size keys instead of arbitrary patterns.
 
 The compiler preserves allow-over-deny precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.
+
+## 28. Stage 5 BPF-LSM read enforcer preparation
+
+`ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:
+
+- scopes decisions to the configured target PID;
+- resolves the opened file to a canonical kernel path with `bpf_d_path`;
+- looks up an exact 256-byte path key in `rewind_read_rules`;
+- emits a `read` event with `audit` or `deny`; and
+- returns `-EACCES` only for a compiled deny rule.
+
+`internal/ebpfload/read_rules.go` owns the userspace representation of the fixed-size key and decision ABI. `internal/ebpfload/read_loader.go` owns only collection loading, map installation, LSM attachment, and ring-reader cleanup. This keeps policy parsing/compilation separate from privileged kernel lifecycle code.
+
+The loader refuses an empty run ID, PID zero, or `off` mode. It must not be invoked until the VM passes this read-only capability gate:
+
+```bash
+test -r /sys/kernel/security/lsm && cat /sys/kernel/security/lsm
+bpftool feature probe kernel | grep -A3 -B2 'program types' | grep -i lsm
+```
+
+`bpf` must appear in the active LSM list. A `bpf` program type reported by `bpftool` alone only proves kernel support; it does not prove that BPF-LSM enforcement is active. If the gate fails, the safe options are to boot a VM kernel with BPF-LSM enabled or keep read mode at `audit`/telemetry-only until another supported enforcement layer is implemented. No privileged read-enforcement load has been run on the personal Mac or in the current VM.
