@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 7 (benchmarking) is starting. Stage 6 protected-run integration is validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, a process-level Landlock denial test, a Go OverlayFS mount/rollback test, a protected-run plan composer, a fail-closed coordinator, a policy-aware hidden helper process, and the user-facing `rewind run/status/events/rollback` flow are available. The VM reports Landlock active, so Landlock is the primary read-enforcement path; eBPF remains the low-overhead telemetry path. The first full FUSE run and rollback passed with a generated workspace; the next step is to capture the B0 baseline before measuring B1–B5 overhead.
+Stage 7 (benchmarking) is in progress. Stage 6 protected-run integration is validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, a process-level Landlock denial test, a Go OverlayFS mount/rollback test, a protected-run plan composer, a fail-closed coordinator, a policy-aware hidden helper process, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. The remaining work is final cold protected-run control and presentation polish.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -59,16 +59,16 @@ The approved integration-test boundary is a disposable Ubuntu VM where RewindBPF
 macOS host → disposable Ubuntu VM → RewindBPF directly
 ```
 
-## Planned user workflow
+## User workflow
 
-Once the runtime stages are implemented, the primary workflow will be:
+The primary workflow runs inside the disposable Linux VM:
 
 ```bash
-rewind run --workspace ./project --policy ./policy.yaml -- agent-command
-rewind status
-rewind events <run_id>
-rewind rollback <run_id>
-rewind commit <run_id>
+sudo rewind run --workspace ./project --runtime-root ./runtime \
+  --policy ./policy.yaml --record ./runtime/record.json -- agent-command
+sudo rewind status --record ./runtime/record.json
+sudo rewind events --record ./runtime/record.json
+sudo rewind rollback --record ./runtime/record.json
 ```
 
 The agent will see a merged workspace backed by an OverlayFS lower/upper pair. Rollback discards the temporary upper layer. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
