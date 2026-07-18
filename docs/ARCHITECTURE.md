@@ -2,7 +2,7 @@
 
 **Document status:** Living document
 
-**Current stage:** Stage 3 — protected run lifecycle foundation (execution gated)
+**Current stage:** Stage 4 — eBPF telemetry contract (execution gated)
 
 **Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
@@ -290,7 +290,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
-| Stage 4 eBPF telemetry | Not started | Safety gate required |
+| Stage 4 eBPF telemetry | Event contract complete; kernel program next | Userspace schema is unit-tested; eBPF load still safety-gated |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
@@ -423,7 +423,7 @@ Keep these responsibilities separate:
 
 ```text
 CLI             → parse user intent and render results
-run lifecycle   → run IDs, state transitions, and process ownership
+run lifecycle   → run IDs and state transitions; process ownership is a later daemon boundary
 overlay         → lower/upper/work/merged filesystem lifecycle
 policy          → parse, validate, compile, and evaluate rules
 eBPF            → kernel event collection and narrowly scoped hooks
@@ -467,3 +467,9 @@ A module is ready when it has:
 - validated transitions that prevent committing an unprepared run or resuming a terminal run
 
 The package does not start processes, mount filesystems, parse policies, or load eBPF. Those operations remain separate integration boundaries for the daemon. Its tests run on the development host and require no kernel or privileged filesystem state.
+
+## 20. Stage 4 event contract foundation
+
+`internal/event` defines the narrow data contract between eBPF telemetry and userspace. It contains only primitive, serializable fields: run ID, PID, operation, optional path, kernel timestamp, decision, and risk level.
+
+The package validates supported operation/decision/risk values before events are persisted. It does not read ring buffers, evaluate glob policies, or write logs. Kernel programs can therefore remain focused on collecting compact records while the daemon owns enrichment and persistence. Its tests run without loading eBPF or requiring Linux kernel state.
