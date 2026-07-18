@@ -290,7 +290,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
-| Stage 4 eBPF telemetry | Tracepoint source, event ABI, and userspace reader complete; VM attach next | Object compiled in VM; Go decoder/reader unit-tested; eBPF load/attach still safety-gated |
+| Stage 4 eBPF telemetry | Tracepoint source, event ABI, userspace reader, and scoped loader complete; VM attach next | Object compiled in VM; Go components unit-tested; eBPF load/attach still safety-gated |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
@@ -507,4 +507,15 @@ The first VM compile exposed an ARM64 header issue: `event.h` was importing user
 - `Decode` validates the fixed 280-byte kernel record, maps numeric ABI codes to the userspace event model, trims the NUL-terminated path, and attaches the active `run_id`.
 - `Reader` adapts the `cilium/ebpf` ring-buffer reader without loading the eBPF collection itself.
 
-The project pins `github.com/cilium/ebpf` to v0.16.0 because it supports the VM’s Go 1.22 toolchain while providing the ring-buffer API. Decoder tests use synthetic byte records and do not require Linux, BTF, or privileges. Collection loading and tracepoint attachment remain daemon responsibilities and are not yet implemented.
+The project pins `github.com/cilium/ebpf` to v0.16.0 because it supports the VM’s Go 1.22 toolchain while providing the ring-buffer API. Decoder tests use synthetic byte records and do not require Linux, BTF, or privileges.
+
+## 24. Stage 4 scoped loader
+
+`internal/ebpfload` owns only the telemetry collection lifecycle:
+
+- validates the object path, run ID, and non-zero target PID before touching BPF
+- rewrites the `target_pid` read-only global in the collection
+- loads `rewind_trace.bpf.o`, attaches the seven declared syscall tracepoints, and creates the run-scoped ring-buffer reader
+- detaches links and closes the collection in a repeat-safe `Close` method
+
+The loader deliberately fails closed for an empty run ID or PID zero, which would otherwise enable unscoped event collection. Its unit tests stop before collection loading by using invalid paths/objects; no eBPF program is loaded on the development host. The first real loader invocation remains a privileged, VM-only safety-gated test.
