@@ -297,17 +297,17 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 
 ### Initial B0 baseline (disposable VM)
 
-The first native-ext4 baseline was captured on 2026-07-18 in `/home/vagrant/rewind-bench.wwogIn` with fio 3.36 on the Ubuntu 24.04 ARM64 VM (`6.8.0-49-generic`). The workload used one 128 MiB file, 4 KiB random I/O, 70% reads / 30% writes, `iodepth=1`, buffered I/O, a 2-second ramp, and a 10-second measurement window.
+The first native-ext4 baseline was captured on 2026-07-18 in the disposable VM with fio 3.36 on Ubuntu 24.04 ARM64 (`6.8.0-49-generic`). Five measured repetitions used one 128 MiB file, 4 KiB random I/O, 70% reads / 30% writes, `iodepth=1`, buffered I/O, a 2-second ramp, and a 10-second measurement window per repetition.
 
 | Metric | Read | Write |
 |---|---:|---:|
-| Throughput | 42,366 KiB/s | 18,110 KiB/s |
-| IOPS | 10,591.6 | 4,527.5 |
-| p50 completion latency | 78.3 µs | 3.28 µs |
-| p95 completion latency | 130.6 µs | 6.94 µs |
-| p99 completion latency | 173.1 µs | 12.2 µs |
+| Throughput (mean) | 41,337 KiB/s | 17,683 KiB/s |
+| IOPS (mean) | 10,334.2 | 4,421.0 |
+| p50 completion latency (mean) | 79.2 µs | 3.344 µs |
+| p95 completion latency (mean) | 136.5 µs | 7.654 µs |
+| p99 completion latency (mean) | 180.8 µs | 14.784 µs |
 
-This is the B0 reference only; it is not evidence for the “near-zero overhead” claim. The next controlled measurement is B2 (FUSE OverlayFS without eBPF or the Rewind lifecycle), followed by B4 (the full protected-run path).
+This is the B0 reference only; it is not evidence for the “near-zero overhead” claim. Throughput standard deviation was approximately 2.7% for both read and write. The next controlled measurement is B2 (FUSE OverlayFS without eBPF or the Rewind lifecycle), followed by B4 (the full protected-run path).
 
 ## 12. Change protocol
 

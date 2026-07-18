@@ -360,7 +360,7 @@ The mount side now gives only the disposable `upper/work` layers to the same unp
 
 The first full synthetic FUSE run and rollback passed in the disposable VM: read denial, deletion isolation, eBPF telemetry, successful lifecycle recording, unmount, upper/work discard, and lower-layer preservation were all observed. Since the privileged MVP currently writes mode-`0600` metadata as root, VM operators use `sudo` for post-run inspection and rollback.
 
-The initial B0 native-ext4 baseline is now captured with fio 3.36: 4 KiB random mixed I/O (70% read, 30% write), one job, `iodepth=1`, 128 MiB file, 2-second ramp, and 10-second measurement. It measured 10,591.6 read IOPS / 42,366 KiB/s and 4,527.5 write IOPS / 18,110 KiB/s; read p50/p95/p99 completion latency was 78.3/130.6/173.1 µs, and write p50/p95/p99 was 3.28/6.94/12.2 µs. These figures are the reference for B2 and B4 overhead calculations.
+The initial B0 native-ext4 baseline is now captured with five fio 3.36 repetitions: 4 KiB random mixed I/O (70% read, 30% write), one job, `iodepth=1`, 128 MiB file, 2-second ramp, and 10-second measurement. Mean throughput was 41,337 KiB/s read and 17,683 KiB/s write; mean IOPS was 10,334.2 read and 4,421.0 write. Read p50/p95/p99 completion latency was 79.2/136.5/180.8 µs, and write p50/p95/p99 was 3.344/7.654/14.784 µs. These figures are the reference for B2 and B4 overhead calculations.
 
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
