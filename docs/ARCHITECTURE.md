@@ -291,7 +291,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
-| Stage 5 read policy | Not started; BPF-LSM design next | VM reports BPF LSM program type, but no enforcement program loaded |
+| Stage 5 read policy | Manifest-to-kernel rule compiler complete; BPF-LSM enforcement next | Exact-path compiler unit-tested; VM reports BPF LSM program type, but no enforcement program loaded |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
 
@@ -429,6 +429,7 @@ policy          → parse, validate, compile, and evaluate rules
 eBPF            → kernel event collection and narrowly scoped hooks
 telemetry       → ring-buffer decoding and userspace event ingestion
 manifest        → content/metadata snapshot and verification
+policycompile   → expand user globs into bounded manifest paths for kernel maps
 benchmark       → deterministic workloads and measurement
 ```
 
@@ -539,3 +540,9 @@ Observed userspace events:
 ```
 
 This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PID filter selected the target process, ring-buffer records were decoded, and userspace enriched each event with the active `run_id`. The current program is telemetry-only; it does not deny reads or writes. Read enforcement is the next stage and must use a separate BPF-LSM policy program because this VM does not have Landlock enabled.
+
+## 27. Stage 5 manifest-to-kernel policy compiler
+
+`internal/policycompile` expands the user-facing read globs against the start-of-run manifest and returns deterministic exact-path rules. This keeps glob matching and filesystem traversal in userspace; the future BPF-LSM program will receive bounded fixed-size keys instead of arbitrary patterns.
+
+The compiler preserves allow-over-deny precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.

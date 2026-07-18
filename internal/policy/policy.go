@@ -58,7 +58,7 @@ func Parse(data []byte) (Policy, error) {
 }
 
 func (p Policy) Validate() error {
-	if err := validateMode("read.mode", p.Read.Mode, true); err != nil {
+	if err := p.Read.Validate(); err != nil {
 		return err
 	}
 	if err := validateMode("network.mode", p.Network.Mode, true); err != nil {
@@ -70,7 +70,14 @@ func (p Policy) Validate() error {
 	if p.Write.Scope != "" && p.Write.Scope != "workspace" && p.Write.Scope != "system" {
 		return fmt.Errorf("write.scope must be workspace or system when set, got %q", p.Write.Scope)
 	}
-	for _, pattern := range append(append([]string{}, p.Read.Deny...), p.Read.Allow...) {
+	return nil
+}
+
+func (p ReadPolicy) Validate() error {
+	if err := validateMode("read.mode", p.Mode, true); err != nil {
+		return err
+	}
+	for _, pattern := range append(append([]string{}, p.Deny...), p.Allow...) {
 		if strings.TrimSpace(pattern) == "" {
 			return fmt.Errorf("read patterns cannot be empty")
 		}
