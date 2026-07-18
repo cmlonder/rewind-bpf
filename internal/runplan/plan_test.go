@@ -32,6 +32,9 @@ func TestBuildComposesOverlayManifestAndLandlockPlan(t *testing.T) {
 	if plan.Run.State != "preparing" {
 		t.Fatalf("run state = %s", plan.Run.State)
 	}
+	if plan.OverlayBackend != "fuse" {
+		t.Fatalf("overlay backend = %q, want fuse", plan.OverlayBackend)
+	}
 	if plan.Layout.Lower != workspace {
 		t.Fatalf("lower = %q, want %q", plan.Layout.Lower, workspace)
 	}

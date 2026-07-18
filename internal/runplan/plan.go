@@ -17,18 +17,20 @@ import (
 )
 
 type Config struct {
-	Workspace    string
-	RuntimeRoot  string
-	Policy       policy.Policy
-	RuntimeRoots []string
+	Workspace      string
+	RuntimeRoot    string
+	Policy         policy.Policy
+	RuntimeRoots   []string
+	OverlayBackend overlay.Backend
 }
 
 type Plan struct {
-	Run       lifecycle.Run
-	Layout    overlay.Layout
-	Manifest  manifest.Manifest
-	ReadRules policycompile.ReadRules
-	Landlock  *landlock.Plan
+	Run            lifecycle.Run
+	Layout         overlay.Layout
+	Manifest       manifest.Manifest
+	ReadRules      policycompile.ReadRules
+	Landlock       *landlock.Plan
+	OverlayBackend overlay.Backend
 }
 
 // Build validates and composes all pre-execution state. The workspace is used
@@ -76,7 +78,14 @@ func Build(config Config) (Plan, error) {
 	if err != nil {
 		return Plan{}, fmt.Errorf("build run plan: lifecycle: %w", err)
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan}, nil
+	backend := config.OverlayBackend
+	if backend == "" {
+		backend = overlay.BackendFuse
+	}
+	if backend != overlay.BackendFuse && backend != overlay.BackendKernel {
+		return Plan{}, fmt.Errorf("build run plan: unsupported overlay backend %q", backend)
+	}
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, OverlayBackend: backend}, nil
 }
 
 func resolveWorkspace(value string) (string, error) {

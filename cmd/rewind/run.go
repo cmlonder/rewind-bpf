@@ -50,10 +50,11 @@ func handleRun(args []string) {
 		fatal(err.Error())
 	}
 	plan, err := runplan.Build(runplan.Config{
-		Workspace:    *workspace,
-		RuntimeRoot:  *runtimeRoot,
-		Policy:       value,
-		RuntimeRoots: splitCSV(*runtimeRoots),
+		Workspace:      *workspace,
+		RuntimeRoot:    *runtimeRoot,
+		Policy:         value,
+		RuntimeRoots:   splitCSV(*runtimeRoots),
+		OverlayBackend: overlay.Backend(*overlayBackend),
 	})
 	if err != nil {
 		fatal(err.Error())
@@ -69,7 +70,7 @@ func handleRun(args []string) {
 		fatal(fmt.Sprintf("resolve rewind helper: %v", err))
 	}
 	coordinator := protectedrun.Coordinator{
-		Overlay: overlay.Manager{Owner: &owner, Backend: overlay.Backend(*overlayBackend)},
+		Overlay: overlay.Manager{Owner: &owner, Backend: plan.OverlayBackend},
 		Starter: protectedrun.ExecStarter{HelperPath: helper},
 		Sensor:  telemetry,
 	}
@@ -123,7 +124,7 @@ func handleRollback(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	coordinator := protectedrun.Coordinator{Overlay: overlay.Manager{}}
+	coordinator := protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}}
 	if err := coordinator.RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(err.Error())
 	}
