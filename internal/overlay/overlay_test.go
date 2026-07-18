@@ -119,7 +119,7 @@ func TestFuseMountBuildsAgentOwnedCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	command := strings.Join(starter.command, " ")
-	for _, expected := range []string{"fuse-overlayfs", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, fmt.Sprintf("uid=%d", os.Getuid()), fmt.Sprintf("gid=%d", os.Getgid()), "allow_other", layout.Merged} {
+	for _, expected := range []string{"fuse-overlayfs", "-f", "lowerdir=" + layout.Lower, "upperdir=" + layout.Upper, "workdir=" + layout.Work, fmt.Sprintf("uid=%d", os.Getuid()), fmt.Sprintf("gid=%d", os.Getgid()), "allow_other", layout.Merged} {
 		if !strings.Contains(command, expected) {
 			t.Errorf("command %q does not contain %q", command, expected)
 		}

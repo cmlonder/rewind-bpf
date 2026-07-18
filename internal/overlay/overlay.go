@@ -259,7 +259,7 @@ func (m Manager) mountFuse(ctx context.Context, l Layout) error {
 		return fmt.Errorf("fuse overlay backend requires an agent owner")
 	}
 	options := fmt.Sprintf("lowerdir=%s,upperdir=%s,workdir=%s,uid=%d,gid=%d,allow_other", l.Lower, l.Upper, l.Work, m.Owner.UID, m.Owner.GID)
-	process, err := m.starter().Start(ctx, "fuse-overlayfs", "-o", options, l.Merged)
+	process, err := m.starter().Start(ctx, "fuse-overlayfs", "-f", "-o", options, l.Merged)
 	if err != nil {
 		return fmt.Errorf("start fuse-overlayfs: %w", err)
 	}
