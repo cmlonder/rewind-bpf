@@ -4,6 +4,8 @@
 
 These values are the measurements captured in the disposable Ubuntu 24.04 ARM64 VM. The machine was running kernel `6.8.0-49-generic`, fio `3.36`, and buffered I/O (`direct=0`). Raw fio JSON files remain in the VM's temporary benchmark directories; this checked-in CSV is the durable summary used for charts and presentation material.
 
+![RewindBPF benchmark summary](results_chart.svg)
+
 ## Current results
 
 | Variant | Read IOPS | Write IOPS | Read BW | Write BW | Read p50 | Write p50 | Upper bytes | Notes |
