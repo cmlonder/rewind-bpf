@@ -291,7 +291,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
-| Stage 5 read policy | Manifest-to-kernel compiler and BPF-LSM loader prepared; execution gated | Exact-path compiler and fixed-key ABI unit-tested; read-enforcer object compiles in VM; VM reports BPF LSM program type, but its active LSM list is `lockdown,capability`, so no enforcement program has been loaded |
+| Stage 5 read policy | Manifest compiler and Landlock allowlist planner prepared; execution gated | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; optional read-enforcer object compiles in VM; current VM reports `landlock` active but not `bpf` |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
 
@@ -378,12 +378,12 @@ Clang:    18.1.3
 bpftrace: 0.20.2
 bpftool:  7.4.0 (libbpf 1.4)
 OverlayFS: module available via modinfo, not loaded
-LSM list:  lockdown,capability
-Landlock: not enabled in this kernel LSM list
+LSM list:  lockdown,capability,landlock,yama
+Landlock: active in this VM kernel LSM list
 BPF LSM:  program type available
 ```
 
-The direct Linux toolchain and BPF capability audit are complete. The OverlayFS module was loaded only for the controlled synthetic smoke test and the test mount was unmounted afterward. Landlock is not enabled in this VM kernel, so read enforcement must use BPF LSM or a future kernel with Landlock enabled. No eBPF program was loaded during either the capability audit or the smoke test.
+The direct Linux toolchain and BPF capability audit are complete. The OverlayFS module was loaded only for the controlled synthetic smoke test and the test mount was unmounted afterward. Landlock is active in the current VM and is now the primary read-enforcement candidate. BPF-LSM remains optional because the active LSM list does not include `bpf`. No eBPF program was loaded during the capability audit or the OverlayFS smoke test.
 
 ## 16. Stage 3 OverlayFS smoke test result
 
@@ -545,9 +545,23 @@ This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PI
 
 `internal/policycompile` expands the user-facing read globs against the start-of-run manifest and returns deterministic exact-path rules. This keeps glob matching and filesystem traversal in userspace; the future BPF-LSM program will receive bounded fixed-size keys instead of arbitrary patterns.
 
-The compiler preserves allow-over-deny precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.
+The compiler preserves allow-over-deny precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. In `enforce` mode it also emits deterministic allowed-file and allowed-directory lists for Landlock’s allowlist model. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.
 
-## 28. Stage 5 BPF-LSM read enforcer preparation
+## 28. Stage 5 read enforcement preparation
+
+The current VM reports `lockdown,capability,landlock,yama` in `/sys/kernel/security/lsm`. Therefore the MVP enforcement choice is:
+
+```text
+Landlock allowlist → actual read denial
+eBPF tracepoints   → low-overhead read audit/telemetry
+BPF-LSM object     → optional path-deny backend for kernels with active bpf LSM
+```
+
+Landlock is an allowlist LSM, not a deny-rule engine. For `enforce`, userspace allows the start-of-run manifest’s non-sensitive files and the explicitly supplied runtime roots; sensitive matched files receive no `READ_FILE` rule and are denied by the kernel. The runtime must pass system paths required to launch the agent explicitly, and must never include the protected workspace as a broad runtime root. `audit` remains telemetry-only because Landlock cannot report an access without enforcing an allowlist.
+
+`internal/landlock` owns the platform-neutral allowlist plan and Linux syscall application boundary. Its `Apply` method is intended for the agent child after setup and before `exec`; it sets `no_new_privs`, creates a read-only ruleset, adds path-beneath rules, and restricts only the current process tree. No Landlock syscall has been run on the personal Mac.
+
+### Optional BPF-LSM backend
 
 `ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:
 
@@ -559,11 +573,11 @@ The compiler preserves allow-over-deny precedence, supports `off`/`audit`/`enfor
 
 `internal/ebpfload/read_rules.go` owns the userspace representation of the fixed-size key and decision ABI. `internal/ebpfload/read_loader.go` owns only collection loading, map installation, LSM attachment, and ring-reader cleanup. This keeps policy parsing/compilation separate from privileged kernel lifecycle code.
 
-The loader refuses an empty run ID, PID zero, or `off` mode. It must not be invoked until the VM passes this read-only capability gate:
+The optional loader refuses an empty run ID, PID zero, or `off` mode. It must not be invoked until the VM passes this read-only capability gate:
 
 ```bash
 test -r /sys/kernel/security/lsm && cat /sys/kernel/security/lsm
 bpftool feature probe kernel | grep -A3 -B2 'program types' | grep -i lsm
 ```
 
-`bpf` must appear in the active LSM list. A `bpf` program type reported by `bpftool` alone only proves kernel support; it does not prove that BPF-LSM enforcement is active. If the gate fails, the safe options are to boot a VM kernel with BPF-LSM enabled or keep read mode at `audit`/telemetry-only until another supported enforcement layer is implemented. No privileged read-enforcement load has been run on the personal Mac or in the current VM.
+`bpf` must appear in the active LSM list. A `bpf` program type reported by `bpftool` alone only proves kernel support; it does not prove that BPF-LSM enforcement is active. The current VM fails this optional gate, so no BPF-LSM program has been loaded. Landlock is the approved VM enforcement path for the next synthetic read test.

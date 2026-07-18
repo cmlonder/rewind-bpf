@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 5 is in progress: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, and a manifest-to-kernel read-rule compiler are available. A separate BPF-LSM `file_open` object and loader are now prepared, but enforcement has not yet been loaded because the disposable VM must first expose an active BPF LSM. The telemetry object was compiled and attached successfully in the VM.
+Stage 5 is in progress: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, a manifest-to-kernel read-rule compiler, and a Landlock allowlist planner are available. The disposable VM reports Landlock active, so Landlock is the primary read-enforcement path; eBPF remains the low-overhead telemetry path. The optional BPF-LSM object is retained for kernels that explicitly enable BPF in the active LSM list. The telemetry object was compiled and attached successfully in the VM.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -132,7 +132,7 @@ tests/            integration-test safety notes
 - Go 1.22 or newer
 - Linux VM for kernel integration
 - OverlayFS and BPF/BTF support in the VM kernel
-- Landlock **or an active BPF LSM** for read enforcement (the current VM reports neither active in its LSM list)
+- Landlock **or an active BPF LSM** for read enforcement (the current VM reports Landlock active)
 The disposable VM setup and safety boundary are documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The MVP runs directly inside that VM.
 
 ## Verification

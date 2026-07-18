@@ -1,6 +1,6 @@
 # eBPF component
 
-This directory contains the kernel-space telemetry and read-policy programs. The first implementation uses C + libbpf/CO-RE and emits compact records through a ring buffer. Tracepoints remain telemetry-only; the separate BPF-LSM program applies exact-path `audit` or `deny` decisions loaded by userspace.
+This directory contains the kernel-space telemetry and optional BPF-LSM read-policy programs. The first implementation uses C + libbpf/CO-RE and emits compact records through a ring buffer. Tracepoints remain telemetry-only. The current VM has Landlock active, so the MVP’s primary read enforcement is the userspace Landlock allowlist; the BPF-LSM program is for kernels that explicitly enable `bpf` in the active LSM list.
 
 Initial observation points:
 
@@ -34,4 +34,4 @@ make compile
 make compile-read
 ```
 
-The commands generate files under this directory and compile objects; they do not load a program or attach a hook. Loading and attaching either object is a separate, privileged safety-gated step. Do not run it on the personal macOS host. The read-enforcer requires an active BPF LSM (`bpf` in `/sys/kernel/security/lsm`); a kernel that merely supports the BPF program type is not sufficient.
+The commands generate files under this directory and compile objects; they do not load a program or attach a hook. Loading and attaching an object is a separate, privileged safety-gated step. Do not run it on the personal macOS host. The optional read-enforcer requires an active BPF LSM (`bpf` in `/sys/kernel/security/lsm`); a kernel that merely supports the BPF program type is not sufficient.

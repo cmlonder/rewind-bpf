@@ -140,6 +140,7 @@ eBPF does not perform every security function by itself. Kernel hooks, namespace
 - **Linux VM:** Ubuntu/Debian with OverlayFS and BPF/BTF support.
 - **Filesystem:** ext4 for the first reproducible environment.
 - **eBPF:** C + libbpf/CO-RE for portable kernel sensors and, where supported, BPF LSM hooks.
+- **Read enforcement:** Landlock allowlists when active; optional BPF LSM backend for kernels with `bpf` enabled in the active LSM list.
 - **Daemon:** Go for process management, mount namespaces, policy handling, ring buffers, JSON, and CLI orchestration.
 - **Policy:** YAML/JSON input, glob patterns, and `off/audit/enforce` modes.
 - **CLI:** no web UI in the first MVP; terminal timeline and commands are sufficient.
@@ -349,6 +350,6 @@ Run the first controlled destructive test only against synthetic fixtures inside
 
 Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.
 
-### Current continuation: BPF-LSM read enforcement gate
+### Current continuation: Landlock read enforcement gate
 
-The manifest-to-kernel compiler, fixed-size rule-map ABI, BPF-LSM `file_open` source, and userspace loader are implemented and unit-tested. The next action is not an automatic privileged attach. First verify the active LSM list inside the disposable VM; only a kernel with `bpf` active may proceed to a synthetic `.env`/custom-pattern denial test. If that gate is unavailable, record the limitation and use a VM kernel configured for BPF-LSM or keep the MVP read path at telemetry/audit until an approved alternate enforcement layer is added.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, and userspace loaders are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent, so the next action is a synthetic Landlock read-denial test in the VM. The test must use only generated fixture files and an explicitly scoped child process; no real `.env`, SSH key, personal data, or host path is allowed.

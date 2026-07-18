@@ -21,8 +21,10 @@ type ReadRule struct {
 }
 
 type ReadRules struct {
-	Mode  policy.Mode
-	Rules []ReadRule
+	Mode         policy.Mode
+	Rules        []ReadRule
+	AllowedFiles []string
+	AllowedDirs  []string
 }
 
 // CompileRead expands read globs against the immutable start-of-run manifest.
@@ -43,6 +45,8 @@ func CompileRead(read policy.ReadPolicy, root string, snapshot manifest.Manifest
 	}
 
 	byPath := make(map[string]string)
+	allowedFiles := make([]string, 0)
+	allowedDirs := make([]string, 0)
 	for _, entry := range snapshot.Entries {
 		if entry.Type != "file" && entry.Type != "directory" {
 			continue
@@ -57,6 +61,13 @@ func CompileRead(read policy.ReadPolicy, root string, snapshot manifest.Manifest
 		}
 		decision := read.Decision(candidate)
 		if decision == "allow" {
+			if read.Mode == policy.ModeEnforce {
+				if entry.Type == "file" {
+					allowedFiles = append(allowedFiles, candidate)
+				} else {
+					allowedDirs = append(allowedDirs, candidate)
+				}
+			}
 			continue
 		}
 		byPath[candidate] = decision
@@ -67,6 +78,10 @@ func CompileRead(read policy.ReadPolicy, root string, snapshot manifest.Manifest
 		result.Rules = append(result.Rules, ReadRule{Path: path, Decision: decision})
 	}
 	sort.Slice(result.Rules, func(i, j int) bool { return result.Rules[i].Path < result.Rules[j].Path })
+	sort.Strings(allowedFiles)
+	sort.Strings(allowedDirs)
+	result.AllowedFiles = allowedFiles
+	result.AllowedDirs = allowedDirs
 	return result, nil
 }
 
