@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 4 foundations are in place: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, and a scoped eBPF loader are available. OverlayFS lifecycle code has passed unit tests and a controlled disposable-VM smoke test. eBPF loading/attachment, read enforcement, and the end-to-end daemon are still being validated incrementally in the disposable Linux environment.
+Stage 4 is complete: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, and a scoped eBPF loader are available. The telemetry object was compiled and attached successfully in the disposable Ubuntu VM. Read enforcement and the end-to-end daemon are the next implementation stages.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 

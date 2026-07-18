@@ -2,7 +2,7 @@
 
 **Document status:** Living document
 
-**Current stage:** Stage 4 — eBPF telemetry contract (execution gated)
+**Current stage:** Stage 5 — sensitive-read policy enforcement (execution gated)
 
 **Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
@@ -290,8 +290,8 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
-| Stage 4 eBPF telemetry | Tracepoint source, event ABI, userspace reader, and scoped loader complete; VM attach next | Object compiled in VM; Go components unit-tested; eBPF load/attach still safety-gated |
-| Stage 5 read policy | Not started | Safety gate required |
+| Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
+| Stage 5 read policy | Not started; BPF-LSM design next | VM reports BPF LSM program type, but no enforcement program loaded |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
 
@@ -526,3 +526,16 @@ The loader deliberately fails closed for an empty run ID or PID zero, which woul
 `rewind sensor attach` is a deliberately narrow VM smoke-test command. It accepts a compiled object, an explicit run ID, and a non-zero target PID; it attaches the seven telemetry tracepoints and prints validated events as JSON until `Ctrl-C`/SIGTERM. It does not start an agent, create a filesystem transaction, or enforce a policy.
 
 The command is intentionally separate from the planned `rewind run` path so privileged kernel attachment can be tested in isolation before process, OverlayFS, and policy orchestration are combined.
+
+## 26. Stage 4 telemetry attach smoke-test result
+
+The first real eBPF attach ran only inside the disposable Ubuntu VM. The test used the compiled ARM64 object and a synthetic shell process with PID `4723`; no project or host path was monitored.
+
+Observed userspace events:
+
+```json
+{"run_id":"run_vm_telemetry","pid":4723,"operation":"openat","path":"/home/vagrant/rewind-telemetry-smoke/output.txt","decision":"allow","risk":"medium"}
+{"run_id":"run_vm_telemetry","pid":4723,"operation":"write","decision":"allow","risk":"high"}
+```
+
+This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PID filter selected the target process, ring-buffer records were decoded, and userspace enriched each event with the active `run_id`. The current program is telemetry-only; it does not deny reads or writes. Read enforcement is the next stage and must use a separate BPF-LSM policy program because this VM does not have Landlock enabled.
