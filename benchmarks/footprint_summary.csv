@@ -1,0 +1,5 @@
+artifact,bytes,notes
+rewind_binary,5670919,"/tmp/rewind; statically linked ARM64 build"
+ebpf_object,21352,"rewind_trace.bpf.o"
+direct_telemetry_events_jsonl,2467528,"16,620 events"
+direct_telemetry_record_json,746,"run record"

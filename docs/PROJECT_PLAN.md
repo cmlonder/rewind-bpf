@@ -368,6 +368,8 @@ The exploratory B2 FUSE-only run used a separate temporary tree and did not alte
 
 The B4 protected-run measurement used five fio repetitions inside one FUSE-backed Rewind run. Mean throughput was 36,726 KiB/s / 9,181.7 IOPS read and 15,730 KiB/s / 3,932.6 IOPS write, approximately 11.1% below B0 and 0.4% above B2. The complete run took 64.34 seconds wall-clock. A direct-fio PID telemetry validation recorded 16,620 events (16,403 writes, 216 opens, one unlink) in a 2,467,528-byte log before rollback. The current PID-only sensor does not follow shell-launched child processes; cgroup/descendant scoping remains a hardening task.
 
+The static footprint measurement is 5,670,919 bytes for the `rewind` binary and 21,352 bytes for the eBPF object. The direct telemetry run record was 746 bytes, and the JSONL event stream averaged 148.5 bytes per event.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```

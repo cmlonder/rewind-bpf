@@ -18,6 +18,8 @@ B4 throughput was approximately 11.1% below B0 and 0.4% above B2. The current re
 
 The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. The current PID-only sensor does not follow shell-launched child processes; cgroup/descendant scoping is a follow-up hardening item.
 
+The static footprint was 5,670,919 bytes for the `rewind` binary and 21,352 bytes for the compiled eBPF object. The run record was 746 bytes. The telemetry stream averaged approximately 148.5 bytes per event for this JSONL format.
+
 ## Storage interpretation
 
 For the full-file 128 MiB fio workload, native and FUSE upper storage were both 134,217,728 bytes, so measured copy-up amplification was approximately 1.0x. The B4 upper layer was 134,253,346 bytes because it also contained five small fio JSON outputs and metadata.
