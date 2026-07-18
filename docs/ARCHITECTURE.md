@@ -519,3 +519,9 @@ The project pins `github.com/cilium/ebpf` to v0.16.0 because it supports the VMâ
 - detaches links and closes the collection in a repeat-safe `Close` method
 
 The loader deliberately fails closed for an empty run ID or PID zero, which would otherwise enable unscoped event collection. Its unit tests stop before collection loading by using invalid paths/objects; no eBPF program is loaded on the development host. The first real loader invocation remains a privileged, VM-only safety-gated test.
+
+## 25. Stage 4 telemetry attach command
+
+`rewind sensor attach` is a deliberately narrow VM smoke-test command. It accepts a compiled object, an explicit run ID, and a non-zero target PID; it attaches the seven telemetry tracepoints and prints validated events as JSON until `Ctrl-C`/SIGTERM. It does not start an agent, create a filesystem transaction, or enforce a policy.
+
+The command is intentionally separate from the planned `rewind run` path so privileged kernel attachment can be tested in isolation before process, OverlayFS, and policy orchestration are combined.

@@ -18,6 +18,7 @@ Usage:
   rewind events <run_id>
   rewind rollback <run_id>
   rewind commit <run_id>
+  rewind sensor attach --object PATH --run-id ID --pid PID   (VM-only telemetry smoke test)
   rewind policy check <policy.yaml>
   rewind fixture create <directory>
   rewind manifest create <directory> [manifest.json]
@@ -39,6 +40,8 @@ func main() {
 		handleManifest(os.Args[2:])
 	case "policy":
 		handlePolicy(os.Args[2:])
+	case "sensor":
+		handleSensor(os.Args[2:])
 	case "run", "status", "events", "rollback", "commit":
 		fmt.Printf("rewind: command %q is planned; kernel and daemon integration are not enabled yet\n", os.Args[1])
 	default:

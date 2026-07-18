@@ -105,6 +105,17 @@ make test
 
 The runtime commands (`run`, `status`, `events`, `rollback`, and `commit`) currently expose the planned interface only; they will remain disabled until the Linux VM integration stages are completed.
 
+The low-level telemetry smoke command is separate and privileged:
+
+```bash
+sudo ./bin/rewind sensor attach \
+  --object /home/vagrant/RewindBPF/ebpf/rewind_trace.bpf.o \
+  --run-id run_vm_smoke \
+  --pid <agent-pid>
+```
+
+Run this only inside the disposable Ubuntu VM after the safety-gated attach step. It is not a replacement for the final `rewind run` workflow.
+
 ## Repository layout
 
 ```text
