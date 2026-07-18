@@ -265,6 +265,8 @@ Additional invariants:
 - A rollback result must include verification, not just an exit code.
 - Event loss must be observable and reported.
 
+Storage is measured alongside latency and throughput. For every protected workload, capture static binary/object size, empty-run metadata size, upper/work bytes, telemetry and record-log growth, and `upperdir_physical_bytes / logical_changed_bytes`. This makes copy-on-write amplification visible instead of implying that low hot-path overhead also means low peak disk usage.
+
 ## 10. Benchmark and test architecture
 
 Benchmark groups:

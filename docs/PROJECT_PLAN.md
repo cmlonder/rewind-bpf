@@ -197,6 +197,8 @@ overhead (%) = ((variant_time - baseline_time) / baseline_time) × 100
 space amplification = upperdir_bytes / logical_changed_bytes
 ```
 
+Storage is a first-class benchmark dimension. Report the static `rewind` binary and eBPF object footprint, an empty-run metadata footprint, upper/work bytes after each workload, telemetry and record-log growth, and the copy-on-write amplification ratio. A low hot-path latency result does not imply low peak disk usage: a partial overwrite can copy up a whole file depending on filesystem behavior.
+
 Initial targets are hypotheses, not guarantees: low single-digit overhead for read-heavy work, acceptable overhead for mixed work, near-one-second visible rollback for the demo workspace, and zero event loss under normal workload.
 
 ## 8. Correctness and security tests
