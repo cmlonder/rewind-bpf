@@ -350,11 +350,11 @@ Run the first controlled destructive test only against synthetic fixtures inside
 
 Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.
 
-### Current continuation: end-to-end protected-run VM smoke
+### Current continuation: benchmark baseline after protected-run smoke
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, inert `internal/runplan` composer, fake-tested `internal/protectedrun` coordinator, policy-aware hidden helper, atomic run store, and `run/status/events/rollback` CLI paths are implemented. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next action is the first end-to-end `rewind run` smoke in the VM using only a generated workspace and static/synthetic agent command.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, inert `internal/runplan` composer, fake-tested `internal/protectedrun` coordinator, policy-aware hidden helper, atomic run store, and `run/status/events/rollback` CLI paths are implemented. The disposable VM reports `landlock` active and `bpf` absent. The Landlock child-process test, isolated OverlayFS rollback test, and full FUSE protected-run smoke all passed with generated fixtures. The next action is to capture the B0 native-ext4 baseline before adding protection layers to the benchmark comparison.
 
-The helper refuses to launch an agent as root: when the parent requires `sudo`, it drops to `SUDO_UID`/`SUDO_GID` before Landlock and `exec`. This is a prerequisite for the end-to-end smoke rather than an optional hardening step.
+The helper refuses to launch an agent as root: when the parent requires `sudo`, it drops to `SUDO_UID`/`SUDO_GID` before Landlock and `exec`. This was verified in the end-to-end smoke rather than treated as an optional hardening step.
 
 The mount side now gives only the disposable `upper/work` layers to the same unprivileged identity. The protected-run CLI defaults to the `fuse-overlayfs` backend with explicit agent `uid/gid` mapping because the target VM kernel rejects `override_creds`; the kernel backend remains available as an explicit capability-tested option. The lower workspace is never chowned or deleted by the runtime.
 
