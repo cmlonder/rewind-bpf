@@ -290,7 +290,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
-| Stage 4 eBPF telemetry | Tracepoint source and event ABI written; VM compile next | Userspace schema is unit-tested; eBPF compile/load still safety-gated |
+| Stage 4 eBPF telemetry | Tracepoint source, event ABI, and userspace reader complete; VM attach next | Object compiled in VM; Go decoder/reader unit-tested; eBPF load/attach still safety-gated |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
@@ -427,6 +427,7 @@ run lifecycle   → run IDs and state transitions; process ownership is a later 
 overlay         → lower/upper/work/merged filesystem lifecycle
 policy          → parse, validate, compile, and evaluate rules
 eBPF            → kernel event collection and narrowly scoped hooks
+telemetry       → ring-buffer decoding and userspace event ingestion
 manifest        → content/metadata snapshot and verification
 benchmark       → deterministic workloads and measurement
 ```
@@ -493,7 +494,17 @@ The first kernel source is intentionally telemetry-only:
 - `ebpf/rewind_trace.bpf.c` observes `execve`, `openat`, `write`, `pwrite64`, `unlinkat`, `renameat2`, and `truncate` tracepoints.
 - A read-only `target_pid` filter scopes events to the agent process; the future daemon must set it before a production run.
 - Events default to `allow` because this program does not enforce policy. BPF-LSM enforcement is a separate module and stage.
+- The compact kernel record intentionally omits the string `run_id`; the userspace ring-buffer reader adds the active run context before validation and persistence.
 
 The source has not been compiled or loaded on the personal Mac. The next authorized VM action is compilation against the VM’s BTF using `ebpf/Makefile`; loading and attaching remains a separate privileged safety review.
 
 The first VM compile exposed an ARM64 header issue: `event.h` was importing userspace Linux types after `vmlinux.h` had already defined the same kernel ABI types. `event.h` now relies on the generated BTF types instead, avoiding duplicate typedefs. No kernel behavior changed.
+
+## 23. Stage 4 userspace ring-buffer reader
+
+`internal/telemetry` now provides two focused pieces:
+
+- `Decode` validates the fixed 280-byte kernel record, maps numeric ABI codes to the userspace event model, trims the NUL-terminated path, and attaches the active `run_id`.
+- `Reader` adapts the `cilium/ebpf` ring-buffer reader without loading the eBPF collection itself.
+
+The project pins `github.com/cilium/ebpf` to v0.16.0 because it supports the VM’s Go 1.22 toolchain while providing the ring-buffer API. Decoder tests use synthetic byte records and do not require Linux, BTF, or privileges. Collection loading and tracepoint attachment remain daemon responsibilities and are not yet implemented.

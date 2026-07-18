@@ -78,6 +78,27 @@ func OperationCode(value Operation) (uint32, bool) {
 	}
 }
 
+func OperationFromCode(code uint32) (Operation, bool) {
+	switch code {
+	case OperationCodeExecve:
+		return Execve, true
+	case OperationCodeOpenAt:
+		return OpenAt, true
+	case OperationCodeRead:
+		return Read, true
+	case OperationCodeWrite:
+		return Write, true
+	case OperationCodeUnlinkAt:
+		return UnlinkAt, true
+	case OperationCodeRenameAt2:
+		return RenameAt2, true
+	case OperationCodeTruncate:
+		return Truncate, true
+	default:
+		return "", false
+	}
+}
+
 func DecisionCode(value Decision) (uint32, bool) {
 	switch value {
 	case Allow:
@@ -91,6 +112,19 @@ func DecisionCode(value Decision) (uint32, bool) {
 	}
 }
 
+func DecisionFromCode(code uint32) (Decision, bool) {
+	switch code {
+	case DecisionCodeAllow:
+		return Allow, true
+	case DecisionCodeAudit:
+		return Audit, true
+	case DecisionCodeDeny:
+		return Deny, true
+	default:
+		return "", false
+	}
+}
+
 func RiskCode(value Risk) (uint32, bool) {
 	switch value {
 	case Low:
@@ -101,6 +135,19 @@ func RiskCode(value Risk) (uint32, bool) {
 		return RiskCodeHigh, true
 	default:
 		return 0, false
+	}
+}
+
+func RiskFromCode(code uint32) (Risk, bool) {
+	switch code {
+	case RiskCodeLow:
+		return Low, true
+	case RiskCodeMedium:
+		return Medium, true
+	case RiskCodeHigh:
+		return High, true
+	default:
+		return "", false
 	}
 }
 

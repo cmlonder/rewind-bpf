@@ -64,4 +64,13 @@ func TestWireCodesAreStable(t *testing.T) {
 	if _, ok := OperationCode("unsupported"); ok {
 		t.Fatal("expected unsupported operation to have no wire code")
 	}
+	if decoded, ok := OperationFromCode(OperationCodeRenameAt2); !ok || decoded != RenameAt2 {
+		t.Fatalf("decoded operation = %q, ok=%v", decoded, ok)
+	}
+	if decoded, ok := DecisionFromCode(DecisionCodeDeny); !ok || decoded != Deny {
+		t.Fatalf("decoded decision = %q, ok=%v", decoded, ok)
+	}
+	if decoded, ok := RiskFromCode(RiskCodeHigh); !ok || decoded != High {
+		t.Fatalf("decoded risk = %q, ok=%v", decoded, ok)
+	}
 }

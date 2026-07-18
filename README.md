@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 4 foundations are in place: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, and a shared eBPF event contract are available. OverlayFS lifecycle code has passed unit tests and a controlled disposable-VM smoke test. eBPF loading, read enforcement, and the end-to-end daemon are still being implemented incrementally in the disposable Linux environment.
+Stage 4 foundations are in place: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, and a userspace ring-buffer decoder/reader are available. OverlayFS lifecycle code has passed unit tests and a controlled disposable-VM smoke test. eBPF loading, read enforcement, and the end-to-end daemon are still being implemented incrementally in the disposable Linux environment.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
