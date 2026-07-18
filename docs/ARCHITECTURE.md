@@ -288,7 +288,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | English project documentation | Complete | README, plan, architecture, benchmark, eBPF, test docs |
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
-| Stage 2 disposable Linux lab | Environment verified; toolchain install pending | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; BTF and bpftool present |
+| Stage 2 disposable Linux lab | Toolchain verified; filesystem capability checks pending | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; Go/clang/bpftrace/bpftool present |
 | Stage 3 OverlayFS rollback | Not started | Safety gate required |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
@@ -373,6 +373,10 @@ Arch:     aarch64
 Kernel:   6.8.0-49-generic
 bpftool:  /usr/sbin/bpftool
 BTF:      /sys/kernel/btf present
+Go:       1.22.2 linux/arm64
+Clang:    18.1.3
+bpftrace: 0.20.2
+bpftool:  7.4.0 (libbpf 1.4)
 ```
 
-The initial command output did not show `go`, `clang`, or `bpftrace`, so the direct Linux toolchain still needs to be installed. OverlayFS module visibility and Landlock support remain pending checks; no kernel module was loaded and no filesystem was mounted during this verification.
+The direct Linux toolchain is now installed. OverlayFS module visibility, Landlock support, and the detailed BPF feature probe remain pending checks; no kernel module was loaded and no filesystem was mounted during this verification.
