@@ -5,6 +5,7 @@ package landlock
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -36,6 +37,22 @@ func BuildPlan(root string, rules policycompile.ReadRules, runtimeRoots []string
 		candidate := filepath.Clean(path)
 		if !isWithin(plan.Root, candidate) {
 			return Plan{}, fmt.Errorf("build Landlock plan: allowed path escapes root: %s", path)
+		}
+	}
+	for _, root := range runtimeRoots {
+		if !filepath.IsAbs(root) {
+			return Plan{}, fmt.Errorf("build Landlock plan: runtime root must be absolute: %s", root)
+		}
+		info, err := os.Stat(root)
+		if err != nil {
+			return Plan{}, fmt.Errorf("build Landlock plan: runtime root does not exist: %s: %w", root, err)
+		}
+		if !info.IsDir() {
+			return Plan{}, fmt.Errorf("build Landlock plan: runtime root is not a directory: %s", root)
+		}
+		cleanRoot := filepath.Clean(root)
+		if isWithin(plan.Root, cleanRoot) || isWithin(cleanRoot, plan.Root) {
+			return Plan{}, fmt.Errorf("build Landlock plan: runtime root overlaps protected workspace: %s", root)
 		}
 	}
 	plan.AllowedFiles = append([]string(nil), rules.AllowedFiles...)

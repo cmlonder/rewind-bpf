@@ -35,3 +35,10 @@ func TestBuildPlanRejectsNonEnforceAndEscapes(t *testing.T) {
 		t.Fatal("expected escaped path rejection")
 	}
 }
+
+func TestBuildPlanRejectsMissingRuntimeRoot(t *testing.T) {
+	_, err := BuildPlan("/workspace", policycompile.ReadRules{Mode: policy.ModeEnforce}, []string{"/path/that/does/not/exist"})
+	if err == nil {
+		t.Fatal("expected missing runtime root error")
+	}
+}

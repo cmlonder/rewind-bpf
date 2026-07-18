@@ -114,7 +114,7 @@ rewind run \
   --policy /home/vagrant/demo-policy.yaml \
   --record /home/vagrant/rewind-runs/run-1/record.json \
   --sensor-object /home/vagrant/RewindBPF/ebpf/rewind_trace.bpf.o \
-  --runtime-roots /bin,/usr/bin,/lib,/lib64,/usr/lib \
+  --runtime-roots /bin,/usr/bin,/lib,/usr/lib \
   -- /home/vagrant/demo-agent
 ```
 
