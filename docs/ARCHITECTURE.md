@@ -412,3 +412,48 @@ This verifies the core copy-on-write invariant: an agent-visible change is isola
 - injectable command runner for unit tests
 
 The unit tests use a fake command runner on the development host. They verify path containment, rejection of `/` and unsafe mount-option characters, expected mount arguments, and lower-layer preservation. No Go unit test executes `mount`, `umount`, or `modprobe` on the personal Mac.
+
+## 18. Engineering principles
+
+The hackathon deadline does not remove the need for maintainable software boundaries.
+
+### 18.1 One module, one responsibility
+
+Keep these responsibilities separate:
+
+```text
+CLI             → parse user intent and render results
+run lifecycle   → run IDs, state transitions, and process ownership
+overlay         → lower/upper/work/merged filesystem lifecycle
+policy          → parse, validate, compile, and evaluate rules
+eBPF            → kernel event collection and narrowly scoped hooks
+manifest        → content/metadata snapshot and verification
+benchmark       → deterministic workloads and measurement
+```
+
+The CLI must not contain mount logic. The eBPF program must not contain business policy parsing. The policy package must not start processes. Each boundary should be testable without requiring the entire runtime.
+
+### 18.2 Prefer explicit boundaries over premature abstractions
+
+- Use small interfaces only where they enable safe tests or platform boundaries (for example, the OverlayFS command runner).
+- Keep data structures plain and serializable.
+- Avoid a plugin system, generic workflow engine, or framework layer until a concrete MVP requirement needs it.
+- Prefer a clear package and a few cohesive files over one very large file.
+
+### 18.3 Safety before convenience
+
+- Validate paths before any filesystem operation.
+- Fail closed when isolation prerequisites are missing.
+- Keep destructive operations behind an explicit lifecycle method.
+- Test policy and path logic with synthetic fixtures.
+- Keep privileged operations inside the disposable VM.
+
+### 18.4 Definition of done for a module
+
+A module is ready when it has:
+
+1. One clearly stated responsibility.
+2. A small public API.
+3. Unit tests that do not require unrelated kernel state where possible.
+4. Error messages that identify the boundary and operation.
+5. A short entry in this architecture document describing its role.
