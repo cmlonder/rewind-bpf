@@ -289,7 +289,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
-| Stage 3 OverlayFS rollback | Smoke test complete; Go lifecycle next | Synthetic lower/upper/work/merged test passed; lower content preserved after unmount |
+| Stage 3 OverlayFS rollback | Lifecycle code complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager has unit tests without host mounts |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
@@ -398,4 +398,17 @@ lower/marker.txt after write    → lower-layer-original
 lower/marker.txt after unmount  → lower-layer-original
 ```
 
-This verifies the core copy-on-write invariant: an agent-visible change is isolated in the upper layer while the lower layer remains unchanged. No personal Mac path or project checkout was mounted. The next implementation step is to move this lifecycle into Go (`prepare`, `mount`, `unmount`, `rollback`) without changing the safety boundary.
+This verifies the core copy-on-write invariant: an agent-visible change is isolated in the upper layer while the lower layer remains unchanged. No personal Mac path or project checkout was mounted.
+
+## 17. Stage 3 lifecycle implementation
+
+`internal/overlay` now models one run’s `lower`, `upper`, `work`, and `merged` directories and provides:
+
+- absolute-path and runtime-root validation
+- safe directory preparation
+- mount command construction
+- unmount lifecycle
+- rollback that unmounts first, then discards only validated upper/work paths
+- injectable command runner for unit tests
+
+The unit tests use a fake command runner on the development host. They verify path containment, rejection of `/` and unsafe mount-option characters, expected mount arguments, and lower-layer preservation. No Go unit test executes `mount`, `umount`, or `modprobe` on the personal Mac.
