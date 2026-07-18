@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 5 read enforcement is validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, and a process-level Landlock denial test are available. The VM reports Landlock active, so Landlock is the primary read-enforcement path; eBPF remains the low-overhead telemetry path. The optional BPF-LSM object is retained for kernels that explicitly enable BPF in the active LSM list. The next stage is combining this policy boundary with the agent lifecycle and OverlayFS transaction.
+Stage 5 read enforcement and Stage 3 OverlayFS rollback are validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, a process-level Landlock denial test, and a Go OverlayFS mount/rollback test are available. The VM reports Landlock active, so Landlock is the primary read-enforcement path; eBPF remains the low-overhead telemetry path. The next stage is combining these boundaries with the agent lifecycle.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 

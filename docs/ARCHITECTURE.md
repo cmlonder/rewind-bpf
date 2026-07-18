@@ -2,7 +2,7 @@
 
 **Document status:** Living document
 
-**Current stage:** Stage 5 — sensitive-read policy enforcement (execution gated)
+**Current stage:** Stage 6 — protected-run integration
 
 **Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
@@ -289,9 +289,9 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
-| Stage 3 OverlayFS rollback | VM integration test prepared; protected-run integration next | Manual VM smoke passed; opt-in Go mount/rollback test now covers only a temporary fixture and is awaiting the next VM run |
+| Stage 3 OverlayFS rollback | Complete for isolated MVP boundary; protected-run integration next | Manual VM smoke and opt-in Go mount/rollback test passed against a temporary fixture; lower layer remained unchanged after rollback |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
-| Stage 5 read policy | Landlock enforcement smoke complete; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
+| Stage 5 read policy | Complete for isolated MVP boundary; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
 
@@ -578,6 +578,8 @@ PASS
 ```
 
 This proves the Landlock syscall boundary and allowlist semantics in isolation. It does not yet prove that a complete `rewind run` agent process receives the policy; that belongs to the lifecycle integration stage.
+
+The opt-in OverlayFS integration test `TestOverlaySyntheticMountRollback` also passed in the disposable Ubuntu VM on 2026-07-18. It mounted a temporary lower/upper/work/merged layout, changed a marker through the merged view, rolled the run back, and verified that the lower marker still contained `lower-layer-original`. This proves the Go OverlayFS manager boundary in addition to the earlier manual smoke test.
 
 ### Optional BPF-LSM backend
 

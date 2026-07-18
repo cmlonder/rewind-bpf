@@ -350,9 +350,9 @@ Run the first controlled destructive test only against synthetic fixtures inside
 
 Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.
 
-### Current continuation: OverlayFS integration test, then protected-run lifecycle
+### Current continuation: protected-run lifecycle integration
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, and userspace loaders are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent. The opt-in synthetic Landlock read-denial test passed in the VM, proving that a child process can read an allowed file while the synthetic protected file returns `EACCES`. An opt-in Go OverlayFS mount/rollback test is now prepared; after that VM check passes, the next implementation step is attaching both boundaries to the protected-run lifecycle.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, and Go OverlayFS manager are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next implementation step is attaching both boundaries to the protected-run lifecycle.
 
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
