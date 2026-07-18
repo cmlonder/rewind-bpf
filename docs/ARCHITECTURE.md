@@ -561,6 +561,15 @@ Landlock is an allowlist LSM, not a deny-rule engine. For `enforce`, userspace a
 
 `internal/landlock` owns the platform-neutral allowlist plan and Linux syscall application boundary. Its `Apply` method is intended for the agent child after setup and before `exec`; it sets `no_new_privs`, creates a read-only ruleset, adds path-beneath rules, and restricts only the current process tree. No Landlock syscall has been run on the personal Mac.
 
+The opt-in integration test `TestLandlockSyntheticReadEnforcement` creates two files under a temporary directory inside the VM, applies the policy only to a child test process, verifies that the public file is readable, and verifies that the synthetic secret returns `EACCES`. It is skipped by default. The approved VM-only command is:
+
+```bash
+cd /home/vagrant/RewindBPF
+REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
+```
+
+Expected side effects are limited to a temporary test directory removed by Go’s test cleanup and a short-lived child process with `no_new_privs`. It does not mount OverlayFS, use `sudo`, delete a user path, or touch the Mac host. If the kernel rejects the ruleset, the child exits with a diagnostic and no system state is changed.
+
 ### Optional BPF-LSM backend
 
 `ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:

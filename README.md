@@ -116,6 +116,14 @@ sudo ./bin/rewind sensor attach \
 
 Run this only inside the disposable Ubuntu VM after the safety-gated attach step. It is not a replacement for the final `rewind run` workflow.
 
+The Landlock read-enforcement smoke test is opt-in and does not require `sudo`, mounts, or real secrets. Run it only inside the disposable VM:
+
+```bash
+REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
+```
+
+It creates synthetic files under a temporary VM directory, applies a read allowlist to a child process, and expects the protected synthetic file to fail with `EACCES`.
+
 ## Repository layout
 
 ```text

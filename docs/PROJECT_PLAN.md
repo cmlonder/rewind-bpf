@@ -352,4 +352,10 @@ Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope,
 
 ### Current continuation: Landlock read enforcement gate
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, and userspace loaders are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent, so the next action is a synthetic Landlock read-denial test in the VM. The test must use only generated fixture files and an explicitly scoped child process; no real `.env`, SSH key, personal data, or host path is allowed.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, and userspace loaders are implemented and unit-tested. The disposable VM reports `landlock` active and `bpf` absent, so the next action is the opt-in synthetic Landlock read-denial test in the VM:
+
+```bash
+REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
+```
+
+The test must use only generated fixture files and an explicitly scoped child process; no real `.env`, SSH key, personal data, or host path is allowed.
