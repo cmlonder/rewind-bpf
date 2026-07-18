@@ -292,7 +292,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 3 OverlayFS rollback | Complete for isolated MVP boundary; protected-run integration next | Manual VM smoke and opt-in Go mount/rollback test passed against a temporary fixture; lower layer remained unchanged after rollback |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
 | Stage 5 read policy | Complete for isolated MVP boundary; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
-| Stage 6 system scope | Not started | Disposable VM only |
+| Stage 6 protected-run integration | Coordinator and plan complete; real helper/CLI next | Inert plan composer and fail-closed coordinator unit-tested; real process/mount orchestration remains VM-gated |
 | Stage 7 benchmarks | Not started | Baseline first |
 
 ## 12. Change protocol
@@ -594,6 +594,21 @@ The opt-in OverlayFS integration test `TestOverlaySyntheticMountRollback` also p
 - creates the lifecycle record in `preparing` state.
 
 The package deliberately does not mount OverlayFS, start the agent, attach eBPF, or mutate lifecycle state. Those effects belong to the next coordinator boundary, which can be tested with injected runners before any VM integration. Its host-safe tests prove workspace/runtime containment, manifest composition, denied sensitive paths, and the resulting allowed-file plan.
+
+## 30. Stage 6 protected-run coordinator
+
+`internal/protectedrun` owns ordering and fail-closed cleanup around a `runplan.Plan`:
+
+```text
+mount OverlayFS
+  → transition preparing → running
+  → start a policy-aware agent process
+  → attach scoped telemetry to the agent PID
+  → wait for exit
+  → succeeded, or failed then rollback
+```
+
+The coordinator depends on three narrow interfaces: an OverlayFS manager, a process starter that must apply a non-nil Landlock plan before execution, and an optional telemetry adapter. If process start or telemetry attach fails, the process is killed, telemetry is closed, the lifecycle enters `failed`, and the validated upper/work layers are rolled back. The coordinator tests use fakes only; no process, mount, or eBPF operation runs on the development host.
 
 ### Optional BPF-LSM backend
 

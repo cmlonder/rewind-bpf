@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 6 is in progress. Stage 5 read enforcement and Stage 3 OverlayFS rollback are validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, a process-level Landlock denial test, a Go OverlayFS mount/rollback test, and an inert protected-run plan composer are available. The VM reports Landlock active, so Landlock is the primary read-enforcement path; eBPF remains the low-overhead telemetry path. The next implementation step is the effectful run coordinator and helper process.
+Stage 6 is in progress. Stage 5 read enforcement and Stage 3 OverlayFS rollback are validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, a process-level Landlock denial test, a Go OverlayFS mount/rollback test, a protected-run plan composer, and a fail-closed coordinator with fake-based tests are available. The VM reports Landlock active, so Landlock is the primary read-enforcement path; eBPF remains the low-overhead telemetry path. The next implementation step is the real policy-aware helper process and CLI wiring.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -142,6 +142,7 @@ cmd/rewind/       CLI entry point
 docs/             technical architecture and project plan
 ebpf/             planned C/libbpf kernel programs
 internal/runplan/ pre-execution protected-run composition
+internal/protectedrun/ run lifecycle ordering and fail-closed cleanup
 policies/         safe example policies
 benchmarks/       benchmark design and future results
 tests/            integration-test safety notes
