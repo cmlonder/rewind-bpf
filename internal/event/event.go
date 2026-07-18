@@ -16,12 +16,31 @@ const (
 	Truncate  Operation = "truncate"
 )
 
+// Numeric operation codes are the stable wire values used by the eBPF ring
+// buffer ABI. Keep them append-only so older userspace readers can continue to
+// decode events emitted by a newer kernel program.
+const (
+	OperationCodeExecve uint32 = iota + 1
+	OperationCodeOpenAt
+	OperationCodeRead
+	OperationCodeWrite
+	OperationCodeUnlinkAt
+	OperationCodeRenameAt2
+	OperationCodeTruncate
+)
+
 type Decision string
 
 const (
 	Allow Decision = "allow"
 	Audit Decision = "audit"
 	Deny  Decision = "deny"
+)
+
+const (
+	DecisionCodeAllow uint32 = iota
+	DecisionCodeAudit
+	DecisionCodeDeny
 )
 
 type Risk string
@@ -31,6 +50,59 @@ const (
 	Medium Risk = "medium"
 	High   Risk = "high"
 )
+
+const (
+	RiskCodeLow uint32 = iota + 1
+	RiskCodeMedium
+	RiskCodeHigh
+)
+
+func OperationCode(value Operation) (uint32, bool) {
+	switch value {
+	case Execve:
+		return OperationCodeExecve, true
+	case OpenAt:
+		return OperationCodeOpenAt, true
+	case Read:
+		return OperationCodeRead, true
+	case Write:
+		return OperationCodeWrite, true
+	case UnlinkAt:
+		return OperationCodeUnlinkAt, true
+	case RenameAt2:
+		return OperationCodeRenameAt2, true
+	case Truncate:
+		return OperationCodeTruncate, true
+	default:
+		return 0, false
+	}
+}
+
+func DecisionCode(value Decision) (uint32, bool) {
+	switch value {
+	case Allow:
+		return DecisionCodeAllow, true
+	case Audit:
+		return DecisionCodeAudit, true
+	case Deny:
+		return DecisionCodeDeny, true
+	default:
+		return 0, false
+	}
+}
+
+func RiskCode(value Risk) (uint32, bool) {
+	switch value {
+	case Low:
+		return RiskCodeLow, true
+	case Medium:
+		return RiskCodeMedium, true
+	case High:
+		return RiskCodeHigh, true
+	default:
+		return 0, false
+	}
+}
 
 // Event is the userspace representation of one observed or enforced action.
 // Kernel-side programs should emit only compact primitive fields; enrichment

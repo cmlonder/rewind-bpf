@@ -47,3 +47,21 @@ func TestInvalidEventFieldsAreRejected(t *testing.T) {
 		})
 	}
 }
+
+func TestWireCodesAreStable(t *testing.T) {
+	operation, ok := OperationCode(RenameAt2)
+	if !ok || operation != OperationCodeRenameAt2 {
+		t.Fatalf("operation code = %d, ok=%v", operation, ok)
+	}
+	decision, ok := DecisionCode(Deny)
+	if !ok || decision != DecisionCodeDeny {
+		t.Fatalf("decision code = %d, ok=%v", decision, ok)
+	}
+	risk, ok := RiskCode(High)
+	if !ok || risk != RiskCodeHigh {
+		t.Fatalf("risk code = %d, ok=%v", risk, ok)
+	}
+	if _, ok := OperationCode("unsupported"); ok {
+		t.Fatal("expected unsupported operation to have no wire code")
+	}
+}

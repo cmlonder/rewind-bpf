@@ -290,7 +290,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
-| Stage 4 eBPF telemetry | Event contract complete; kernel program next | Userspace schema is unit-tested; eBPF load still safety-gated |
+| Stage 4 eBPF telemetry | Tracepoint source and event ABI written; VM compile next | Userspace schema is unit-tested; eBPF compile/load still safety-gated |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
@@ -484,3 +484,14 @@ The README contains the user-facing feature matrix. The architectural conclusion
 - DeltaBox is a relevant research direction for OS-level agent checkpoint/rollback, but it is not the same as a ready-to-run local CLI/runtime.
 
 Therefore RewindBPF’s defensible MVP claim is composition and focus: a Linux OverlayFS transaction prepared before execution, event data tied to a run lifecycle, configurable sensitive-read policy, and one-command discard of the writable layer. Performance and rollback-speed claims remain benchmark hypotheses until the VM benchmark matrix is measured.
+
+## 22. Stage 4 tracepoint sensor source
+
+The first kernel source is intentionally telemetry-only:
+
+- `ebpf/event.h` defines the stable numeric ring-buffer record layout.
+- `ebpf/rewind_trace.bpf.c` observes `execve`, `openat`, `write`, `pwrite64`, `unlinkat`, `renameat2`, and `truncate` tracepoints.
+- A read-only `target_pid` filter scopes events to the agent process; the future daemon must set it before a production run.
+- Events default to `allow` because this program does not enforce policy. BPF-LSM enforcement is a separate module and stage.
+
+The source has not been compiled or loaded on the personal Mac. The next authorized VM action is compilation against the VM’s BTF using `ebpf/Makefile`; loading and attaching remains a separate privileged safety review.
