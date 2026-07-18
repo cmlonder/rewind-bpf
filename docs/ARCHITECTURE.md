@@ -612,6 +612,8 @@ The coordinator depends on three narrow interfaces: an OverlayFS manager, a proc
 
 `internal/protectedrun/ExecStarter` launches the hidden `rewind helper` command. When a Landlock plan is present, it serializes the plan to a mode-`0600` file in the dedicated runtime root, starts the helper, and the helper applies Landlock before `syscall.Exec` replaces it with the agent command. The plan file is removed when the child exits or is killed. This avoids a short unprotected interval and keeps the policy boundary in the child process.
 
+When the parent runtime is invoked through `sudo`, the helper reads `SUDO_UID`/`SUDO_GID`, drops supplementary groups, GID, and UID before applying Landlock, and then execs the agent. A root helper without those explicit target IDs is rejected; the agent is never intentionally launched as root.
+
 `internal/runstore` persists the plan, lifecycle record, and telemetry log path atomically with mode `0600`. The CLI can reconstruct a completed run for rollback in a later process. `commit` is still disabled: preserving the lower layer and exporting an intentional diff need a separate conflict-safe implementation.
 
 ### Optional BPF-LSM backend

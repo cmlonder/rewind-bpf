@@ -120,6 +120,8 @@ rewind run \
 
 The command must run inside the disposable Ubuntu VM. It creates an OverlayFS mount, starts the agent through the policy-aware helper, optionally attaches scoped eBPF telemetry, and leaves a successful run mounted until `rewind rollback --record ...` is called. Do not run this on the personal Mac or against a real home directory.
 
+The parent may need `sudo` for OverlayFS/eBPF, but the helper drops the agent to the invoking user using `SUDO_UID`/`SUDO_GID`. A direct root agent is rejected.
+
 The low-level telemetry smoke command is separate and privileged:
 
 ```bash

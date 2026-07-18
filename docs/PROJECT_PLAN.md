@@ -354,6 +354,8 @@ Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope,
 
 The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, inert `internal/runplan` composer, fake-tested `internal/protectedrun` coordinator, policy-aware hidden helper, atomic run store, and `run/status/events/rollback` CLI paths are implemented. The disposable VM reports `landlock` active and `bpf` absent. Both opt-in VM tests passed: the Landlock child process denied the synthetic protected file with `EACCES`, and the OverlayFS manager preserved the lower marker after rollback. The next action is the first end-to-end `rewind run` smoke in the VM using only a generated workspace and static/synthetic agent command.
 
+The helper refuses to launch an agent as root: when the parent requires `sudo`, it drops to `SUDO_UID`/`SUDO_GID` before Landlock and `exec`. This is a prerequisite for the end-to-end smoke rather than an optional hardening step.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```
