@@ -291,7 +291,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
 | Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
-| Stage 5 read policy | Manifest compiler and Landlock allowlist planner prepared; execution gated | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; optional read-enforcer object compiles in VM; current VM reports `landlock` active but not `bpf` |
+| Stage 5 read policy | Landlock enforcement smoke complete; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
 | Stage 6 system scope | Not started | Disposable VM only |
 | Stage 7 benchmarks | Not started | Baseline first |
 
@@ -569,6 +569,15 @@ REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run
 ```
 
 Expected side effects are limited to a temporary test directory removed by Go’s test cleanup and a short-lived child process with `no_new_privs`. It does not mount OverlayFS, use `sudo`, delete a user path, or touch the Mac host. If the kernel rejects the ruleset, the child exits with a diagnostic and no system state is changed.
+
+The test passed in the disposable Ubuntu VM on 2026-07-18:
+
+```text
+landlock-ok: allowed file readable; synthetic secret denied
+PASS
+```
+
+This proves the Landlock syscall boundary and allowlist semantics in isolation. It does not yet prove that a complete `rewind run` agent process receives the policy; that belongs to the lifecycle integration stage.
 
 ### Optional BPF-LSM backend
 
