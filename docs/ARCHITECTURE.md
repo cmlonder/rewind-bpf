@@ -2,7 +2,7 @@
 
 **Document status:** Living document
 
-**Current stage:** Stage 2 — direct disposable Linux lab definition (execution gated)
+**Current stage:** Stage 3 — protected run lifecycle foundation (execution gated)
 
 **Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
@@ -289,7 +289,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
 | Stage 2 disposable Linux lab | Complete | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; direct toolchain and capability audit verified |
-| Stage 3 OverlayFS rollback | Lifecycle code complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager has unit tests without host mounts |
+| Stage 3 OverlayFS rollback | Lifecycle foundation complete; VM integration next | Synthetic smoke test passed; Go layout/mount/unmount/rollback manager and run state machine have unit tests without host mounts |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
 | Stage 6 system scope | Not started | Disposable VM only |
@@ -457,3 +457,13 @@ A module is ready when it has:
 3. Unit tests that do not require unrelated kernel state where possible.
 4. Error messages that identify the boundary and operation.
 5. A short entry in this architecture document describing its role.
+
+## 19. Stage 3 run lifecycle foundation
+
+`internal/lifecycle` owns only the state machine for one protected agent run. It provides:
+
+- a serializable run record with a stable `run_id` and lifecycle timestamps
+- explicit states: `preparing`, `running`, `paused`, `succeeded`, `failed`, `committed`, and `rolled_back`
+- validated transitions that prevent committing an unprepared run or resuming a terminal run
+
+The package does not start processes, mount filesystems, parse policies, or load eBPF. Those operations remain separate integration boundaries for the daemon. Its tests run on the development host and require no kernel or privileged filesystem state.
