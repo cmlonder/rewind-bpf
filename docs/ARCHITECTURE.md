@@ -288,7 +288,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | English project documentation | Complete | README, plan, architecture, benchmark, eBPF, test docs |
 | Stage 0 environment inventory | Complete | macOS arm64; Go 1.24.3 |
 | Stage 1 fixtures/policy contract | Complete | Synthetic fixture generator, SHA-256 manifest, glob policy parser, run IDs, CLI smoke checks |
-| Stage 2 disposable Linux lab | Toolchain verified; filesystem capability checks pending | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; Go/clang/bpftrace/bpftool present |
+| Stage 2 disposable Linux lab | Kernel capability audit complete; OverlayFS smoke test gated | UTM Ubuntu 24.04.1 ARM64 VM; kernel 6.8.0-49; eBPF tracepoint/ringbuf/LSM present; Landlock unavailable |
 | Stage 3 OverlayFS rollback | Not started | Safety gate required |
 | Stage 4 eBPF telemetry | Not started | Safety gate required |
 | Stage 5 read policy | Not started | Safety gate required |
@@ -377,6 +377,10 @@ Go:       1.22.2 linux/arm64
 Clang:    18.1.3
 bpftrace: 0.20.2
 bpftool:  7.4.0 (libbpf 1.4)
+OverlayFS: module available via modinfo, not loaded
+LSM list:  lockdown,capability
+Landlock: not enabled in this kernel LSM list
+BPF LSM:  program type available
 ```
 
-The direct Linux toolchain is now installed. OverlayFS module visibility, Landlock support, and the detailed BPF feature probe remain pending checks; no kernel module was loaded and no filesystem was mounted during this verification.
+The direct Linux toolchain and BPF capability audit are complete. The OverlayFS module exists but is not currently loaded; a controlled `modprobe` plus synthetic mount smoke test is the next gated action. Landlock is not enabled in this VM kernel, so read enforcement must use BPF LSM or a future kernel with Landlock enabled. No kernel module was loaded, no eBPF program was loaded, and no filesystem was mounted during this verification.
