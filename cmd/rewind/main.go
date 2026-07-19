@@ -39,6 +39,7 @@ Usage:
   rewind manifest verify <directory> <manifest.json>
 
 The run command is Linux-only and requires a disposable VM for OverlayFS/eBPF integration.
+Successful runs discard the temporary write layer by default; use --on-success review to hold it for inspection.
 `
 
 func main() {

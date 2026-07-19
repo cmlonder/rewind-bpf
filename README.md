@@ -115,7 +115,7 @@ sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
 ```
 
-The agent will see a merged workspace backed by an OverlayFS lower/upper pair. Rollback discards the temporary upper layer. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
+Successful runs discard the temporary upper/work layer by default. Add `--on-success review` when you explicitly need to inspect the merged view before choosing export or discard. The agent always sees a merged workspace backed by an OverlayFS lower/upper pair; the protected lower layer is never modified before acceptance. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
 
 Example policy:
 
@@ -174,10 +174,11 @@ rewind run \
   --sensor-object /home/vagrant/RewindBPF/ebpf/rewind_trace.bpf.o \
   --runtime-roots /bin,/usr/bin,/lib,/usr/lib \
   --overlay-backend fuse \
+  --on-success review \
   -- /home/vagrant/demo-agent
 ```
 
-The command must run inside the disposable Ubuntu VM. It checks capabilities, creates one cgroup-v2 scope, creates a `fuse-overlayfs` mount, gates agent `exec` until telemetry is attached, starts the agent through the policy-aware helper, and leaves a successful run mounted until `rewind rollback --record ...` is called. The record includes event count, byte count, SHA-256 digest, and a kernel-side dropped-event count; any dropped event marks evidence incomplete. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
+The command must run inside the disposable Ubuntu VM. It checks capabilities, creates one cgroup-v2 scope, creates a `fuse-overlayfs` mount, gates agent `exec` until telemetry is attached, and starts the agent through the policy-aware helper. With `--on-success review`, the merged view stays available for inspection; without it, successful completion automatically discards upper/work. The record includes event count, byte count, SHA-256 digest, and a kernel-side dropped-event count; any dropped event marks evidence incomplete. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
 
 For bounded telemetry retention, set `REWIND_EVENT_MAX_BYTES` to a positive total byte count inside the VM. The runtime continues draining kernel events after the cap, marks the run evidence `truncated=true`, and makes `verify` fail closed; it never presents a capped stream as complete. To rotate a long stream without truncation, set `REWIND_EVENT_ROTATE_BYTES`; the record stores the ordered `events.jsonl`, `events-000001.jsonl`, ... paths and the verifier hashes them as one chain. Explicit backpressure policy remains future work. If `resources` is present, the run writes the requested cgroup-v2 limits before the agent is released; a missing controller file fails closed. `network.mode: enforce` is intentionally rejected until the planned network namespace/proxy backend exists; `off` and `audit` remain available.
 

@@ -45,6 +45,7 @@ func handleRun(args []string) {
 	sensorObject := flags.String("sensor-object", "", "optional compiled telemetry object")
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
+	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -54,6 +55,9 @@ func handleRun(args []string) {
 	}
 	if *overlayBackend != string(overlay.BackendFuse) && *overlayBackend != string(overlay.BackendKernel) {
 		fatal(fmt.Sprintf("unsupported overlay backend %q (want fuse or kernel)", *overlayBackend))
+	}
+	if err := validateOnSuccess(*onSuccess); err != nil {
+		fatal(err.Error())
 	}
 	value, err := policy.Load(*policyPath)
 	if err != nil {
@@ -140,12 +144,30 @@ func handleRun(args []string) {
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		fatal(errors.Join(waitErr, rollbackErr).Error())
 	}
+	if *onSuccess == "discard" {
+		if err := handle.Rollback(context.Background()); err != nil {
+			_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
+			fatal(fmt.Sprintf("default discard: %v", err))
+		}
+		if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
+			fatal(fmt.Sprintf("persist discarded run: %v", err))
+		}
+		fmt.Printf("run completed and discarded: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
+		return
+	}
 	if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist successful run; transaction rolled back: %v", err))
 	}
-	fmt.Printf("run succeeded: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
-	fmt.Printf("rollback with: rewind rollback --record %s\n", *recordPath)
+	fmt.Printf("run ready for review: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
+	fmt.Printf("discard with: rewind rollback --record %s\n", *recordPath)
+}
+
+func validateOnSuccess(value string) error {
+	if value != "discard" && value != "review" {
+		return fmt.Errorf("unsupported --on-success value %q (want discard or review)", value)
+	}
+	return nil
 }
 
 func agentOwner() (overlay.Owner, error) {

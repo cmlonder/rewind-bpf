@@ -19,6 +19,17 @@ The UI must make three questions answerable immediately:
 
 The UI is not the security boundary. eBPF, Landlock, OverlayFS/FUSE, cgroup-v2, lifecycle recovery, and evidence persistence remain in the Linux runtime and supervisor. The UI sends validated intents to a local supervisor and never performs privileged filesystem or kernel operations itself.
 
+## 1.1 P0 user-outcome surface
+
+The UI follows the same four P0 promises as the runtime:
+
+| Promise | Required UI behavior |
+|---|---|
+| Immutable project | Show `DISCARD BY DEFAULT`, lower-layer integrity, upper-layer bytes, and an explicit review hold. |
+| Invisible secrets | Show the matched pattern and decision without rendering secret contents; expose degraded/refused backend state. |
+| Explicit acceptance | Keep commit disabled until conflict checks exist; make export and discard the primary paths. |
+| Fail-closed trust | Surface dropped events, truncation, stale descendants, mount failures, and recovery progress as actionable states. |
+
 ## 2. Users and jobs to be done
 
 ### Hackathon juror

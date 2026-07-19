@@ -17,6 +17,19 @@ The Phase 2 product promise is therefore:
 
 The implementation promise underneath is: run an unmodified AI agent inside a pre-created, reversible Linux transaction; enforce least-privilege reads before execution; observe the complete process tree; and prove rollback or commit with verifiable evidence.
 
+## 1.1 P0 priority reset
+
+P0 is now organized by user outcome, with a runtime workstream and a matching Control Plane workstream:
+
+| Promise | Runtime P0 | UI P0 | Proof |
+|---|---|---|---|
+| Immutable project | Default-discard successful runs; explicit review/hold opt-in; no lower-layer writes before acceptance | Show `DISCARD BY DEFAULT`, upper-layer size, lower-layer integrity, and explicit `Review`/`Discard` actions | Destructive delete, rename, overwrite, and rollback fixture |
+| Invisible secrets | Enforce user-defined sensitive-read patterns; record deny decisions without secret contents | Policy simulator, secret-path decision timeline, capability/degraded state | `.env`, SSH, key, PII synthetic fixtures |
+| Explicit acceptance | Review export first; conflict-checked apply remains blocked until destination manifest checks exist | Make acceptance states visible; keep `Commit` disabled with a clear reason; expose export/discard as primary paths | Destination drift must refuse apply |
+| Fail-closed trust | Cleanup, process drain, mount state, event drops, truncation, and unsupported backends become explicit failure states | Evidence health, degraded backend banner, recovery progress, and actionable error states | Fault-injection matrix and incomplete-evidence verification |
+
+P0 scope excludes durable snapshot history, detachable sessions, registry features, and local authentication. Those are post-demo/productisation work unless required by a connected deployment boundary.
+
 This is deliberately narrower than “protect the whole operating system” or “zero overhead.” OverlayFS protects filesystem changes inside the selected boundary. Landlock protects the selected read/write hierarchy. eBPF supplies low-cost telemetry and optional enforcement where the kernel supports it. Network, kernel state, devices, external services, and already-open descriptors remain explicit safety boundaries.
 
 ## 2. What the MVP proved, and what it did not
@@ -151,6 +164,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 
 **Build**
 
+- Make successful runs discard the upper/work layer by default. Add an explicit `--on-success review` opt-in for inspection; never require the operator to remember a later rollback just to keep the lower layer safe.
 - Add an explicit run journal with atomic state transitions: `planned → mounted → running → succeeded|failed → rolled_back|committed`.
 - Persist the policy digest, lower/upper/work/merged paths, backend, kernel capability report, helper PID/cgroup, and event sequence counters.
 - Add startup recovery: detect stale `mounted/running` records, unmount safely, preserve evidence, and mark the run `aborted` rather than silently deleting data.
