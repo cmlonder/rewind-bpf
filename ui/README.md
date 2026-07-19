@@ -21,6 +21,8 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Create and select versioned policy packages, copy a policy preview, and simulate deny/allow/audit outcomes.
 - Add or edit workspace assignments and run a fixture boundary test before a future run.
 - Edit global runtime settings through revisioned controls; active runs remain unchanged.
+- Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
+- Use all destinations on mobile through a horizontally scrollable bottom navigation.
 
 These actions deliberately stop at the adapter boundary. They demonstrate the control-plane contract without granting the browser root access or pretending that fixture state is live runtime state.
 

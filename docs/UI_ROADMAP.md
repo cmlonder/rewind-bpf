@@ -319,6 +319,7 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - revisioned global configuration controls with active-run isolation;
 - evidence, benchmark, and audit surfaces suitable for a jury walkthrough;
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
+- keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
 The remaining work is the connected supervisor contract: persistent storage, Unix-socket authorization, live SSE/polling, signed policy packages, conflict-checked commit, and end-to-end reconnect/recovery behavior. Those belong to the runtime/API boundary, not to a browser-only fixture.
 
