@@ -383,3 +383,19 @@ REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run
 ```
 
 The test must use only generated fixture files and an explicitly scoped child process; no real `.env`, SSH key, personal data, or host path is allowed.
+
+## 15. Adopted product strategy and platform roadmap
+
+The product is not a general-purpose sandbox parity project. The primary user outcome is: **the agent can work aggressively without direct access to the real project or real credentials**. The four promises are immutable project writes, invisible secrets, explicit acceptance, and fail-closed trust. The detailed decision record is [docs/PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md).
+
+The current Linux VM remains the reference implementation. Native macOS and Windows are planned as separate platform backends behind the same transaction, policy, and evidence contracts; they are not implemented by pretending that OverlayFS/eBPF exist on those operating systems.
+
+```text
+P0  Linux VM demo: delete isolation + sensitive-read denial + rollback proof
+P1  Linux product core: supervisor + credential/network plane + conflict-safe accept
+P2  macOS native backend: Seatbelt/EndpointSecurity + APFS/disposable workspace
+P3  Windows native backend: Windows process/filesystem policy + disposable workspace
+P4  Durable history, retention, detachable sessions, registry, integrations
+```
+
+WSL2 is a Linux compatibility path for Windows development, not a claim that the Windows host filesystem is protected. Native adapters must expose their capability matrix and refuse unsupported enforce modes.

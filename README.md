@@ -1,8 +1,10 @@
 # RewindBPF
 
-RewindBPF is an **AI Agent Safety Runtime** for running autonomous agents inside reversible, policy-controlled Linux filesystem transactions.
+RewindBPF is an **AI Agent Safety Runtime** for running autonomous agents inside reversible, policy-controlled filesystem transactions.
 
-It protects the agent operator from destructive changes and unauthorized sensitive-file access without requiring changes to the agent itself.
+Its product focus is deliberately narrow: **let an agent work aggressively without giving it direct access to the real project or real credentials**. The current production proof is Linux-first; native macOS and Windows backends are planned behind the same transaction contract.
+
+The product strategy is documented in [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md).
 
 ## Current status
 
@@ -42,10 +44,21 @@ There are established kernel-security projects that overlap with parts of the de
 ### Our defensible position
 
 - We do **not** claim to be the first kernel-level agent safety project. `nono`, Tetragon, KubeArmor, and research systems such as DeltaBox make that claim untenable.
-- Our MVP focuses on a narrower integration: **OverlayFS as the write transaction, eBPF as the low-overhead sensor/enforcement path, and a userspace run controller as the rollback authority**.
+- Our MVP focuses on a narrower user outcome: **immutable project writes, invisible secrets, explicit acceptance, and fail-closed trust**. OverlayFS is the write transaction, eBPF is the low-overhead sensor/enforcement path, and a userspace run controller is the rollback authority.
 - Unlike command deny-lists, the rollback boundary does not depend on recognizing every spelling of `rm`, `mv`, a shell script, or a library call. The agent can perform normal writes inside the merged view; the lower layer remains unchanged until an explicit commit/export.
 - Unlike a post-hoc backup, the expensive copy is avoided on the hot path. Copy-on-write occurs only for blocks/files that the agent actually changes. This is a benchmark hypothesis, not an unmeasured guarantee.
 - Unlike a generic container sandbox, the project makes the file transaction and recovery invariant explicit and testable. The MVP still uses a disposable VM for privileged Linux integration and does not claim to reverse kernel, device, network, or external-service side effects.
+
+### Product boundary versus nono
+
+nono is the stronger broad developer sandbox today. RewindBPF is intentionally not trying to copy its entire surface. We focus on the moment an operator needs a high-assurance answer to four questions:
+
+1. Did the agent write to the real project before I accepted the result? **No.**
+2. Could it read my configured sensitive paths? **The policy backend denies or hides them.**
+3. Can I accept the result without overwriting destination drift? **Only through a future conflict-checked apply.**
+4. Can the runtime prove the run was complete? **Evidence loss makes the run incomplete.**
+
+See [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md) for the adopted native-platform and post-demo roadmap.
 
 The benchmark plan deliberately compares these tradeoffs rather than relying on a “near-zero overhead” slogan: native ext4, eBPF-only, OverlayFS-only, OverlayFS + eBPF, and the full daemon path are measured separately. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the test matrix and safety boundary.
 
@@ -225,6 +238,7 @@ internal/protectedrun/ run lifecycle ordering and fail-closed cleanup
 policies/         safe example policies
 benchmarks/       benchmark design and future results
 docs/PHASE2_PLAN.md Phase 2 hardening and productisation roadmap
+docs/PRODUCT_STRATEGY.md product wedge, competitive position, and native-platform roadmap
 tests/            integration-test safety notes
 ```
 

@@ -9,9 +9,13 @@
 
 The MVP is ready to demonstrate in the disposable Ubuntu VM. Phase 2 should not try to add every Linux security primitive at once. The highest-value work is to make the current transaction boundary correct under failure, make policy scope complete for the whole process tree, and make the evidence reproducible.
 
+The strategic correction after the nono comparison is recorded in [`docs/PRODUCT_STRATEGY.md`](PRODUCT_STRATEGY.md). RewindBPF will not become a less mature general-purpose sandbox. Its wedge is the user-visible combination of immutable project writes, invisible secrets, explicit acceptance, and fail-closed trust.
+
 The Phase 2 product promise is therefore:
 
-> **Run an unmodified AI agent inside a pre-created, reversible Linux transaction; enforce least-privilege reads before execution; observe the complete process tree; and prove rollback or commit with verifiable evidence.**
+> **Let an agent work aggressively without giving it direct access to the real project or real credentials; accept only the reviewed result.**
+
+The implementation promise underneath is: run an unmodified AI agent inside a pre-created, reversible Linux transaction; enforce least-privilege reads before execution; observe the complete process tree; and prove rollback or commit with verifiable evidence.
 
 This is deliberately narrower than “protect the whole operating system” or “zero overhead.” OverlayFS protects filesystem changes inside the selected boundary. Landlock protects the selected read/write hierarchy. eBPF supplies low-cost telemetry and optional enforcement where the kernel supports it. Network, kernel state, devices, external services, and already-open descriptors remain explicit safety boundaries.
 
@@ -107,7 +111,7 @@ Nono is the closest product benchmark, so its publicly documented feature set be
 | Signed provenance/registry for profiles and agent packs | Local files only | **P2:** document trust boundary and sign release artifacts | Sigstore-compatible profile/adapter registry. |
 | Detachable/ghost sessions | Not implemented | **P2:** explicitly out of the six-day critical path | Persistent run handles with reconnect, retention, and operator takeover. |
 
-The priority is intentional. Nono already demonstrates a broad product surface: kernel isolation, undo, audit, provenance, supervision, network filtering, credential injection, and detachable sessions ([feature overview](https://nono.sh/), [undo](https://nono.sh/undo), [audit trail](https://nono.sh/audit-trail), [profile learning](https://nono.sh/blog/nono-learn-policy-profile)). RewindBPF should first close the correctness and evidence gaps that would make our rollback claim unreliable, then add network/credential/supervisor features as separate policy planes. A six-day sprint that starts with a registry or UI would create parity theatre without a stronger safety invariant.
+The priority is intentional. Nono already demonstrates a broad product surface: kernel isolation, undo, audit, provenance, supervision, network filtering, credential injection, and detachable sessions ([feature overview](https://nono.sh/), [undo](https://nono.sh/undo), [audit trail](https://nono.sh/audit-trail), [profile learning](https://nono.sh/blog/nono-learn-policy-profile)). RewindBPF should first close the correctness and evidence gaps that would make our rollback claim unreliable, then add network/credential/supervisor features as separate policy planes. A six-day sprint that starts with a registry, durable history, or UI polish would create parity theatre without a stronger safety invariant. The complete product strategy, including native macOS and Windows tracks, lives in [`docs/PRODUCT_STRATEGY.md`](PRODUCT_STRATEGY.md).
 
 ### What RewindBPF should do better than nono
 
