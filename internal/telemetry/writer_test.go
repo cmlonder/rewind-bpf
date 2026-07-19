@@ -2,6 +2,8 @@ package telemetry
 
 import (
 	"bytes"
+	"encoding/json"
+	"io"
 	"strings"
 	"testing"
 
@@ -43,5 +45,41 @@ func TestJournalWriterProducesVerifiableChain(t *testing.T) {
 	}
 	if writer.Truncated || writer.Bytes != uint64(output.Len()) || !strings.HasSuffix(output.String(), "\n") {
 		t.Fatalf("unexpected writer state: %+v output=%q", writer, output.String())
+	}
+}
+
+func TestJournalWriterRotatesWithoutResettingChain(t *testing.T) {
+	outputs := []*bytes.Buffer{&bytes.Buffer{}}
+	writer := &JournalWriter{
+		Destination: outputs[0],
+		RotateBytes: 1,
+		Rotate: func() (io.Writer, error) {
+			value := &bytes.Buffer{}
+			outputs = append(outputs, value)
+			return value, nil
+		},
+	}
+	first := testEvent()
+	second := testEvent()
+	second.TimestampNS = 2
+	if err := writer.Append(first); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Append(second); err != nil {
+		t.Fatal(err)
+	}
+	if len(outputs) != 2 || outputs[0].Len() == 0 || outputs[1].Len() == 0 {
+		t.Fatalf("rotation outputs = %d, lengths %d/%d", len(outputs), outputs[0].Len(), outputs[1].Len())
+	}
+	var journal []JournalEvent
+	for _, output := range outputs {
+		var value JournalEvent
+		if err := json.Unmarshal(bytes.TrimSpace(output.Bytes()), &value); err != nil {
+			t.Fatal(err)
+		}
+		journal = append(journal, value)
+	}
+	if !Verify(journal) || writer.Bytes != uint64(outputs[0].Len()+outputs[1].Len()) {
+		t.Fatalf("rotated chain invalid or byte count wrong: valid=%v bytes=%d", Verify(journal), writer.Bytes)
 	}
 }

@@ -63,6 +63,29 @@ func TestSummarizeEventsCountsBytesAndDetectsTruncation(t *testing.T) {
 	}
 }
 
+func TestSummarizeEventsPathsPreservesRotationOrder(t *testing.T) {
+	root := t.TempDir()
+	first := filepath.Join(root, "events.jsonl")
+	second := filepath.Join(root, "events-000001.jsonl")
+	if err := os.WriteFile(first, []byte("{\"event\":1}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(second, []byte("{\"event\":2}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ordered, err := SummarizeEventsPaths([]string{first, second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	separate, err := SummarizeEventsPaths([]string{second, first})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ordered.Count != 2 || ordered.Bytes != separate.Bytes || ordered.SHA256 == separate.SHA256 || !ordered.Complete {
+		t.Fatalf("ordered=%+v separate=%+v", ordered, separate)
+	}
+}
+
 func TestEventEvidenceWithDroppedMarksIncomplete(t *testing.T) {
 	evidence := EventEvidence{Count: 4, Bytes: 100, SHA256: "digest", Complete: true}
 	evidence = evidence.WithDropped(3)

@@ -73,14 +73,14 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "Policy learn, bounded evidence, cgroup resource budgets, fail-closed network semantics, and a standalone evidence verifier are shipped. Next: multi-file rotation, an enforceable network backend, conflict-checked commit, and signed or remote evidence." },
+    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "Policy learn, bounded evidence, ordered JSONL rotation, cgroup resource budgets, fail-closed network semantics, and a standalone evidence verifier are shipped. Next: an enforceable network backend, conflict-checked commit, backpressure, and signed or remote evidence." },
     { phase: "AFTER", title: "P2: product surface", status: "Planned", body: "Portable signed profiles, content-addressed retention, a detachable supervisor, credential injection, remote evidence, and Linux distribution packaging." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],
     ["02", "Read boundary", "User-defined glob policies with off, audit, and enforce modes via Landlock."],
     ["03", "Process scope", "cgroup-v2 lifecycle, descendant drain gate, and optional PID/memory/CPU budgets."],
-    ["04", "Evidence integrity", "eBPF telemetry, dropped-event accounting, hash chain, bounded logs, and verification."],
+    ["04", "Evidence integrity", "eBPF telemetry, dropped-event accounting, hash chain, bounded logs, rotation, and verification."],
     ["05", "Recovery paths", "SIGKILL, open-descriptor, stale-mount, and already-torn-down run recovery."],
     ["06", "Review surface", "inspect, diff, export, policy explain, policy learn, and standalone evidence verification."],
   ],

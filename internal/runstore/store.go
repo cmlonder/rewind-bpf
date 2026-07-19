@@ -17,9 +17,10 @@ import (
 )
 
 type Record struct {
-	Plan       runplan.Plan  `json:"plan"`
-	EventsPath string        `json:"events_path,omitempty"`
-	Events     EventEvidence `json:"events,omitempty"`
+	Plan        runplan.Plan  `json:"plan"`
+	EventsPath  string        `json:"events_path,omitempty"`
+	EventsPaths []string      `json:"events_paths,omitempty"`
+	Events      EventEvidence `json:"events,omitempty"`
 }
 
 type EventEvidence struct {
@@ -35,44 +36,71 @@ type EventEvidence struct {
 // exposing event paths. Count is newline-delimited record count; malformed
 // lines make Complete false so callers cannot claim a complete audit stream.
 func SummarizeEvents(path string) (EventEvidence, error) {
-	if path == "" {
+	return SummarizeEventsPaths([]string{path})
+}
+
+// SummarizeEventsPaths computes one ordered digest over a rotated JSONL
+// stream. The first path is the original events.jsonl file; subsequent paths
+// are appended in the order supplied by the writer.
+func SummarizeEventsPaths(paths []string) (EventEvidence, error) {
+	if len(paths) == 0 || (len(paths) == 1 && paths[0] == "") {
 		return EventEvidence{Complete: true}, nil
 	}
-	file, err := os.Open(path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return EventEvidence{Complete: true}, nil
-		}
-		return EventEvidence{}, fmt.Errorf("summarize events: open: %w", err)
-	}
-	defer file.Close()
 	hash := sha256.New()
 	count := uint64(0)
 	complete := true
-	reader := bufio.NewReader(file)
 	var totalBytes uint64
-	for {
-		line, readErr := reader.ReadBytes('\n')
-		if len(line) > 0 {
-			_, _ = hash.Write(line)
-			totalBytes += uint64(len(line))
-			if line[len(line)-1] == '\n' {
-				count++
-				if !json.Valid(bytes.TrimSpace(line)) {
+	for _, path := range paths {
+		if path == "" {
+			continue
+		}
+		file, err := os.Open(path)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return EventEvidence{}, fmt.Errorf("summarize events: open: %w", err)
+		}
+		reader := bufio.NewReader(file)
+		for {
+			line, readErr := reader.ReadBytes('\n')
+			if len(line) > 0 {
+				_, _ = hash.Write(line)
+				totalBytes += uint64(len(line))
+				if line[len(line)-1] == '\n' {
+					count++
+					if !json.Valid(bytes.TrimSpace(line)) {
+						complete = false
+					}
+				} else {
 					complete = false
 				}
-			} else {
-				complete = false
+			}
+			if readErr != nil {
+				if readErr != io.EOF {
+					_ = file.Close()
+					return EventEvidence{}, fmt.Errorf("summarize events: read: %w", readErr)
+				}
+				break
 			}
 		}
-		if readErr != nil {
-			if readErr != io.EOF {
-				return EventEvidence{}, fmt.Errorf("summarize events: read: %w", readErr)
-			}
-			break
+		if err := file.Close(); err != nil {
+			return EventEvidence{}, fmt.Errorf("summarize events: close: %w", err)
 		}
 	}
 	return EventEvidence{Count: count, Bytes: totalBytes, SHA256: fmt.Sprintf("%x", hash.Sum(nil)), Complete: complete}, nil
+}
+
+// EventLogPaths returns the recorded rotation order while preserving
+// compatibility with records written before rotation support existed.
+func EventLogPaths(record Record) []string {
+	if len(record.EventsPaths) > 0 {
+		return append([]string(nil), record.EventsPaths...)
+	}
+	if record.EventsPath == "" {
+		return nil
+	}
+	return []string{record.EventsPath}
 }
 
 // WithDropped marks the evidence incomplete when the kernel ring buffer had

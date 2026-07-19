@@ -26,25 +26,31 @@ type Result struct {
 }
 
 func Verify(record runstore.Record) (Result, error) {
-	file, err := os.Open(record.EventsPath)
-	if err != nil {
-		return Result{}, fmt.Errorf("verify evidence: open events: %w", err)
-	}
-	defer file.Close()
 	var journal []telemetry.JournalEvent
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), 2*1024*1024)
-	for scanner.Scan() {
-		var value telemetry.JournalEvent
-		if err := json.Unmarshal(scanner.Bytes(), &value); err != nil {
-			return Result{}, fmt.Errorf("verify evidence: decode event journal: %w", err)
+	for _, path := range runstore.EventLogPaths(record) {
+		file, err := os.Open(path)
+		if err != nil {
+			return Result{}, fmt.Errorf("verify evidence: open events: %w", err)
 		}
-		journal = append(journal, value)
+		scanner := bufio.NewScanner(file)
+		scanner.Buffer(make([]byte, 64*1024), 2*1024*1024)
+		for scanner.Scan() {
+			var value telemetry.JournalEvent
+			if err := json.Unmarshal(scanner.Bytes(), &value); err != nil {
+				_ = file.Close()
+				return Result{}, fmt.Errorf("verify evidence: decode event journal: %w", err)
+			}
+			journal = append(journal, value)
+		}
+		if err := scanner.Err(); err != nil {
+			_ = file.Close()
+			return Result{}, fmt.Errorf("verify evidence: read event journal: %w", err)
+		}
+		if err := file.Close(); err != nil {
+			return Result{}, fmt.Errorf("verify evidence: close event journal: %w", err)
+		}
 	}
-	if err := scanner.Err(); err != nil {
-		return Result{}, fmt.Errorf("verify evidence: read event journal: %w", err)
-	}
-	evidence, err := runstore.SummarizeEvents(record.EventsPath)
+	evidence, err := runstore.SummarizeEventsPaths(runstore.EventLogPaths(record))
 	if err != nil {
 		return Result{}, err
 	}

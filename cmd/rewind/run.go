@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -77,7 +78,11 @@ func handleRun(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	telemetry := &telemetryAdapter{path: eventsPath, owner: owner, maxBytes: maxEventBytes}
+	rotateEventBytes, err := configuredTelemetryRotateBytes()
+	if err != nil {
+		fatal(err.Error())
+	}
+	telemetry := &telemetryAdapter{path: eventsPath, owner: owner, maxBytes: maxEventBytes, rotateBytes: rotateEventBytes}
 	capabilityReport := capabilities.Probe()
 	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil); err != nil {
 		fatal(fmt.Sprintf("protected-run capability check: %v", err))
@@ -239,12 +244,24 @@ type evidenceState struct {
 }
 
 func persistRecordState(path string, plan runplan.Plan, eventsPath string, state evidenceState) error {
-	evidence, err := runstore.SummarizeEvents(eventsPath)
+	eventPaths := discoverEventPaths(eventsPath)
+	evidence, err := runstore.SummarizeEventsPaths(eventPaths)
 	if err != nil {
 		return err
 	}
 	evidence = evidence.WithDropped(state.dropped).WithTruncated(state.truncated)
-	return runstore.Write(path, runstore.Record{Plan: plan, EventsPath: eventsPath, Events: evidence})
+	return runstore.Write(path, runstore.Record{Plan: plan, EventsPath: eventsPath, EventsPaths: eventPaths, Events: evidence})
+}
+
+func discoverEventPaths(eventsPath string) []string {
+	if strings.TrimSpace(eventsPath) == "" {
+		return nil
+	}
+	paths := []string{eventsPath}
+	pattern := fmt.Sprintf("%s-*.jsonl", strings.TrimSuffix(eventsPath, filepath.Ext(eventsPath)))
+	rotated, _ := filepath.Glob(pattern)
+	sort.Strings(rotated)
+	return append(paths, rotated...)
 }
 
 func handleStatus(args []string) {
@@ -299,13 +316,18 @@ func handleEvents(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	file, err := os.Open(record.EventsPath)
-	if err != nil {
-		fatal(fmt.Sprintf("open events: %v", err))
-	}
-	defer file.Close()
-	if _, err := io.Copy(os.Stdout, file); err != nil {
-		fatal(fmt.Sprintf("read events: %v", err))
+	for _, path := range runstore.EventLogPaths(record) {
+		file, err := os.Open(path)
+		if err != nil {
+			fatal(fmt.Sprintf("open events: %v", err))
+		}
+		if _, err := io.Copy(os.Stdout, file); err != nil {
+			_ = file.Close()
+			fatal(fmt.Sprintf("read events: %v", err))
+		}
+		if err := file.Close(); err != nil {
+			fatal(fmt.Sprintf("close events: %v", err))
+		}
 	}
 }
 
@@ -445,14 +467,29 @@ func configuredTelemetryMaxBytes() (uint64, error) {
 	return maxBytes, nil
 }
 
+func configuredTelemetryRotateBytes() (uint64, error) {
+	value := strings.TrimSpace(os.Getenv("REWIND_EVENT_ROTATE_BYTES"))
+	if value == "" {
+		return 0, nil
+	}
+	rotateBytes, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || rotateBytes == 0 {
+		return 0, fmt.Errorf("REWIND_EVENT_ROTATE_BYTES must be a positive integer when set")
+	}
+	return rotateBytes, nil
+}
+
 type telemetryAdapter struct {
-	path     string
-	owner    overlay.Owner
-	maxBytes uint64
+	path        string
+	owner       overlay.Owner
+	maxBytes    uint64
+	rotateBytes uint64
 
 	mu        sync.Mutex
 	session   *ebpfload.Session
 	file      *os.File
+	paths     []string
+	nextIndex uint64
 	done      chan struct{}
 	once      sync.Once
 	closeErr  error
@@ -467,24 +504,52 @@ func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, p
 	if err != nil {
 		return nil, err
 	}
-	file, err := os.OpenFile(a.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	file, err := a.openFile(a.path)
 	if err != nil {
 		_ = session.Close()
 		return nil, fmt.Errorf("open telemetry log: %w", err)
 	}
-	if os.Geteuid() == 0 {
-		if err := os.Chown(a.path, a.owner.UID, a.owner.GID); err != nil {
-			_ = file.Close()
-			_ = session.Close()
-			return nil, fmt.Errorf("set telemetry log owner: %w", err)
-		}
-	}
 	a.mu.Lock()
 	a.session, a.file, a.done = session, file, make(chan struct{})
-	a.writer = &telemetry.JournalWriter{Destination: file, MaxBytes: a.maxBytes}
+	a.paths, a.nextIndex = []string{a.path}, 1
+	a.writer = &telemetry.JournalWriter{Destination: file, MaxBytes: a.maxBytes, RotateBytes: a.rotateBytes, Rotate: a.rotate}
 	a.mu.Unlock()
 	go a.readLoop()
 	return a, nil
+}
+
+func (a *telemetryAdapter) openFile(path string) (*os.File, error) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("open telemetry log: %w", err)
+	}
+	if os.Geteuid() == 0 {
+		if err := os.Chown(path, a.owner.UID, a.owner.GID); err != nil {
+			_ = file.Close()
+			return nil, fmt.Errorf("set telemetry log owner: %w", err)
+		}
+	}
+	return file, nil
+}
+
+func (a *telemetryAdapter) rotate() (io.Writer, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.file == nil {
+		return nil, fmt.Errorf("current telemetry log is closed")
+	}
+	if err := a.file.Close(); err != nil {
+		return nil, err
+	}
+	path := fmt.Sprintf("%s-%06d.jsonl", strings.TrimSuffix(a.path, filepath.Ext(a.path)), a.nextIndex)
+	file, err := a.openFile(path)
+	if err != nil {
+		return nil, err
+	}
+	a.file = file
+	a.paths = append(a.paths, path)
+	a.nextIndex++
+	return file, nil
 }
 
 func (a *telemetryAdapter) readLoop() {
@@ -514,7 +579,7 @@ func (a *telemetryAdapter) readLoop() {
 func (a *telemetryAdapter) Close() error {
 	a.once.Do(func() {
 		a.mu.Lock()
-		session, file, done := a.session, a.file, a.done
+		session, done := a.session, a.done
 		a.mu.Unlock()
 		if session != nil {
 			// A process can exit immediately after submitting a ring-buffer
@@ -530,6 +595,9 @@ func (a *telemetryAdapter) Close() error {
 		if done != nil {
 			<-done
 		}
+		a.mu.Lock()
+		file := a.file
+		a.mu.Unlock()
 		if file != nil {
 			a.closeErr = errors.Join(a.closeErr, a.dropErr, file.Close())
 		}

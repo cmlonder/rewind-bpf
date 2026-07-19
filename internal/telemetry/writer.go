@@ -16,8 +16,11 @@ import (
 type JournalWriter struct {
 	Destination io.Writer
 	MaxBytes    uint64
+	RotateBytes uint64
 	Bytes       uint64
+	FileBytes   uint64
 	Truncated   bool
+	Rotate      func() (io.Writer, error)
 	chain       Chain
 }
 
@@ -38,9 +41,21 @@ func (w *JournalWriter) Append(value event.Event) error {
 		w.Truncated = true
 		return nil
 	}
+	if w.RotateBytes > 0 && w.FileBytes > 0 && w.FileBytes+uint64(len(data)) > w.RotateBytes {
+		if w.Rotate == nil {
+			return fmt.Errorf("rotate journal event: destination callback is required")
+		}
+		destination, err := w.Rotate()
+		if err != nil {
+			return fmt.Errorf("rotate journal event: %w", err)
+		}
+		w.Destination = destination
+		w.FileBytes = 0
+	}
 	if _, err := w.Destination.Write(data); err != nil {
 		return fmt.Errorf("write journal event: %w", err)
 	}
 	w.Bytes += uint64(len(data))
+	w.FileBytes += uint64(len(data))
 	return nil
 }
