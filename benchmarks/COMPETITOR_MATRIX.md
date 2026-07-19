@@ -15,6 +15,8 @@ Every external number must include:
 
 The primary RewindBPF dataset remains B0/B2/B4 in [`RESULTS.md`](RESULTS.md). External systems are not ranked when their safety boundary or workload is different.
 
+The current disposable VM inventory (2026-07-19) contains none of the `nono`, Tetragon, KubeArmor, or AgentFS executables, and no Kubernetes/container runtime. Therefore the external rows below remain explicitly `not-comparable`; no competitor was silently installed or benchmarked under a mismatched setup.
+
 ## Feature and benchmark scope
 
 | System | Relationship | Feature overlap | Fair benchmark dimensions | Explicitly out of scope |
