@@ -203,6 +203,10 @@ Initial targets are hypotheses, not guarantees: low single-digit overhead for re
 
 ## 8. Correctness and security tests
 
+### 8.1 Jury-facing project site
+
+The repository includes a static, dependency-free single-page site under `site/`. Its content is assembled from modular section files (`site/sections/*.js`) and a shared data module (`site/data.js`). The page is an explanatory surface, not a second runtime: shipped capabilities, roadmap items, competitor relationships, and benchmark values are copied from the checked-in ledgers and link to the canonical Markdown documents. It is safe to publish as a static directory and can later move to a route-based frontend without changing the runtime.
+
 Create a lower-layer manifest before every test. Compare content, file structure, mode, UID/GID, symlink targets, xattrs, size, and timestamps after rollback.
 
 Core scenarios:

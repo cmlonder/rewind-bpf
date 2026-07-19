@@ -1,0 +1,11 @@
+import { siteData } from "../data.js";
+
+export function Benchmarks() {
+  const max = Math.max(...siteData.benchmarks.map((b) => b.read));
+  return `<section class="benchmarks-section section-shell" id="benchmarks" aria-labelledby="benchmarks-title">
+    <div class="benchmark-header reveal"><div><div class="section-kicker">05 / MEASURED IN THE VM</div><h2 id="benchmarks-title">The cost of<br /><span>the safety invariant</span></h2></div><div class="benchmark-callout"><strong>11.1%</strong><span>warm B4 read throughput gap vs B0</span><small>FUSE + eBPF + helper / fio 3.36</small></div></div>
+    <div class="benchmark-panel reveal"><div class="chart-head"><span>Randrw throughput / 4 KiB / 70R : 30W</span><span class="chart-legend"><i class="legend-read"></i> read IOPS <i class="legend-write"></i> write IOPS</span></div><div class="bar-chart">${siteData.benchmarks.map((b, i) => `<div class="bar-row"><div class="bar-label"><strong>${b.label}</strong><span>${b.note}</span></div><div class="bar-track"><div class="bar read" style="--bar:${(b.read / max * 100).toFixed(1)}%"><span>${b.readLabel}</span></div><div class="bar write" style="--bar:${(b.write / max * 100).toFixed(1)}%"><span>${b.writeLabel}</span></div></div><div class="bar-values"><b>${b.readLabel}</b><b>${b.writeLabel}</b></div></div>`).join("")}</div><div class="chart-foot"><span>B0 native ext4</span><span>B2 FUSE-only</span><span>B4 protected path</span></div></div>
+    <div class="evidence-grid">${siteData.evidence.map(([value, label], i) => `<div class="evidence-cell reveal reveal-delay-${i % 3}"><strong>${value}</strong><span>${label}</span></div>`).join("")}</div>
+    <div class="benchmark-disclaimer reveal"><span>READ THIS LIKE AN ENGINEER</span><p>These are VM measurements, not a universal “near-zero overhead” guarantee. B4 is ~0.4% above the FUSE-only B2 control in this warm sample; cold runs include first-copy-up and lifecycle costs. Storage is first-class: a full 128 MiB overwrite measured ~1.0× upper-layer amplification.</p><a href="https://github.com/rewindbpf/rewind/blob/main/benchmarks/RESULTS.md" target="_blank" rel="noreferrer">Open full results ↗</a></div>
+  </section>`;
+}

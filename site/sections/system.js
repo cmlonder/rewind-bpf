@@ -1,0 +1,9 @@
+import { siteData } from "../data.js";
+
+export function System() {
+  return `<section class="system-section section-shell" id="system" aria-labelledby="system-title">
+    <div class="section-intro reveal"><div class="section-kicker">01 / THE CORE INVARIANT</div><h2 id="system-title">The agent can be<br /><span>wrong. Your files aren’t.</span></h2><p>RewindBPF prepares the boundary before the agent starts. It does not wait for a dangerous command, guess what “rm” means, or make a backup after the damage.</p></div>
+    <div class="flow-rail">${siteData.stages.map((stage, i) => `<article class="flow-stage reveal reveal-delay-${i % 3}"><div class="flow-number">${stage.icon}</div><div class="flow-label">${stage.label}</div><h3>${stage.title}</h3><p>${stage.body}</p>${i < siteData.stages.length - 1 ? `<span class="flow-arrow" aria-hidden="true">→</span>` : ""}</article>`).join("")}</div>
+    <div class="architecture-note reveal"><div class="note-symbol">⌁</div><div><strong>One mental model</strong><p><code>lowerdir</code> is the original. <code>upperdir</code> is disposable. <code>merged</code> is what the agent sees. Rollback is deleting the upper layer—not reconstructing a backup.</p></div><a href="https://github.com/rewindbpf/rewind/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noreferrer">Architecture notes <span>↗</span></a></div>
+  </section>`;
+}

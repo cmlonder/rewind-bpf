@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-The MVP is complete for its explicitly documented disposable-VM boundary. Phase 2 P0 hardening is now in progress: cgroup-v2 run scopes, capability reporting, atomic prepared-run journaling, idempotent recovery, invoker-owned metadata, event evidence digests, a sensor start gate, dropped-event accounting, sequence/hash-chained event records, parent-crash recovery, and a read-only merged-view diff command are implemented and VM-smoke-tested. Stage 6 protected-run integration and Stage 7 benchmark controls remain validated: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, scoped telemetry with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, process-level read denial, OverlayFS mount/rollback, a fail-closed coordinator, a policy-aware helper, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining Phase 2 work is broader crash-edge coverage, bounded log rotation, network/credential policy planes, conflict-safe export, and release rehearsal.
+The MVP is complete for its explicitly documented disposable-VM boundary. Phase 2 P0 hardening is now in progress: cgroup-v2 run scopes, capability reporting, atomic prepared-run journaling, idempotent recovery, invoker-owned metadata, event evidence digests, a sensor start gate, dropped-event accounting, sequence/hash-chained event records, parent-crash recovery, a read-only merged-view diff command, and a conflict-safe review export are implemented and VM-smoke-tested. Stage 6 protected-run integration and Stage 7 benchmark controls remain validated: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, scoped telemetry with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, process-level read denial, OverlayFS mount/rollback, a fail-closed coordinator, a policy-aware helper, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining Phase 2 work is broader crash-edge coverage, bounded log rotation, network/credential policy planes, policy learning, conflict-checked commit, and release rehearsal.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -50,6 +50,17 @@ There are established kernel-security projects that overlap with parts of the de
 The benchmark plan deliberately compares these tradeoffs rather than relying on a “near-zero overhead” slogan: native ext4, eBPF-only, OverlayFS-only, OverlayFS + eBPF, and the full daemon path are measured separately. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the test matrix and safety boundary.
 
 Captured VM measurements are summarized in [benchmarks/RESULTS.md](benchmarks/RESULTS.md) and [benchmarks/results_summary.csv](benchmarks/results_summary.csv). The CSV is the input for the final Python charts; raw VM artifacts remain outside Git unless explicitly archived.
+
+## Project site
+
+The jury-facing single-page site lives in [`site/`](site/). It is dependency-free and assembled from modular JavaScript sections so it can be published as a static site today and split into routes later. To preview it locally:
+
+```bash
+python3 -m http.server 4173 --directory site
+open http://127.0.0.1:4173
+```
+
+The page covers the shipped safety surface, reversible transaction flow, Phase 2 roadmap, competitor capability matrix, and measured B0/B2/B4 evidence. The Markdown ledgers remain canonical.
 
 ## Safety warning
 
@@ -114,7 +125,7 @@ make test
 ./bin/rewind policy explain policies/example.yaml /workspace/.env
 ```
 
-The `run`, `status`, `events`, and `rollback` commands are now wired for the disposable Linux VM. `commit` remains intentionally disabled until diff/export semantics are implemented and verified.
+The `run`, `status`, `events`, `verify`, `diff`, `export`, and `rollback` commands are wired for the disposable Linux VM. `commit` remains intentionally disabled until conflict-checked merge semantics are implemented and verified.
 
 VM-only run shape:
 

@@ -119,7 +119,13 @@ rewind events RUN_ID
 rewind rollback RUN_ID
 rewind commit RUN_ID
 rewind policy check POLICY
+rewind policy explain POLICY PATH
+rewind verify --record PATH
+rewind diff --record PATH
+rewind export --record PATH --output PATH
 ```
+
+The dependency-free `site/` directory is a jury-facing presentation layer. It imports modular sections from `site/sections/` and links back to the canonical architecture, phase, and benchmark ledgers; it is not a second runtime or policy source.
 
 #### `rewindd` daemon
 

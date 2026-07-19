@@ -89,6 +89,8 @@ The comparison is deliberately two-layered. RewindBPF owns the primary, reproduc
 
 The benchmark ledger therefore reports measurement provenance (`measured`, `published`, or `not comparable`) beside every external value. The jury-facing claim is not “faster than every competitor”; it is that RewindBPF measures the cost of its explicit safety invariant—pre-created COW writes plus kernel telemetry—and makes the tradeoff auditable.
 
+The jury-facing single-page site in `site/` now presents this same distinction: shipped capabilities first, planned work second, then a capability matrix and the measured B0/B2/B4 bars. The site is a static presentation layer; the Markdown architecture and benchmark ledgers remain canonical.
+
 ## 3.1 Nono parity track
 
 Nono is the closest product benchmark, so its publicly documented feature set becomes a checklist rather than a vague comparison. The goal is feature parity where it materially improves agent safety, not a blind reimplementation of its architecture.
