@@ -77,3 +77,11 @@ func TestEventEvidenceWithDroppedMarksIncomplete(t *testing.T) {
 		t.Fatalf("zero dropped events should preserve complete evidence: %+v", zero)
 	}
 }
+
+func TestEventEvidenceWithTruncatedMarksIncomplete(t *testing.T) {
+	evidence := EventEvidence{Count: 4, Bytes: 100, SHA256: "digest", Complete: true}
+	got := evidence.WithTruncated(true)
+	if !got.Truncated || got.Complete {
+		t.Fatalf("truncated evidence = %+v", got)
+	}
+}

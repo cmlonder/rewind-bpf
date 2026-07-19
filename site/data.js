@@ -73,7 +73,7 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "The review-only policy learn slice is shipped. Next: bounded event rotation, independent evidence verifier, network namespace/proxy modes, resource budgets, and conflict-checked commit." },
+    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "Policy learn and a bounded single-file event cap are shipped. Next: multi-file rotation, independent evidence verifier, network namespace/proxy modes, resource budgets, and conflict-checked commit." },
     { phase: "AFTER", title: "P2: product surface", status: "Planned", body: "Portable signed profiles, content-addressed retention, a detachable supervisor, credential injection, remote evidence, and Linux distribution packaging." },
   ],
   competitors: [

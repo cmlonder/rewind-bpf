@@ -23,11 +23,12 @@ type Record struct {
 }
 
 type EventEvidence struct {
-	Count    uint64 `json:"count"`
-	Bytes    uint64 `json:"bytes"`
-	Dropped  uint64 `json:"dropped,omitempty"`
-	SHA256   string `json:"sha256,omitempty"`
-	Complete bool   `json:"complete"`
+	Count     uint64 `json:"count"`
+	Bytes     uint64 `json:"bytes"`
+	Dropped   uint64 `json:"dropped,omitempty"`
+	Truncated bool   `json:"truncated,omitempty"`
+	SHA256    string `json:"sha256,omitempty"`
+	Complete  bool   `json:"complete"`
 }
 
 // SummarizeEvents computes a portable evidence digest without parsing or
@@ -80,6 +81,16 @@ func SummarizeEvents(path string) (EventEvidence, error) {
 func (e EventEvidence) WithDropped(dropped uint64) EventEvidence {
 	e.Dropped = dropped
 	if dropped > 0 {
+		e.Complete = false
+	}
+	return e
+}
+
+// WithTruncated records a userspace byte cap or rotation boundary. A capped
+// stream remains useful for diagnostics but must never be reported complete.
+func (e EventEvidence) WithTruncated(truncated bool) EventEvidence {
+	e.Truncated = truncated
+	if truncated {
 		e.Complete = false
 	}
 	return e

@@ -73,7 +73,11 @@ func handleRun(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	telemetry := &telemetryAdapter{path: eventsPath, owner: owner}
+	maxEventBytes, err := configuredTelemetryMaxBytes()
+	if err != nil {
+		fatal(err.Error())
+	}
+	telemetry := &telemetryAdapter{path: eventsPath, owner: owner, maxBytes: maxEventBytes}
 	capabilityReport := capabilities.Probe()
 	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil); err != nil {
 		fatal(fmt.Sprintf("protected-run capability check: %v", err))
@@ -106,20 +110,20 @@ func handleRun(args []string) {
 	}
 	handle, err := coordinator.Start(context.Background(), &plan, command, *sensorObject)
 	if err != nil {
-		_ = persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped())
+		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		fatal(err.Error())
 	}
-	if err := persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped()); err != nil {
+	if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist running run; transaction rolled back: %v", err))
 	}
 	waitErr := handle.Wait()
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
-		_ = persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped())
+		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		fatal(errors.Join(waitErr, rollbackErr).Error())
 	}
-	if err := persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped()); err != nil {
+	if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist successful run; transaction rolled back: %v", err))
 	}
@@ -163,7 +167,7 @@ func handleRollback(args []string) {
 	if err := coordinator.RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(err.Error())
 	}
-	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, record.Events.Dropped); err != nil {
+	if err := persistRecordState(*recordPath, record.Plan, record.EventsPath, evidenceState{dropped: record.Events.Dropped, truncated: record.Events.Truncated}); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
@@ -189,7 +193,7 @@ func handleRecover(args []string) {
 	if err := (protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}, Scope: persistedScope(record.Plan.CgroupPath)}).RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(fmt.Sprintf("recover protected run: %v", err))
 	}
-	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, record.Events.Dropped); err != nil {
+	if err := persistRecordState(*recordPath, record.Plan, record.EventsPath, evidenceState{dropped: record.Events.Dropped, truncated: record.Events.Truncated}); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run recovered and rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
@@ -210,15 +214,24 @@ func persistedScope(path string) protectedrun.ProcessScope {
 }
 
 func persistRecord(path string, plan runplan.Plan, eventsPath string, dropped ...uint64) error {
+	var state evidenceState
+	if len(dropped) > 0 {
+		state.dropped = dropped[0]
+	}
+	return persistRecordState(path, plan, eventsPath, state)
+}
+
+type evidenceState struct {
+	dropped   uint64
+	truncated bool
+}
+
+func persistRecordState(path string, plan runplan.Plan, eventsPath string, state evidenceState) error {
 	evidence, err := runstore.SummarizeEvents(eventsPath)
 	if err != nil {
 		return err
 	}
-	var droppedCount uint64
-	if len(dropped) > 0 {
-		droppedCount = dropped[0]
-	}
-	evidence = evidence.WithDropped(droppedCount)
+	evidence = evidence.WithDropped(state.dropped).WithTruncated(state.truncated)
 	return runstore.Write(path, runstore.Record{Plan: plan, EventsPath: eventsPath, Events: evidence})
 }
 
@@ -327,16 +340,17 @@ func handleVerify(args []string) {
 		Count          uint64 `json:"count"`
 		Bytes          uint64 `json:"bytes"`
 		Dropped        uint64 `json:"dropped"`
+		Truncated      bool   `json:"truncated"`
 		Complete       bool   `json:"complete"`
 		StreamComplete bool   `json:"stream_complete"`
 		RecordComplete bool   `json:"record_complete"`
 		ChainValid     bool   `json:"chain_valid"`
 		MatchesRecord  bool   `json:"matches_record"`
-	}{record.Plan.Run.ID, evidence.Count, evidence.Bytes, record.Events.Dropped, evidence.Complete && record.Events.Complete && record.Events.Dropped == 0 && chainValid && matchesRecord, evidence.Complete, record.Events.Complete, chainValid, matchesRecord}
+	}{record.Plan.Run.ID, evidence.Count, evidence.Bytes, record.Events.Dropped, record.Events.Truncated, evidence.Complete && record.Events.Complete && record.Events.Dropped == 0 && !record.Events.Truncated && chainValid && matchesRecord, evidence.Complete, record.Events.Complete, chainValid, matchesRecord}
 	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 		fatal(err.Error())
 	}
-	if !matchesRecord || !evidence.Complete || record.Events.Dropped > 0 || !chainValid {
+	if !matchesRecord || !evidence.Complete || record.Events.Dropped > 0 || record.Events.Truncated || !chainValid {
 		os.Exit(2)
 	}
 }
@@ -439,19 +453,33 @@ func splitCSV(value string) []string {
 	return result
 }
 
-type telemetryAdapter struct {
-	path  string
-	owner overlay.Owner
+func configuredTelemetryMaxBytes() (uint64, error) {
+	value := strings.TrimSpace(os.Getenv("REWIND_EVENT_MAX_BYTES"))
+	if value == "" {
+		return 0, nil
+	}
+	maxBytes, err := strconv.ParseUint(value, 10, 64)
+	if err != nil || maxBytes == 0 {
+		return 0, fmt.Errorf("REWIND_EVENT_MAX_BYTES must be a positive integer when set")
+	}
+	return maxBytes, nil
+}
 
-	mu       sync.Mutex
-	session  *ebpfload.Session
-	file     *os.File
-	done     chan struct{}
-	once     sync.Once
-	closeErr error
-	dropped  uint64
-	dropErr  error
-	chain    telemetry.Chain
+type telemetryAdapter struct {
+	path     string
+	owner    overlay.Owner
+	maxBytes uint64
+
+	mu        sync.Mutex
+	session   *ebpfload.Session
+	file      *os.File
+	done      chan struct{}
+	once      sync.Once
+	closeErr  error
+	dropped   uint64
+	dropErr   error
+	writer    *telemetry.JournalWriter
+	truncated bool
 }
 
 func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, pid uint32) (io.Closer, error) {
@@ -473,6 +501,7 @@ func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, p
 	}
 	a.mu.Lock()
 	a.session, a.file, a.done = session, file, make(chan struct{})
+	a.writer = &telemetry.JournalWriter{Destination: file, MaxBytes: a.maxBytes}
 	a.mu.Unlock()
 	go a.readLoop()
 	return a, nil
@@ -480,27 +509,24 @@ func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, p
 
 func (a *telemetryAdapter) readLoop() {
 	a.mu.Lock()
-	session, file, done := a.session, a.file, a.done
+	session, done, writer := a.session, a.done, a.writer
 	a.mu.Unlock()
 	defer close(done)
-	encoder := json.NewEncoder(file)
 	for {
 		value, err := session.Events().Read()
 		if err != nil {
 			return
 		}
-		journal, err := a.chain.Append(value)
-		if err != nil {
+		if err := writer.Append(value); err != nil {
 			a.mu.Lock()
 			a.closeErr = err
 			a.mu.Unlock()
 			return
 		}
-		if err := encoder.Encode(journal); err != nil {
+		if writer.Truncated {
 			a.mu.Lock()
-			a.closeErr = err
+			a.truncated = true
 			a.mu.Unlock()
-			return
 		}
 	}
 }
@@ -519,7 +545,7 @@ func (a *telemetryAdapter) Close() error {
 			a.mu.Lock()
 			a.dropped, a.dropErr = dropped, dropErr
 			a.mu.Unlock()
-			a.closeErr = session.Close()
+			a.closeErr = errors.Join(a.closeErr, session.Close())
 		}
 		if done != nil {
 			<-done
@@ -537,4 +563,12 @@ func (a *telemetryAdapter) Dropped() uint64 {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.dropped
+}
+
+func (a *telemetryAdapter) EvidenceState() evidenceState {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	state := evidenceState{dropped: a.dropped}
+	state.truncated = a.truncated
+	return state
 }
