@@ -52,6 +52,9 @@ func (c *Chain) Append(value event.Event) (JournalEvent, error) {
 func Verify(events []JournalEvent) bool {
 	var chain Chain
 	for _, value := range events {
+		if err := value.Event.Validate(); err != nil {
+			return false
+		}
 		if value.Sequence != chain.next+1 || value.PreviousHash != chain.previous {
 			return false
 		}
