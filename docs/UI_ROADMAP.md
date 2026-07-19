@@ -332,7 +332,7 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining work is the connected supervisor contract: persistent storage, live SSE/polling, signed policy packages, conflict-checked commit, and end-to-end reconnect/recovery behavior. Local authentication/authorization is explicitly a post-demo hardening item; the hackathon UI remains fixture-only and never receives root access.
+The remaining connected work is supervisor integration: live SSE/polling, signed policy packages, wiring the conflict checker to a real apply path, and end-to-end reconnect/recovery behavior. P4 now has a bounded history contract and fixture-backed retention view. Local authentication/authorization is explicitly a post-demo hardening item; the hackathon UI remains fixture-only and never receives root access.
 
 The UI is being kept platform-neutral. It must show the active backend and capability matrix explicitly: Linux OverlayFS/FUSE + Landlock/eBPF, macOS Seatbelt/EndpointSecurity + APFS/disposable workspace, or Windows native process/filesystem policy + disposable workspace. A platform adapter that cannot provide one of the four product promises must render degraded/refused state rather than silently presenting Linux-level guarantees.
 

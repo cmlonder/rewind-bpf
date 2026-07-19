@@ -73,9 +73,10 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "NEXT", title: "P1: invisible secrets + explicit accept", status: "Next", body: "Make discard the default outcome, add a scoped credential broker and enforceable egress plane, then ship conflict-checked patch/branch acceptance. No raw credential enters the agent workspace." },
-    { phase: "PLATFORM", title: "P2: native macOS + Windows", status: "Planned", body: "Implement native transaction and policy adapters behind the same four promises: immutable project, invisible secrets, explicit acceptance, and fail-closed trust. WSL2 remains compatibility, not Windows host protection." },
-    { phase: "LATER", title: "P3: durable history + supervisor", status: "Planned", body: "Only after the safety core is stable: persistent checkpoints, retention, detachable sessions, signed profiles, remote evidence, and thin agent integrations." },
+    { phase: "P1", title: "P1: invisible secrets + explicit accept", status: "Contract shipped", body: "Scoped credential references refuse raw secret exposure, network policy has an auditable preview plan, and candidate acceptance rejects same-path destination drift." },
+    { phase: "P2", title: "P2: native macOS adapter", status: "Contract shipped", body: "Seatbelt / EndpointSecurity + APFS are represented as an explicit capability contract. The backend remains refused until it passes disposable-volume tests." },
+    { phase: "P3", title: "P3: native Windows adapter", status: "Contract shipped", body: "Windows cross-build and fail-closed process boundary are ready; native Job Object/filesystem enforcement remains disabled until tested on disposable Windows storage." },
+    { phase: "P4", title: "P4: durable history + supervisor", status: "Contract shipped", body: "Atomic bounded run history, keep-latest pruning, supervisor request/response schema, and a fixture-backed retention view are now in place." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],

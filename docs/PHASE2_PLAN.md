@@ -40,6 +40,14 @@ The first product-core slice adds three explicit, portable contracts:
 
 The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This keeps the demo honest while preserving the API shape for native backends.
 
+### P4 implementation boundary
+
+`internal/history` now stores bounded, durable run summaries with atomic JSON
+replacement and keep-latest pruning. `internal/supervisor` defines the future
+local control-plane request/response schema without pretending that transport
+or authentication is production-ready. The UI history page is fixture-backed
+until a local supervisor is added after the demo.
+
 This is deliberately narrower than “protect the whole operating system” or “zero overhead.” OverlayFS protects filesystem changes inside the selected boundary. Landlock protects the selected read/write hierarchy. eBPF supplies low-cost telemetry and optional enforcement where the kernel supports it. Network, kernel state, devices, external services, and already-open descriptors remain explicit safety boundaries.
 
 ## 2. What the MVP proved, and what it did not
