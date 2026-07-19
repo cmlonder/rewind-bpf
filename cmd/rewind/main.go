@@ -20,6 +20,7 @@ Usage:
   rewind events --record PATH
   rewind verify --record PATH
   rewind diff --record PATH
+  rewind export --record PATH --output PATH
   rewind capabilities
   rewind rollback --record PATH
   rewind recover --record PATH
@@ -68,6 +69,8 @@ func main() {
 		handleVerify(os.Args[2:])
 	case "diff":
 		handleDiff(os.Args[2:])
+	case "export":
+		handleExport(os.Args[2:])
 	case "capabilities":
 		handleCapabilities(os.Args[2:])
 	case "commit":

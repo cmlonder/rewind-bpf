@@ -201,7 +201,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Add a bounded ring-buffer/event pipeline with sequence numbers, dropped-event counters, backpressure policy, and rotation limits.
 - Store compact JSONL for streaming plus a queryable run index (SQLite or an append-only compact format) for summaries.
 - Hash-chain event batches and include the final digest in the run record; document that this is tamper evidence, not a trusted remote log.
-- Add `rewind diff` to summarize created, modified, deleted, renamed, and policy-denied paths without printing secret contents.
+- Add `rewind diff` to summarize created, modified, deleted, renamed, and policy-denied paths without printing secret contents. The non-mutating `rewind export` review bundle is implemented; conflict-checked commit remains separate.
 - Add `rewind capabilities`, `rewind inspect`, `rewind verify`, and machine-readable status output.
 
 **Tests**

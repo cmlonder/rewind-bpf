@@ -73,11 +73,12 @@ rewind inspect --record ./runtime/record.json
 sudo rewind events --record ./runtime/record.json
 rewind verify --record ./runtime/record.json
 sudo rewind diff --record ./runtime/record.json
+rewind export --record ./runtime/record.json --output ./review-bundle.json
 sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
 ```
 
-The agent will see a merged workspace backed by an OverlayFS lower/upper pair. Rollback discards the temporary upper layer. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
+The agent will see a merged workspace backed by an OverlayFS lower/upper pair. Rollback discards the temporary upper layer. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
 
 Example policy:
 

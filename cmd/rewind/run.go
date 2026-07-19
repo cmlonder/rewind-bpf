@@ -20,6 +20,8 @@ import (
 	"github.com/rewindbpf/rewind/internal/cgroup"
 	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/ebpfload"
+	"github.com/rewindbpf/rewind/internal/export"
+	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/overlay"
 	"github.com/rewindbpf/rewind/internal/policy"
@@ -363,6 +365,55 @@ func handleDiff(args []string) {
 	if err := json.NewEncoder(os.Stdout).Encode(diff.Compare(record.Plan.Manifest, after)); err != nil {
 		fatal(fmt.Sprintf("encode diff: %v", err))
 	}
+}
+
+func handleExport(args []string) {
+	if runtime.GOOS != "linux" {
+		fatal("rewind export is Linux-only; use the disposable Ubuntu VM")
+	}
+	flags := flag.NewFlagSet("rewind export", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	recordPath := flags.String("record", "", "run record JSON path")
+	outputPath := flags.String("output", "", "review bundle JSON output path")
+	if err := flags.Parse(args); err != nil {
+		fatal(err.Error())
+	}
+	if flags.NArg() != 0 || strings.TrimSpace(*recordPath) == "" || strings.TrimSpace(*outputPath) == "" {
+		fatal("usage: rewind export --record PATH --output PATH")
+	}
+	record, err := runstore.Read(*recordPath)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if record.Plan.Run.State == lifecycle.RolledBack || record.Plan.Run.State == lifecycle.Committed {
+		fatal(fmt.Sprintf("export run %s: merged view is no longer available", record.Plan.Run.ID))
+	}
+	outputAbs, err := filepath.Abs(*outputPath)
+	if err != nil {
+		fatal(fmt.Sprintf("resolve export output: %v", err))
+	}
+	if pathWithin(record.Plan.Layout.Lower, outputAbs) || pathWithin(record.Plan.Layout.Root, outputAbs) {
+		fatal("export output must be outside the workspace and runtime root")
+	}
+	after, err := manifest.Build(record.Plan.Layout.Merged)
+	if err != nil {
+		fatal(fmt.Sprintf("build export manifest: %v", err))
+	}
+	bundle, err := export.Build(record.Plan.Run.ID, record.Plan.Manifest, after)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := export.Write(*outputPath, bundle); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("wrote review export with %d changes to %s\n", len(bundle.Changes), *outputPath)
+}
+
+func pathWithin(root, candidate string) bool {
+	root = filepath.Clean(root)
+	candidate = filepath.Clean(candidate)
+	rel, err := filepath.Rel(root, candidate)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
 func handleCapabilities(args []string) {
