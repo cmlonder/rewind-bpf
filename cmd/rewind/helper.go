@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
-	"syscall"
 
 	"github.com/rewindbpf/rewind/internal/landlock"
 )
@@ -58,7 +57,7 @@ func handleHelper(args []string) {
 	if err != nil {
 		fatal(fmt.Sprintf("find agent command: %v", err))
 	}
-	if err := syscall.Exec(path, command, os.Environ()); err != nil {
+	if err := execAgent(path, command, os.Environ()); err != nil {
 		fatal(fmt.Sprintf("exec agent command: %v", err))
 	}
 }
@@ -80,33 +79,6 @@ func waitForStartGate() error {
 	var signal [1]byte
 	if _, err := io.ReadFull(file, signal[:]); err != nil {
 		return fmt.Errorf("helper wait for start gate: %w", err)
-	}
-	return nil
-}
-
-func dropRootAgentPrivileges() error {
-	if os.Geteuid() != 0 {
-		return nil
-	}
-	uid, err := parseIDEnv("SUDO_UID")
-	if err != nil {
-		return fmt.Errorf("helper refuses root agent: %w", err)
-	}
-	gid, err := parseIDEnv("SUDO_GID")
-	if err != nil {
-		return fmt.Errorf("helper refuses root agent: %w", err)
-	}
-	if err := syscall.Setgroups([]int{gid}); err != nil {
-		return fmt.Errorf("helper drop supplementary groups: %w", err)
-	}
-	if err := syscall.Setgid(gid); err != nil {
-		return fmt.Errorf("helper drop gid: %w", err)
-	}
-	if err := syscall.Setuid(uid); err != nil {
-		return fmt.Errorf("helper drop uid: %w", err)
-	}
-	if os.Geteuid() == 0 {
-		return fmt.Errorf("helper failed to drop root agent privileges")
 	}
 	return nil
 }

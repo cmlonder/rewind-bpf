@@ -213,7 +213,7 @@ func (s Scope) Terminate() error {
 		if parseErr != nil || pid < 1 {
 			continue
 		}
-		if err := syscall.Kill(pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+		if err := killPID(pid); err != nil && !isProcessGone(err) {
 			errs = append(errs, fmt.Errorf("kill pid %d: %w", pid, err))
 		}
 	}
