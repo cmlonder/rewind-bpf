@@ -161,7 +161,7 @@ func handleRollback(args []string) {
 	if err := coordinator.RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(err.Error())
 	}
-	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, 0); err != nil {
+	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, record.Events.Dropped); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
@@ -187,7 +187,7 @@ func handleRecover(args []string) {
 	if err := (protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}, Scope: persistedScope(record.Plan.CgroupPath)}).RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(fmt.Sprintf("recover protected run: %v", err))
 	}
-	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, 0); err != nil {
+	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, record.Events.Dropped); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run recovered and rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
