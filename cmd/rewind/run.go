@@ -239,6 +239,25 @@ func handleStatus(args []string) {
 	}
 }
 
+func handleInspect(args []string) {
+	flags := flag.NewFlagSet("rewind inspect", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	recordPath := flags.String("record", "", "run record JSON path")
+	if err := flags.Parse(args); err != nil {
+		fatal(err.Error())
+	}
+	if flags.NArg() != 0 || strings.TrimSpace(*recordPath) == "" {
+		fatal("usage: rewind inspect --record PATH")
+	}
+	record, err := runstore.Read(*recordPath)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(record); err != nil {
+		fatal(fmt.Sprintf("encode run inspection: %v", err))
+	}
+}
+
 func handleEvents(args []string) {
 	flags := flag.NewFlagSet("rewind events", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)

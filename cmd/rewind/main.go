@@ -15,6 +15,7 @@ const usage = `RewindBPF — AI Agent Safety Runtime
 Usage:
   rewind run [options] -- <agent-command>
   rewind status --record PATH
+  rewind inspect --record PATH
   rewind events --record PATH
   rewind verify --record PATH
   rewind diff --record PATH
@@ -57,6 +58,8 @@ func main() {
 		handleRecover(os.Args[2:])
 	case "status":
 		handleStatus(os.Args[2:])
+	case "inspect":
+		handleInspect(os.Args[2:])
 	case "events":
 		handleEvents(os.Args[2:])
 	case "verify":
