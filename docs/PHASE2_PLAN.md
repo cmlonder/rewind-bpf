@@ -60,6 +60,34 @@ Phase 2 must stop treating “kernel-level” as a differentiator by itself. The
 - **Evidence-first lifecycle:** every run has a state, policy digest, backend, event-loss status, manifest, and rollback/commit result.
 - **Honest portability:** capability detection chooses kernel OverlayFS, FUSE OverlayFS, Landlock, or a safe refusal instead of silently weakening the guarantee.
 
+## 3.1 Nono parity track
+
+Nono is the closest product benchmark, so its publicly documented feature set becomes a checklist rather than a vague comparison. The goal is feature parity where it materially improves agent safety, not a blind reimplementation of its architecture.
+
+| Publicly documented nono capability | RewindBPF MVP state | Phase 2 decision | Longer-term position |
+|---|---|---|---|
+| Kernel isolation and inherited child restrictions | Landlock read policy plus PID descendant telemetry; FUSE transaction | **P0:** cgroup-v2 scope, capability report, policy preview, and explicit degraded mode | Keep Linux-first Landlock/BPF-LSM backends; consider other OS backends only after Linux correctness. |
+| Profile-based policy and `learn` workflow | YAML policy, glob deny patterns, `off/audit/enforce` | **P0:** versioned policy schema, `policy learn`, explain/validate commands | Signed, composable profiles with toolchain/runtime groups. |
+| Atomic undo and content-addressed snapshots | OverlayFS/FUSE upper-layer discard; SHA-256 start manifests | **P0:** diff index, rollback evidence, crash recovery; **P1:** deduplicated content store if storage measurements justify it | Multiple checkpoints and portable run bundles. |
+| Cryptographic audit trail/Merkle commitment | JSONL telemetry and run record; no final Merkle root | **P0:** sequence numbers, drop counters, hash-chained batches, final root | Signed remote evidence and independent verification CLI. |
+| Domain/network filtering | Policy field exists, no equivalent enforcement | **P1:** network namespace/proxy adapter with audit/enforce semantics | Credential-aware egress broker and per-agent network profiles. |
+| Credential injection without exposing raw keys | Not implemented | **P1:** design only during six-day sprint; never pass secrets through argv or agent workspace | Keychain/secret-manager adapters and short-lived scoped tokens. |
+| Runtime supervisor and dynamic permission approval | CLI owns one run; no long-lived supervisor | **P1:** Unix-socket supervisor design and approval protocol | Policy decision service with human/automation approval and time-bounded grants. |
+| Signed provenance/registry for profiles and agent packs | Local files only | **P2:** document trust boundary and sign release artifacts | Sigstore-compatible profile/adapter registry. |
+| Detachable/ghost sessions | Not implemented | **P2:** explicitly out of the six-day critical path | Persistent run handles with reconnect, retention, and operator takeover. |
+
+The priority is intentional. Nono already demonstrates a broad product surface: kernel isolation, undo, audit, provenance, supervision, network filtering, credential injection, and detachable sessions ([feature overview](https://nono.sh/), [undo](https://nono.sh/undo), [audit trail](https://nono.sh/audit-trail), [profile learning](https://nono.sh/blog/nono-learn-policy-profile)). RewindBPF should first close the correctness and evidence gaps that would make our rollback claim unreliable, then add network/credential/supervisor features as separate policy planes. A six-day sprint that starts with a registry or UI would create parity theatre without a stronger safety invariant.
+
+### What RewindBPF should do better than nono
+
+These are product hypotheses to validate, not current claims:
+
+1. **Transaction-native writes:** make the lower/upper/merged filesystem boundary the primary object from which diffs, rollback, and future commit are derived, instead of treating undo as a post-session snapshot feature.
+2. **Filesystem and policy timeline in one run:** correlate the eBPF event stream, Landlock decisions, process/cgroup identity, upper-layer diff, and final state in one evidence bundle.
+3. **Conflict-safe export:** make `commit` refuse when the destination lower manifest changed, then export a reviewable patch/diff rather than overwriting the live workspace.
+4. **Capability honesty:** report exactly which guarantees are active on this kernel (Landlock ABI, BPF-LSM, cgroup-v2, OverlayFS/FUSE, network backend) and fail closed when an enforce-mode guarantee cannot be provided.
+5. **Agent-agnostic deployment:** keep the core runtime independent of Claude/Codex/OpenHands/etc.; integrations remain thin adapters.
+
 ## 4. Phase 2 goals and non-goals
 
 ### Goals
