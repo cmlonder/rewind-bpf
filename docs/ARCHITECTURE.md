@@ -137,7 +137,7 @@ The daemon is expected to run with narrowly scoped Linux capabilities inside the
 
 The kernel data plane observes target process/cgroup activity and emits compact events through a ring buffer. It does not create snapshots after the fact. Candidate observation points include `execve`, `openat/openat2`, `unlinkat`, `renameat2`, `write`, `pwrite`, `truncate`, and `ftruncate`.
 
-For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism.
+For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime accepts network `off` and `audit`; `network.mode: enforce` fails closed until a network namespace/proxy backend is configured.
 
 #### OverlayFS transaction
 

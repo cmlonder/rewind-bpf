@@ -55,3 +55,15 @@ func TestBuildRejectsWorkspaceRuntimeOverlap(t *testing.T) {
 		t.Fatal("expected workspace/runtime overlap error")
 	}
 }
+
+func TestBuildFailsClosedForUnavailableNetworkEnforcement(t *testing.T) {
+	workspace := t.TempDir()
+	_, err := Build(Config{
+		Workspace:   workspace,
+		RuntimeRoot: filepath.Join(t.TempDir(), "run"),
+		Policy:      policy.Policy{Network: policy.NetworkPolicy{Mode: policy.ModeEnforce}},
+	})
+	if err == nil {
+		t.Fatal("expected network enforcement to fail closed")
+	}
+}

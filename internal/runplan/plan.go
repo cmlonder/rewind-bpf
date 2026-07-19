@@ -49,6 +49,9 @@ func Build(config Config) (Plan, error) {
 	if err := config.Policy.Validate(); err != nil {
 		return Plan{}, fmt.Errorf("build run plan: policy: %w", err)
 	}
+	if config.Policy.Network.Mode == policy.ModeEnforce {
+		return Plan{}, fmt.Errorf("build run plan: network enforce is unavailable; use off or audit until a network backend is configured")
+	}
 	runtimeRoot, err := resolveRuntimeRoot(config.RuntimeRoot)
 	if err != nil {
 		return Plan{}, err
