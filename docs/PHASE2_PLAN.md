@@ -75,6 +75,20 @@ Phase 2 must stop treating “kernel-level” as a differentiator by itself. The
 - **Evidence-first lifecycle:** every run has a state, policy digest, backend, event-loss status, manifest, and rollback/commit result.
 - **Honest portability:** capability detection chooses kernel OverlayFS, FUSE OverlayFS, Landlock, or a safe refusal instead of silently weakening the guarantee.
 
+### Competitive benchmark strategy
+
+The comparison is deliberately two-layered. RewindBPF owns the primary, reproducible B0/B2/B4 dataset in the disposable Ubuntu VM. Competitor numbers are added only when the same tool, version, kernel, workload, and policy boundary can be reproduced; otherwise the cell is labeled “published” or “not comparable.”
+
+| Competitor | What we can measure fairly | What remains non-comparable |
+|---|---|---|
+| nono | Startup, policy-denied read latency, mixed file I/O, undo time, storage growth, audit bytes, and fork/exec coverage | Different sandbox/undo implementation and backend; no universal overhead ranking from one VM |
+| Tetragon | Event throughput, CPU/memory, drop behavior, decision latency, and process-tree visibility | It is not a filesystem transaction or rollback engine |
+| KubeArmor | Rule-install and deny latency, event throughput, CPU/memory, and enforcement coverage in its supported workload | Kubernetes policy deployment is a different product boundary from a local agent run |
+| AgentFS | Write/snapshot/restore/query latency, logical vs physical bytes, and export size | SQLite/filesystem abstraction is not native ext4 + OverlayFS syscall behavior |
+| DeltaBox | Published paper numbers with exact configuration, or an author artifact reproduction | Research checkpoint scope and workload cannot be treated as a product benchmark by default |
+
+The benchmark ledger therefore reports measurement provenance (`measured`, `published`, or `not comparable`) beside every external value. The jury-facing claim is not “faster than every competitor”; it is that RewindBPF measures the cost of its explicit safety invariant—pre-created COW writes plus kernel telemetry—and makes the tradeoff auditable.
+
 ## 3.1 Nono parity track
 
 Nono is the closest product benchmark, so its publicly documented feature set becomes a checklist rather than a vague comparison. The goal is feature parity where it materially improves agent safety, not a blind reimplementation of its architecture.
@@ -188,7 +202,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Store compact JSONL for streaming plus a queryable run index (SQLite or an append-only compact format) for summaries.
 - Hash-chain event batches and include the final digest in the run record; document that this is tamper evidence, not a trusted remote log.
 - Add `rewind diff` to summarize created, modified, deleted, renamed, and policy-denied paths without printing secret contents.
-- Add `rewind capabilities`, `rewind inspect`, and machine-readable status output.
+- Add `rewind capabilities`, `rewind inspect`, `rewind verify`, and machine-readable status output.
 
 **Tests**
 

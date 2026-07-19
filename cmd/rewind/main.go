@@ -16,6 +16,7 @@ Usage:
   rewind run [options] -- <agent-command>
   rewind status --record PATH
   rewind events --record PATH
+  rewind verify --record PATH
   rewind diff --record PATH
   rewind capabilities
   rewind rollback --record PATH
@@ -58,6 +59,8 @@ func main() {
 		handleStatus(os.Args[2:])
 	case "events":
 		handleEvents(os.Args[2:])
+	case "verify":
+		handleVerify(os.Args[2:])
 	case "diff":
 		handleDiff(os.Args[2:])
 	case "capabilities":

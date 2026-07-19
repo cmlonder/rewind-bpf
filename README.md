@@ -69,7 +69,8 @@ The primary workflow runs inside the disposable Linux VM:
 sudo rewind run --workspace ./project --runtime-root ./runtime \
   --policy ./policy.yaml --record ./runtime/record.json -- agent-command
 sudo rewind status --record ./runtime/record.json
-sudo rewind events --record ./runtime/record.json
+  sudo rewind events --record ./runtime/record.json
+  rewind verify --record ./runtime/record.json
 sudo rewind diff --record ./runtime/record.json
 sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
@@ -138,7 +139,7 @@ sudo ./bin/rewind rollback --record /home/vagrant/rewind-runs/run-1/record.json
 sudo ./bin/rewind recover --record /home/vagrant/rewind-runs/run-1/record.json
 ```
 
-The runtime changes record and event-log ownership back to the invoking `SUDO_UID`/`SUDO_GID`, so status, events, and diff are readable without `sudo`. A FUSE mount created by a privileged parent still requires `sudo` for unmount/rollback; `recover` is the explicit stale-run cleanup path.
+The runtime changes record and event-log ownership back to the invoking `SUDO_UID`/`SUDO_GID`, so status, events, diff, and `verify` are readable without `sudo`. A FUSE mount created by a privileged parent still requires `sudo` for unmount/rollback; `recover` is the explicit stale-run cleanup path. `verify` recomputes the JSONL digest and validates sequence/hash-chain links; it exits non-zero if the evidence was truncated, changed, or marked incomplete.
 
 The parent may need `sudo` for OverlayFS/eBPF, but the helper drops the agent to the invoking user using `SUDO_UID`/`SUDO_GID`. Before mounting, only the temporary `upper/work` directories are chowned to that user; the original lower workspace is never chowned. A direct root agent is rejected.
 
