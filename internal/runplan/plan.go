@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rewindbpf/rewind/internal/capabilities"
 	"github.com/rewindbpf/rewind/internal/landlock"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
@@ -25,12 +26,14 @@ type Config struct {
 }
 
 type Plan struct {
-	Run            lifecycle.Run
-	Layout         overlay.Layout
-	Manifest       manifest.Manifest
-	ReadRules      policycompile.ReadRules
-	Landlock       *landlock.Plan
-	OverlayBackend overlay.Backend
+	Run            lifecycle.Run           `json:"run"`
+	Layout         overlay.Layout          `json:"layout"`
+	Manifest       manifest.Manifest       `json:"manifest"`
+	ReadRules      policycompile.ReadRules `json:"read_rules"`
+	Landlock       *landlock.Plan          `json:"landlock,omitempty"`
+	OverlayBackend overlay.Backend         `json:"overlay_backend"`
+	CgroupPath     string                  `json:"cgroup_path,omitempty"`
+	Capabilities   capabilities.Report     `json:"capabilities,omitempty"`
 }
 
 // Build validates and composes all pre-execution state. The workspace is used

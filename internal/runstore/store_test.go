@@ -38,3 +38,27 @@ func TestWriteReadRecordIsAtomicAndPrivate(t *testing.T) {
 		t.Fatalf("record = %+v", got)
 	}
 }
+
+func TestSummarizeEventsCountsBytesAndDetectsTruncation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "events.jsonl")
+	if err := os.WriteFile(path, []byte("{\"event\":1}\n{\"event\":2}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	summary, err := SummarizeEvents(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Count != 2 || summary.Bytes != 24 || !summary.Complete || summary.SHA256 == "" {
+		t.Fatalf("summary = %+v", summary)
+	}
+	if err := os.WriteFile(path, []byte("partial"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	summary, err = SummarizeEvents(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Complete {
+		t.Fatal("expected incomplete final line")
+	}
+}

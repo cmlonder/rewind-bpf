@@ -23,7 +23,7 @@ func TestSuccessfulRunCanBeCommitted(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, next := range []State{Running, Succeeded, Committed} {
+	for _, next := range []State{Mounted, Running, Succeeded, Committed} {
 		if err := run.Transition(next); err != nil {
 			t.Fatalf("transition to %s: %v", next, err)
 		}
@@ -38,7 +38,7 @@ func TestFailedRunMustBeRolledBackBeforeTerminalState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, next := range []State{Running, Failed, RolledBack} {
+	for _, next := range []State{Mounted, Running, Failed, RolledBack} {
 		if err := run.Transition(next); err != nil {
 			t.Fatalf("transition to %s: %v", next, err)
 		}
@@ -53,7 +53,7 @@ func TestInvalidTransitionsAreRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, next := range []State{Committed, RolledBack, State("unknown")} {
+	for _, next := range []State{Committed, Paused, State("unknown")} {
 		if err := run.Transition(next); err == nil {
 			t.Fatalf("expected transition to %q to fail", next)
 		}
@@ -65,7 +65,7 @@ func TestPausedRunCanResumeOrRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, next := range []State{Running, Paused, Running, Succeeded, RolledBack} {
+	for _, next := range []State{Mounted, Running, Paused, Running, Succeeded, RolledBack} {
 		if err := run.Transition(next); err != nil {
 			t.Fatalf("transition to %s: %v", next, err)
 		}

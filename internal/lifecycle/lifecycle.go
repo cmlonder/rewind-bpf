@@ -14,6 +14,7 @@ type State string
 
 const (
 	Preparing  State = "preparing"
+	Mounted    State = "mounted"
 	Running    State = "running"
 	Paused     State = "paused"
 	Succeeded  State = "succeeded"
@@ -62,7 +63,7 @@ func (r *Run) Transition(next State) error {
 
 func validState(state State) bool {
 	switch state {
-	case Preparing, Running, Paused, Succeeded, Failed, Committed, RolledBack:
+	case Preparing, Mounted, Running, Paused, Succeeded, Failed, Committed, RolledBack:
 		return true
 	default:
 		return false
@@ -72,7 +73,9 @@ func validState(state State) bool {
 func canTransition(from, to State) bool {
 	switch from {
 	case Preparing:
-		return to == Running || to == Failed
+		return to == Mounted || to == Failed || to == RolledBack
+	case Mounted:
+		return to == Running || to == Failed || to == RolledBack
 	case Running:
 		return to == Paused || to == Succeeded || to == Failed
 	case Paused:

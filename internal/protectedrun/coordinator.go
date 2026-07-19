@@ -27,6 +27,10 @@ type Process interface {
 	Kill() error
 }
 
+type StartGate interface {
+	Release() error
+}
+
 // Starter must apply the supplied Landlock plan before the agent command can
 // execute. A starter that cannot honor a non-nil plan must return an error.
 type Starter interface {
@@ -37,10 +41,18 @@ type Sensor interface {
 	Attach(context.Context, string, string, uint32) (io.Closer, error)
 }
 
+type ProcessScope interface {
+	AddPID(uint32) error
+	Terminate() error
+	Close() error
+	Path() string
+}
+
 type Coordinator struct {
 	Overlay Overlay
 	Starter Starter
 	Sensor  Sensor
+	Scope   ProcessScope
 }
 
 type Handle struct {
@@ -48,6 +60,7 @@ type Handle struct {
 	plan        *runplan.Plan
 	process     Process
 	sensor      io.Closer
+	scope       ProcessScope
 	waited      bool
 }
 
@@ -58,18 +71,38 @@ func (c Coordinator) RollbackPlan(ctx context.Context, plan *runplan.Plan) error
 	if plan == nil || c.Overlay == nil {
 		return fmt.Errorf("rollback protected run: plan and overlay are required")
 	}
-	if plan.Run.State == lifecycle.Running {
+	if plan.Run.State == lifecycle.Running || plan.Run.State == lifecycle.Mounted {
 		if err := plan.Run.Transition(lifecycle.Failed); err != nil {
 			return err
 		}
 	}
+	if plan.Run.State == lifecycle.Preparing {
+		if err := plan.Run.Transition(lifecycle.RolledBack); err != nil {
+			return err
+		}
+		return nil
+	}
+	if plan.Run.State == lifecycle.RolledBack {
+		return nil
+	}
 	if plan.Run.State != lifecycle.Failed && plan.Run.State != lifecycle.Succeeded && plan.Run.State != lifecycle.Paused {
 		return fmt.Errorf("rollback protected run: run %s is %s", plan.Run.ID, plan.Run.State)
 	}
-	if err := c.Overlay.Rollback(ctx, plan.Layout); err != nil {
-		return err
+	var errs []error
+	if c.Scope != nil {
+		if err := c.Scope.Terminate(); err != nil {
+			errs = append(errs, err)
+		}
+		if err := c.Scope.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return plan.Run.Transition(lifecycle.RolledBack)
+	if err := c.Overlay.Rollback(ctx, plan.Layout); err != nil {
+		errs = append(errs, err)
+	} else if err := plan.Run.Transition(lifecycle.RolledBack); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }
 
 func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []string, sensorObject string) (*Handle, error) {
@@ -88,7 +121,10 @@ func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []st
 	if err := c.Overlay.Mount(ctx, plan.Layout); err != nil {
 		return nil, fmt.Errorf("start protected run: mount: %w", err)
 	}
-	handle := &Handle{coordinator: &c, plan: plan}
+	handle := &Handle{coordinator: &c, plan: plan, scope: c.Scope}
+	if err := plan.Run.Transition(lifecycle.Mounted); err != nil {
+		return handle.failAndRollback(ctx, fmt.Errorf("start protected run: transition mounted: %w", err))
+	}
 	if err := plan.Run.Transition(lifecycle.Running); err != nil {
 		return handle.failAndRollback(ctx, fmt.Errorf("start protected run: transition running: %w", err))
 	}
@@ -97,6 +133,11 @@ func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []st
 		return handle.failAndRollback(ctx, fmt.Errorf("start protected run: start agent: %w", err))
 	}
 	handle.process = process
+	if handle.scope != nil {
+		if err := handle.scope.AddPID(process.PID()); err != nil {
+			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: add agent to process scope: %w", err))
+		}
+	}
 	if strings.TrimSpace(sensorObject) != "" {
 		if c.Sensor == nil {
 			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: telemetry sensor is required when an object is configured"))
@@ -110,6 +151,11 @@ func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []st
 		}
 		handle.sensor = sensor
 	}
+	if gate, ok := process.(StartGate); ok {
+		if err := gate.Release(); err != nil {
+			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: release agent gate: %w", err))
+		}
+	}
 	return handle, nil
 }
 
@@ -120,11 +166,16 @@ func (h *Handle) Wait() error {
 	err := h.process.Wait()
 	h.waited = true
 	closeErr := h.closeSensor()
+	scopeErr := h.closeScope()
 	if err != nil {
 		if transitionErr := h.plan.Run.Transition(lifecycle.Failed); transitionErr != nil {
 			err = errors.Join(err, transitionErr)
 		}
-		return errors.Join(err, closeErr)
+		return errors.Join(err, closeErr, scopeErr)
+	}
+	if scopeErr != nil {
+		_ = h.plan.Run.Transition(lifecycle.Failed)
+		return errors.Join(scopeErr, closeErr)
 	}
 	if transitionErr := h.plan.Run.Transition(lifecycle.Succeeded); transitionErr != nil {
 		return errors.Join(transitionErr, closeErr)
@@ -145,6 +196,14 @@ func (h *Handle) Rollback(ctx context.Context) error {
 	}
 	if err := h.closeSensor(); err != nil {
 		errs = append(errs, err)
+	}
+	if h.scope != nil {
+		if err := h.scope.Terminate(); err != nil {
+			errs = append(errs, fmt.Errorf("terminate process scope: %w", err))
+		}
+		if err := h.scope.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close process scope: %w", err))
+		}
 	}
 	if h.plan.Run.State == lifecycle.Running {
 		if err := h.plan.Run.Transition(lifecycle.Failed); err != nil {
@@ -169,6 +228,14 @@ func (h *Handle) failAndRollback(ctx context.Context, cause error) (*Handle, err
 	if err := h.closeSensor(); err != nil {
 		cause = errors.Join(cause, err)
 	}
+	if h.scope != nil {
+		if err := h.scope.Terminate(); err != nil {
+			cause = errors.Join(cause, fmt.Errorf("terminate process scope: %w", err))
+		}
+		if err := h.scope.Close(); err != nil {
+			cause = errors.Join(cause, fmt.Errorf("close process scope: %w", err))
+		}
+	}
 	if h.plan.Run.State == lifecycle.Running {
 		if err := h.plan.Run.Transition(lifecycle.Failed); err != nil {
 			cause = errors.Join(cause, err)
@@ -183,6 +250,21 @@ func (h *Handle) failAndRollback(ctx context.Context, cause error) (*Handle, err
 		}
 	}
 	return h, cause
+}
+
+func (h *Handle) closeScope() error {
+	if h.scope == nil {
+		return nil
+	}
+	err := h.scope.Close()
+	if err == nil {
+		h.scope = nil
+		return nil
+	}
+	terminateErr := h.scope.Terminate()
+	closeErr := h.scope.Close()
+	h.scope = nil
+	return errors.Join(err, terminateErr, closeErr)
 }
 
 func (h *Handle) closeSensor() error {

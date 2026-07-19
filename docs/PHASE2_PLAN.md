@@ -37,6 +37,21 @@ This is deliberately narrower than “protect the whole operating system” or �
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
 7. Network and capability policy are represented in the policy model but are not equivalent to filesystem rollback.
 
+### Phase 2 implementation progress
+
+The first P0 slice is now implemented and verified in the disposable VM:
+
+- `mounted` lifecycle state plus prepared run journal before mount/agent start.
+- Idempotent `rollback` and explicit `recover` for stale records.
+- Per-run cgroup-v2 creation, helper admission, descendant inheritance, and cleanup.
+- Read-only `capabilities` probe persisted in the run plan.
+- Invoker-owned record and event log after privileged execution.
+- Helper start gate that releases the agent only after sensor attachment.
+- Event count, byte count, SHA-256 digest, and complete/truncated JSONL evidence flag.
+- Read-only `diff --record` manifest comparison for a live merged view.
+
+The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command, and rollback preserved the lower-layer marker. The remaining P0 items are fault injection, ring-buffer overflow accounting, and open-descriptor/drain tests.
+
 ## 3. Research and competitive findings
 
 The market does not have a clean “nobody does kernel-level agent safety” gap. The defensible opportunity is the composition and proof boundary: RewindBPF combines a pre-run writable filesystem transaction, configurable read confidentiality, kernel telemetry, and a run-level rollback state machine in one Linux-first workflow.

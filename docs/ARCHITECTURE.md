@@ -296,6 +296,10 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 5 read policy | Complete for isolated MVP boundary; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
 | Stage 6 protected-run integration | Complete | FUSE-backed end-to-end VM smoke passed: read denial, agent deletion isolation, generated-file creation, eBPF telemetry, successful record, rollback, and lower-layer preservation |
 | Stage 7 benchmarks | Complete for MVP evidence | Warm/cold B0/B2/B4 results, storage footprint, telemetry growth, and charts are recorded in `benchmarks/RESULTS.md`; broader B1–B5 coverage is Phase 2 work |
+| Phase 2 P0 transaction journal | In progress | Prepared record, `mounted` lifecycle state, idempotent rollback/recovery, invoker-owned metadata, cgroup path, and capability report are implemented; crash injection remains |
+| Phase 2 process scope | VM smoke complete | cgroup-v2 scope is created per run, helper PID is admitted before release, descendants inherit the scope, and stale scopes are cleaned during rollback |
+| Phase 2 telemetry evidence | In progress | Start gate closes short-run attach race; event count/bytes/SHA-256 and complete flag are persisted; ring-buffer overflow accounting remains |
+| Phase 2 merged diff | Implemented | `rewind diff --record PATH` compares the start manifest with the live merged view without mutating either tree |
 
 ### Initial B0 baseline (disposable VM)
 
@@ -645,13 +649,15 @@ When the parent runtime is invoked through `sudo`, the helper reads `SUDO_UID`/`
 
 The privileged filesystem manager similarly chowns only the validated temporary `upper` and `work` directories to that agent identity before mounting. The default VM backend is `fuse-overlayfs`, launched with explicit `uid`, `gid`, and `allow_other` options so the unprivileged helper can use the merged view. The kernel backend deliberately does not pass the unsupported `override_creds` option; kernels that do not provide compatible copy-up credential semantics should use FUSE. The manager never chowns or removes `lowerdir`, so the original workspace remains owned and protected by its existing permissions.
 
-`internal/runstore` persists the plan, lifecycle record, and telemetry log path atomically with mode `0600`. The CLI can reconstruct a completed run for rollback in a later process. `commit` is still disabled: preserving the lower layer and exporting an intentional diff need a separate conflict-safe implementation.
+`internal/runstore` persists the plan, lifecycle record, telemetry log path, capability report, cgroup path, and event evidence atomically with mode `0600`. When invoked with `sudo`, it restores record/log ownership to `SUDO_UID`/`SUDO_GID`; the privileged FUSE mount still requires `sudo` for unmount. The CLI can reconstruct a stale or completed run for idempotent rollback through `rollback` or `recover`. `commit` is still disabled: preserving the lower layer and exporting an intentional diff need a separate conflict-safe implementation. `rewind diff --record PATH` now provides a read-only manifest comparison while the merged mount is live.
 
 ### Verified protected-run smoke (disposable VM)
 
 The first end-to-end FUSE run was verified on 2026-07-18 in the Ubuntu 24.04 ARM64 VM using only generated files. The policy denied `synthetic.env` with `EACCES`, the agent removed `src/` and created `generated.txt` in the merged view, and the eBPF sensor recorded the run. The lower workspace still contained `original-source`. `rewind rollback` then unmounted the FUSE view, discarded the temporary upper/work changes, and transitioned the persisted lifecycle from `succeeded` to `rolled_back`.
 
-Because the current privileged MVP writes the mode-`0600` record and telemetry file as root, the VM operator must use `sudo` for `status`, `events`, and `rollback` after a `sudo rewind run`. A later hardening pass can chown those metadata files to the invoking user without changing the filesystem safety boundary.
+### Phase 2 P0 VM smoke (disposable VM)
+
+On 2026-07-19 the Phase 2 binary passed package tests, capability probing, and a FUSE protected run in the Ubuntu 24.04 ARM64 VM. The capability report identified OverlayFS, FUSE OverlayFS, BTF, Landlock, cgroup-v2, and seccomp; BPF-LSM was absent. The run record persisted the cgroup path, backend, capability report, and event evidence. The helper waited on a start gate until the eBPF sensor was attached, eliminating the short-command attach race: the synthetic shell run recorded 77 events (14,428 bytes) with a complete SHA-256 digest. Record and event logs were owned by `vagrant:vagrant` after `sudo` execution. A privileged rollback removed the FUSE mount and temporary upper/work state while preserving `original-source` in the lower workspace. The unmount still correctly requires `sudo` because the parent mount is privileged.
 
 ### Optional BPF-LSM backend
 

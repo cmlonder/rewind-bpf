@@ -13,8 +13,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
+	"github.com/rewindbpf/rewind/internal/capabilities"
+	"github.com/rewindbpf/rewind/internal/cgroup"
+	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/ebpfload"
+	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/overlay"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/protectedrun"
@@ -60,10 +65,30 @@ func handleRun(args []string) {
 		fatal(err.Error())
 	}
 	eventsPath := filepath.Join(plan.Layout.Root, "events.jsonl")
-	telemetry := &telemetryAdapter{path: eventsPath}
 	owner, err := agentOwner()
 	if err != nil {
 		fatal(err.Error())
+	}
+	telemetry := &telemetryAdapter{path: eventsPath, owner: owner}
+	capabilityReport := capabilities.Probe()
+	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil); err != nil {
+		fatal(fmt.Sprintf("protected-run capability check: %v", err))
+	}
+	plan.Capabilities = capabilityReport
+	// Prepare the dedicated runtime tree before the first journal write. The
+	// agent must be able to traverse the eventual merged mount; creating the
+	// parent through runstore alone would leave it mode 0700 when invoked via
+	// sudo.
+	if err := plan.Layout.Prepare(); err != nil {
+		fatal(fmt.Sprintf("prepare runtime layout: %v", err))
+	}
+	scope, err := cgroup.New(plan.Run.ID)
+	if err != nil {
+		fatal(fmt.Sprintf("create process scope: %v", err))
+	}
+	plan.CgroupPath = scope.Path()
+	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
+		fatal(fmt.Sprintf("persist prepared run: %v", err))
 	}
 	helper, err := os.Executable()
 	if err != nil {
@@ -73,18 +98,24 @@ func handleRun(args []string) {
 		Overlay: overlay.Manager{Owner: &owner, Backend: plan.OverlayBackend},
 		Starter: protectedrun.ExecStarter{HelperPath: helper},
 		Sensor:  telemetry,
+		Scope:   &scope,
 	}
 	handle, err := coordinator.Start(context.Background(), &plan, command, *sensorObject)
 	if err != nil {
+		_ = persistRecord(*recordPath, plan, eventsPath)
 		fatal(err.Error())
+	}
+	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
+		_ = handle.Rollback(context.Background())
+		fatal(fmt.Sprintf("persist running run; transaction rolled back: %v", err))
 	}
 	waitErr := handle.Wait()
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
-		_ = runstore.Write(*recordPath, runstore.Record{Plan: plan, EventsPath: eventsPath})
+		_ = persistRecord(*recordPath, plan, eventsPath)
 		fatal(errors.Join(waitErr, rollbackErr).Error())
 	}
-	if err := runstore.Write(*recordPath, runstore.Record{Plan: plan, EventsPath: eventsPath}); err != nil {
+	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist successful run; transaction rolled back: %v", err))
 	}
@@ -124,14 +155,62 @@ func handleRollback(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	coordinator := protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}}
+	coordinator := protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}, Scope: persistedScope(record.Plan.CgroupPath)}
 	if err := coordinator.RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(err.Error())
 	}
-	if err := runstore.Write(*recordPath, record); err != nil {
+	if err := persistRecord(*recordPath, record.Plan, record.EventsPath); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
+}
+
+func handleRecover(args []string) {
+	if runtime.GOOS != "linux" {
+		fatal("rewind recover is Linux-only; use the disposable Ubuntu VM")
+	}
+	flags := flag.NewFlagSet("rewind recover", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	recordPath := flags.String("record", "", "run record JSON path")
+	if err := flags.Parse(args); err != nil {
+		fatal(err.Error())
+	}
+	if flags.NArg() != 0 || strings.TrimSpace(*recordPath) == "" {
+		fatal("usage: rewind recover --record PATH")
+	}
+	record, err := runstore.Read(*recordPath)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := (protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}, Scope: persistedScope(record.Plan.CgroupPath)}).RollbackPlan(context.Background(), &record.Plan); err != nil {
+		fatal(fmt.Sprintf("recover protected run: %v", err))
+	}
+	if err := persistRecord(*recordPath, record.Plan, record.EventsPath); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("run recovered and rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
+}
+
+func persistedScope(path string) protectedrun.ProcessScope {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	scope, err := cgroup.FromPath(path)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if scope.Path() == "" {
+		return nil
+	}
+	return &scope
+}
+
+func persistRecord(path string, plan runplan.Plan, eventsPath string) error {
+	evidence, err := runstore.SummarizeEvents(eventsPath)
+	if err != nil {
+		return err
+	}
+	return runstore.Write(path, runstore.Record{Plan: plan, EventsPath: eventsPath, Events: evidence})
 }
 
 func handleStatus(args []string) {
@@ -177,6 +256,44 @@ func handleEvents(args []string) {
 	}
 }
 
+func handleDiff(args []string) {
+	if runtime.GOOS != "linux" {
+		fatal("rewind diff is Linux-only; use the disposable Ubuntu VM")
+	}
+	flags := flag.NewFlagSet("rewind diff", flag.ContinueOnError)
+	flags.SetOutput(os.Stderr)
+	recordPath := flags.String("record", "", "run record JSON path")
+	if err := flags.Parse(args); err != nil {
+		fatal(err.Error())
+	}
+	if flags.NArg() != 0 || strings.TrimSpace(*recordPath) == "" {
+		fatal("usage: rewind diff --record PATH")
+	}
+	record, err := runstore.Read(*recordPath)
+	if err != nil {
+		fatal(err.Error())
+	}
+	after, err := manifest.Build(record.Plan.Layout.Merged)
+	if err != nil {
+		fatal(fmt.Sprintf("build merged diff manifest: %v (the run may already be rolled back)", err))
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(diff.Compare(record.Plan.Manifest, after)); err != nil {
+		fatal(fmt.Sprintf("encode diff: %v", err))
+	}
+}
+
+func handleCapabilities(args []string) {
+	if len(args) != 0 {
+		fatal("usage: rewind capabilities")
+	}
+	report := capabilities.Probe()
+	data, err := report.JSON()
+	if err != nil {
+		fatal(fmt.Sprintf("encode capabilities: %v", err))
+	}
+	fmt.Println(string(data))
+}
+
 func splitCSV(value string) []string {
 	var result []string
 	for _, item := range strings.Split(value, ",") {
@@ -189,7 +306,8 @@ func splitCSV(value string) []string {
 }
 
 type telemetryAdapter struct {
-	path string
+	path  string
+	owner overlay.Owner
 
 	mu       sync.Mutex
 	session  *ebpfload.Session
@@ -208,6 +326,13 @@ func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, p
 	if err != nil {
 		_ = session.Close()
 		return nil, fmt.Errorf("open telemetry log: %w", err)
+	}
+	if os.Geteuid() == 0 {
+		if err := os.Chown(a.path, a.owner.UID, a.owner.GID); err != nil {
+			_ = file.Close()
+			_ = session.Close()
+			return nil, fmt.Errorf("set telemetry log owner: %w", err)
+		}
 	}
 	a.mu.Lock()
 	a.session, a.file, a.done = session, file, make(chan struct{})
@@ -242,6 +367,10 @@ func (a *telemetryAdapter) Close() error {
 		session, file, done := a.session, a.file, a.done
 		a.mu.Unlock()
 		if session != nil {
+			// A process can exit immediately after submitting a ring-buffer
+			// record. Give the userspace reader a bounded drain window before
+			// closing the map, otherwise short runs can lose every event.
+			time.Sleep(100 * time.Millisecond)
 			a.closeErr = session.Close()
 		}
 		if done != nil {

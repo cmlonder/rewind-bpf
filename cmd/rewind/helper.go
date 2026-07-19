@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -49,6 +50,9 @@ func handleHelper(args []string) {
 			fatal(err.Error())
 		}
 	}
+	if err := waitForStartGate(); err != nil {
+		fatal(err.Error())
+	}
 
 	path, err := exec.LookPath(command[0])
 	if err != nil {
@@ -57,6 +61,27 @@ func handleHelper(args []string) {
 	if err := syscall.Exec(path, command, os.Environ()); err != nil {
 		fatal(fmt.Sprintf("exec agent command: %v", err))
 	}
+}
+
+func waitForStartGate() error {
+	value := os.Getenv("REWIND_START_GATE_FD")
+	if value == "" {
+		return nil
+	}
+	fd, err := strconv.Atoi(value)
+	if err != nil || fd < 3 {
+		return fmt.Errorf("helper start gate fd is invalid")
+	}
+	file := os.NewFile(uintptr(fd), "rewind-start-gate")
+	if file == nil {
+		return fmt.Errorf("helper start gate fd is unavailable")
+	}
+	defer file.Close()
+	var signal [1]byte
+	if _, err := io.ReadFull(file, signal[:]); err != nil {
+		return fmt.Errorf("helper wait for start gate: %w", err)
+	}
+	return nil
 }
 
 func dropRootAgentPrivileges() error {

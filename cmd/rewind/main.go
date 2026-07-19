@@ -16,7 +16,10 @@ Usage:
   rewind run [options] -- <agent-command>
   rewind status --record PATH
   rewind events --record PATH
+  rewind diff --record PATH
+  rewind capabilities
   rewind rollback --record PATH
+  rewind recover --record PATH
   rewind commit <run_id>
   rewind sensor attach --object PATH --run-id ID --pid PID   (VM-only telemetry smoke test)
   rewind helper [--plan-file PATH] -- <agent-command>       (internal child helper)
@@ -49,10 +52,16 @@ func main() {
 		handleRun(os.Args[2:])
 	case "rollback":
 		handleRollback(os.Args[2:])
+	case "recover":
+		handleRecover(os.Args[2:])
 	case "status":
 		handleStatus(os.Args[2:])
 	case "events":
 		handleEvents(os.Args[2:])
+	case "diff":
+		handleDiff(os.Args[2:])
+	case "capabilities":
+		handleCapabilities(os.Args[2:])
 	case "commit":
 		fmt.Printf("rewind: command %q is planned; kernel and daemon integration are not enabled yet\n", os.Args[1])
 	default:

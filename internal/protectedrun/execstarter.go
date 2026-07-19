@@ -53,23 +53,36 @@ func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, pl
 	args = append(args, command...)
 	process := exec.CommandContext(ctx, s.HelperPath, args...)
 	process.Dir = cwd
+	gateRead, gateWrite, err := os.Pipe()
+	if err != nil {
+		if planPath != "" {
+			_ = os.Remove(planPath)
+		}
+		return nil, fmt.Errorf("start agent: create start gate: %w", err)
+	}
+	process.ExtraFiles = []*os.File{gateRead}
+	process.Env = append(os.Environ(), "REWIND_START_GATE_FD=3")
 	// Preserve the agent's terminal streams so helper and policy failures are
 	// visible to the operator instead of collapsing into "exit status 2".
 	process.Stdin = os.Stdin
 	process.Stdout = os.Stdout
 	process.Stderr = os.Stderr
 	if err := process.Start(); err != nil {
+		_ = gateRead.Close()
+		_ = gateWrite.Close()
 		if planPath != "" {
 			_ = os.Remove(planPath)
 		}
 		return nil, fmt.Errorf("start agent helper: %w", err)
 	}
-	return &execProcess{cmd: process, planPath: planPath}, nil
+	_ = gateRead.Close()
+	return &execProcess{cmd: process, planPath: planPath, gate: gateWrite}, nil
 }
 
 type execProcess struct {
 	cmd      *exec.Cmd
 	planPath string
+	gate     *os.File
 }
 
 func (p *execProcess) PID() uint32 {
@@ -84,6 +97,7 @@ func (p *execProcess) Wait() error {
 		return fmt.Errorf("wait agent: process is nil")
 	}
 	err := p.cmd.Wait()
+	p.closeGate()
 	p.cleanupPlan()
 	return err
 }
@@ -92,9 +106,29 @@ func (p *execProcess) Kill() error {
 	if p == nil || p.cmd == nil || p.cmd.Process == nil {
 		return fmt.Errorf("kill agent: process is nil")
 	}
+	p.closeGate()
 	err := p.cmd.Process.Kill()
 	p.cleanupPlan()
 	return err
+}
+
+func (p *execProcess) Release() error {
+	if p == nil || p.gate == nil {
+		return nil
+	}
+	_, err := p.gate.Write([]byte{1})
+	p.closeGate()
+	if err != nil {
+		return fmt.Errorf("release agent start gate: %w", err)
+	}
+	return nil
+}
+
+func (p *execProcess) closeGate() {
+	if p != nil && p.gate != nil {
+		_ = p.gate.Close()
+		p.gate = nil
+	}
 }
 
 func (p *execProcess) cleanupPlan() {

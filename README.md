@@ -6,7 +6,7 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-The MVP is complete for its explicitly documented disposable-VM boundary. Stage 6 protected-run integration and Stage 7 benchmark controls are validated: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, scoped telemetry with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, process-level read denial, OverlayFS mount/rollback, a fail-closed coordinator, a policy-aware helper, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. The next six-day sprint is Phase 2 hardening: crash recovery, cgroup process scope, event completeness, policy capability reporting, conflict-safe commit/export, and a reproducible release demo.
+The MVP is complete for its explicitly documented disposable-VM boundary. Phase 2 P0 hardening is now in progress: cgroup-v2 run scopes, capability reporting, atomic prepared-run journaling, idempotent recovery, invoker-owned metadata, event evidence digests, a sensor start gate, and a read-only merged-view diff command are implemented and VM-smoke-tested. Stage 6 protected-run integration and Stage 7 benchmark controls remain validated: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, scoped telemetry with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, process-level read denial, OverlayFS mount/rollback, a fail-closed coordinator, a policy-aware helper, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining Phase 2 work is crash injection, event overflow accounting, network/credential policy planes, conflict-safe export, and release rehearsal.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -70,7 +70,9 @@ sudo rewind run --workspace ./project --runtime-root ./runtime \
   --policy ./policy.yaml --record ./runtime/record.json -- agent-command
 sudo rewind status --record ./runtime/record.json
 sudo rewind events --record ./runtime/record.json
+sudo rewind diff --record ./runtime/record.json
 sudo rewind rollback --record ./runtime/record.json
+sudo rewind recover --record ./runtime/record.json
 ```
 
 The agent will see a merged workspace backed by an OverlayFS lower/upper pair. Rollback discards the temporary upper layer. Read policies can be disabled, audited, or enforced with user-defined glob patterns.
@@ -101,6 +103,7 @@ These commands do not perform kernel operations. They are safe to run on a devel
 make build
 make test
 ./bin/rewind --help
+./bin/rewind capabilities
 ./bin/rewind fixture create /tmp/rewind-fixture
 ./bin/rewind manifest create /tmp/rewind-fixture /tmp/rewind-manifest.json
 ./bin/rewind manifest verify /tmp/rewind-fixture /tmp/rewind-manifest.json
@@ -123,15 +126,19 @@ rewind run \
   -- /home/vagrant/demo-agent
 ```
 
-The command must run inside the disposable Ubuntu VM. It creates a `fuse-overlayfs` mount, starts the agent through the policy-aware helper, optionally attaches scoped eBPF telemetry, and leaves a successful run mounted until `rewind rollback --record ...` is called. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
+The command must run inside the disposable Ubuntu VM. It checks capabilities, creates one cgroup-v2 scope, creates a `fuse-overlayfs` mount, gates agent `exec` until telemetry is attached, starts the agent through the policy-aware helper, and leaves a successful run mounted until `rewind rollback --record ...` is called. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
 
 When the run is launched with `sudo`, inspect and roll it back with `sudo` as well because the current MVP writes the `0600` run record and telemetry log as root:
 
 ```bash
 sudo ./bin/rewind status --record /home/vagrant/rewind-runs/run-1/record.json
-sudo ./bin/rewind events --record /home/vagrant/rewind-runs/run-1/record.json
+./bin/rewind events --record /home/vagrant/rewind-runs/run-1/record.json
+./bin/rewind diff --record /home/vagrant/rewind-runs/run-1/record.json
 sudo ./bin/rewind rollback --record /home/vagrant/rewind-runs/run-1/record.json
+sudo ./bin/rewind recover --record /home/vagrant/rewind-runs/run-1/record.json
 ```
+
+The runtime changes record and event-log ownership back to the invoking `SUDO_UID`/`SUDO_GID`, so status, events, and diff are readable without `sudo`. A FUSE mount created by a privileged parent still requires `sudo` for unmount/rollback; `recover` is the explicit stale-run cleanup path.
 
 The parent may need `sudo` for OverlayFS/eBPF, but the helper drops the agent to the invoking user using `SUDO_UID`/`SUDO_GID`. Before mounting, only the temporary `upper/work` directories are chowned to that user; the original lower workspace is never chowned. A direct root agent is rejected.
 
