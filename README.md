@@ -6,9 +6,11 @@ It protects the agent operator from destructive changes and unauthorized sensiti
 
 ## Current status
 
-Stage 7 (benchmarking) is in progress. Stage 6 protected-run integration is validated in the disposable VM: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, a scoped telemetry loader with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, a process-level Landlock denial test, a Go OverlayFS mount/rollback test, a protected-run plan composer, a fail-closed coordinator, a policy-aware hidden helper process, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining work is final presentation polish and demo rehearsal.
+The MVP is complete for its explicitly documented disposable-VM boundary. Stage 6 protected-run integration and Stage 7 benchmark controls are validated: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, scoped telemetry with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, process-level read denial, OverlayFS mount/rollback, a fail-closed coordinator, a policy-aware helper, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. The next six-day sprint is Phase 2 hardening: crash recovery, cgroup process scope, event completeness, policy capability reporting, conflict-safe commit/export, and a reproducible release demo.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
+
+The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
 
 ## Competitive landscape
 
@@ -175,6 +177,7 @@ internal/runplan/ pre-execution protected-run composition
 internal/protectedrun/ run lifecycle ordering and fail-closed cleanup
 policies/         safe example policies
 benchmarks/       benchmark design and future results
+docs/PHASE2_PLAN.md Phase 2 hardening and productisation roadmap
 tests/            integration-test safety notes
 ```
 

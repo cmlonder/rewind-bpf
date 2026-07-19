@@ -2,7 +2,7 @@
 
 **Document status:** Living document
 
-**Current stage:** Stage 7 — benchmark baseline
+**Current stage:** MVP complete — Phase 2 hardening planned
 
 **Last verified:** 2026-07-18
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
@@ -295,7 +295,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 4 eBPF telemetry | Complete; read-policy integration next | Object compiled and attached in the disposable VM; JSON events observed for `openat` and `write`; Go components unit-tested |
 | Stage 5 read policy | Complete for isolated MVP boundary; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
 | Stage 6 protected-run integration | Complete | FUSE-backed end-to-end VM smoke passed: read denial, agent deletion isolation, generated-file creation, eBPF telemetry, successful record, rollback, and lower-layer preservation |
-| Stage 7 benchmarks | In progress | B0 baseline must be captured first; B1–B5 comparison remains VM-gated |
+| Stage 7 benchmarks | Complete for MVP evidence | Warm/cold B0/B2/B4 results, storage footprint, telemetry growth, and charts are recorded in `benchmarks/RESULTS.md`; broader B1–B5 coverage is Phase 2 work |
 
 ### Initial B0 baseline (disposable VM)
 

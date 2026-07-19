@@ -352,9 +352,9 @@ Run the first controlled destructive test only against synthetic fixtures inside
 
 Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope, benchmarks, and the deterministic demo in that order.
 
-### Current continuation: benchmark baseline after protected-run smoke
+### Current continuation: MVP complete, Phase 2 hardening
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, inert `internal/runplan` composer, fake-tested `internal/protectedrun` coordinator, policy-aware hidden helper, atomic run store, and `run/status/events/rollback` CLI paths are implemented. The disposable VM reports `landlock` active and `bpf` absent. The Landlock child-process test, isolated OverlayFS rollback test, and full FUSE protected-run smoke all passed with generated fixtures. The next action is to capture the B0 native-ext4 baseline before adding protection layers to the benchmark comparison.
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, protected-run coordinator, policy-aware helper, atomic run store, and `run/status/events/rollback` CLI paths are implemented. The disposable VM reports `landlock` active and `bpf` absent. The Landlock child-process test, isolated OverlayFS rollback test, full FUSE protected-run smoke, descendant telemetry smoke, and warm/cold B0/B2/B4 benchmark controls passed with generated fixtures. The MVP boundary is now documented as complete; the next work is the six-day Phase 2 hardening sprint described in [`docs/PHASE2_PLAN.md`](PHASE2_PLAN.md): crash recovery, cgroup process scope, event completeness, policy capability reporting, conflict-safe commit/export, and a reproducible release demo.
 
 The helper refuses to launch an agent as root: when the parent requires `sudo`, it drops to `SUDO_UID`/`SUDO_GID` before Landlock and `exec`. This was verified in the end-to-end smoke rather than treated as an optional hardening step.
 
