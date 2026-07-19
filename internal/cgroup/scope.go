@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const defaultRoot = "/sys/fs/cgroup"
@@ -138,15 +139,21 @@ func (s Scope) Close() error {
 	if s.path == "" {
 		return nil
 	}
-	data, err := os.ReadFile(filepath.Join(s.path, "cgroup.procs"))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("close cgroup %s: read members: %w", s.path, err)
+	deadline := time.Now().Add(1 * time.Second)
+	for {
+		data, err := os.ReadFile(filepath.Join(s.path, "cgroup.procs"))
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("close cgroup %s: read members: %w", s.path, err)
+		}
+		if strings.TrimSpace(string(data)) == "" {
+			if err := os.Remove(s.path); err != nil && !errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("close cgroup %s: %w", s.path, err)
+			}
+			return nil
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("close cgroup %s: processes remain", s.path)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	if strings.TrimSpace(string(data)) != "" {
-		return fmt.Errorf("close cgroup %s: processes remain", s.path)
-	}
-	if err := os.Remove(s.path); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("close cgroup %s: %w", s.path, err)
-	}
-	return nil
 }
