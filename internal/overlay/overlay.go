@@ -313,7 +313,13 @@ func (m Manager) Rollback(ctx context.Context, l Layout) error {
 		return err
 	}
 	if err := m.Unmount(ctx, l); err != nil {
-		return fmt.Errorf("rollback unmount: %w", err)
+		// A crashed fuse-overlayfs process can tear down its own mount before
+		// the later recovery command runs. Treat the resulting fusermount
+		// "already unmounted" error as success; all other unmount failures
+		// remain fail-closed so upper/work are never discarded blindly.
+		if !(m.backend() == BackendFuse && alreadyUnmounted(err)) {
+			return fmt.Errorf("rollback unmount: %w", err)
+		}
 	}
 	for _, path := range []string{l.Upper, l.Work} {
 		if err := os.RemoveAll(path); err != nil {
@@ -324,4 +330,14 @@ func (m Manager) Rollback(ctx context.Context, l Layout) error {
 		}
 	}
 	return nil
+}
+
+func alreadyUnmounted(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "invalid argument") ||
+		strings.Contains(message, "not found in /etc/mtab") ||
+		strings.Contains(message, "not mounted")
 }

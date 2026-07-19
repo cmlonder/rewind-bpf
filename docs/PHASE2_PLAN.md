@@ -29,9 +29,9 @@ This is deliberately narrower than “protect the whole operating system” or �
 
 ### Known MVP gaps
 
-1. Run metadata is root-owned and mode `0600` when the command is launched with `sudo`; this is operationally confusing.
-2. Parent/descendant PID tracking is verified, but a cgroup is a stronger identity boundary for agents that daemonise, fork quickly, or launch process trees through supervisors.
-3. The event stream is JSONL and can grow much faster than the run record; loss, backpressure, rotation, and tamper evidence are not yet first-class.
+1. The record and event log are now restored to the invoking user after `sudo`; the privileged FUSE mount still requires `sudo` for unmount/rollback.
+2. Cgroup-v2 is now the primary process identity and drain boundary; PID descendant tracking remains in the eBPF sensor for event correlation and compatibility.
+3. The event stream is JSONL and can grow much faster than the run record; kernel-side reserve failures are now counted and make evidence incomplete, while backpressure, rotation, and tamper evidence remain future work.
 4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
 5. There is no conflict-aware `commit`/export path. “Discard upper” is safe; merging arbitrary agent changes into a live workspace is not yet safe.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
@@ -47,10 +47,10 @@ The first P0 slice is now implemented and verified in the disposable VM:
 - Read-only `capabilities` probe persisted in the run plan.
 - Invoker-owned record and event log after privileged execution.
 - Helper start gate that releases the agent only after sensor attachment.
-- Event count, byte count, SHA-256 digest, and complete/truncated JSONL evidence flag.
+- Event count, byte count, SHA-256 digest, kernel-side dropped-event count, and complete/truncated JSONL evidence flag.
 - Read-only `diff --record` manifest comparison for a live merged view.
 
-The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command, and rollback preserved the lower-layer marker. The remaining P0 items are fault injection, ring-buffer overflow accounting, and open-descriptor/drain tests.
+The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Remaining P0 items are lifecycle crash injection and open-descriptor semantics; ring-buffer loss accounting is implemented, while bounded rotation and tamper-evident chaining remain P1.
 
 ## 3. Research and competitive findings
 

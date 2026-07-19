@@ -173,3 +173,24 @@ func TestRollbackDoesNotRemoveLowerAndRequiresUnmount(t *testing.T) {
 		t.Fatalf("rollback should unmount first, got %#v", runner.commands)
 	}
 }
+
+func TestFuseRollbackAcceptsMountAlreadyGoneAfterCrash(t *testing.T) {
+	runner := &fakeRunner{err: fmt.Errorf("fusermount3: invalid argument")}
+	layout, err := NewLayout(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := layout.Prepare(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(layout.Upper, "temporary"), []byte("change"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	manager := Manager{Runner: runner, Backend: BackendFuse}
+	if err := manager.Rollback(context.Background(), layout); err != nil {
+		t.Fatalf("expected already-unmounted recovery to succeed: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(layout.Upper, "temporary")); !os.IsNotExist(err) {
+		t.Fatalf("upper layer was not discarded: %v", err)
+	}
+}

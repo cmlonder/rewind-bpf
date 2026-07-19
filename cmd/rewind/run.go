@@ -378,7 +378,10 @@ func (a *telemetryAdapter) Close() error {
 			// record. Give the userspace reader a bounded drain window before
 			// closing the map, otherwise short runs can lose every event.
 			time.Sleep(100 * time.Millisecond)
-			a.dropped, a.dropErr = session.Dropped()
+			dropped, dropErr := session.Dropped()
+			a.mu.Lock()
+			a.dropped, a.dropErr = dropped, dropErr
+			a.mu.Unlock()
 			a.closeErr = session.Close()
 		}
 		if done != nil {

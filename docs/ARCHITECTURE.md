@@ -298,7 +298,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 7 benchmarks | Complete for MVP evidence | Warm/cold B0/B2/B4 results, storage footprint, telemetry growth, and charts are recorded in `benchmarks/RESULTS.md`; broader B1–B5 coverage is Phase 2 work |
 | Phase 2 P0 transaction journal | In progress | Prepared record, `mounted` lifecycle state, idempotent rollback/recovery, invoker-owned metadata, cgroup path, and capability report are implemented; crash injection remains |
 | Phase 2 process scope | VM smoke complete | cgroup-v2 scope is created per run, helper PID is admitted before release, descendants inherit the scope, and stale scopes are cleaned during rollback |
-| Phase 2 telemetry evidence | In progress | Start gate closes short-run attach race; event count/bytes/SHA-256 and complete flag are persisted; ring-buffer overflow accounting remains |
+| Phase 2 telemetry evidence | VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, and complete flag are persisted; rotation and hash chaining remain |
 | Phase 2 merged diff | Implemented | `rewind diff --record PATH` compares the start manifest with the live merged view without mutating either tree |
 
 ### Initial B0 baseline (disposable VM)
@@ -657,7 +657,7 @@ The first end-to-end FUSE run was verified on 2026-07-18 in the Ubuntu 24.04 ARM
 
 ### Phase 2 P0 VM smoke (disposable VM)
 
-On 2026-07-19 the Phase 2 binary passed package tests, capability probing, and a FUSE protected run in the Ubuntu 24.04 ARM64 VM. The capability report identified OverlayFS, FUSE OverlayFS, BTF, Landlock, cgroup-v2, and seccomp; BPF-LSM was absent. The run record persisted the cgroup path, backend, capability report, and event evidence. The helper waited on a start gate until the eBPF sensor was attached, eliminating the short-command attach race: the synthetic shell run recorded 77 events (14,428 bytes) with a complete SHA-256 digest. Record and event logs were owned by `vagrant:vagrant` after `sudo` execution. A privileged rollback removed the FUSE mount and temporary upper/work state while preserving `original-source` in the lower workspace. The unmount still correctly requires `sudo` because the parent mount is privileged.
+On 2026-07-19 the Phase 2 binary passed package tests, capability probing, and a FUSE protected run in the Ubuntu 24.04 ARM64 VM. The capability report identified OverlayFS, FUSE OverlayFS, BTF, Landlock, cgroup-v2, and seccomp; BPF-LSM was absent. The run record persisted the cgroup path, backend, capability report, and event evidence. The helper waited on a start gate until the eBPF sensor was attached, eliminating the short-command attach race: the synthetic shell run recorded 77 events (14,428 bytes) with `dropped=0` and a complete SHA-256 digest. Record and event logs were owned by `vagrant:vagrant` after `sudo` execution. A second destructive synthetic run recorded 39 events (7,334 bytes), also with `dropped=0`, and rolled back. A background child-process test caused the cgroup drain gate to fail closed; recovery removed the child, cgroup, mount, and temporary upper/work state. A privileged rollback preserved `original-source` in the lower workspace. The unmount still correctly requires `sudo` because the parent mount is privileged.
 
 ### Optional BPF-LSM backend
 
