@@ -321,7 +321,7 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining work is the connected supervisor contract: persistent storage, Unix-socket authorization, live SSE/polling, signed policy packages, conflict-checked commit, and end-to-end reconnect/recovery behavior. Those belong to the runtime/API boundary, not to a browser-only fixture.
+The remaining work is the connected supervisor contract: persistent storage, live SSE/polling, signed policy packages, conflict-checked commit, and end-to-end reconnect/recovery behavior. Local authentication/authorization is explicitly a post-demo hardening item; the hackathon UI remains fixture-only and never receives root access.
 
 ## 12. Implementation phases and exit criteria
 
@@ -345,7 +345,7 @@ Exit: an operator can create a package, simulate it, assign it to a workspace, a
 
 ### Phase 4 — Supervisor integration — next runtime boundary
 
-Add `rewindd`, Unix-socket API, SSE event stream, local authorization, signed packages, and persistent action audit.
+Add `rewindd`, Unix-socket API, SSE event stream, signed packages, persistent action audit, and recovery/reconnect behavior. Add local authentication/authorization after the demo unless the connected deployment boundary requires it earlier.
 
 Exit: UI state matches runtime state under refresh, reconnect, supervisor restart, and recovery scenarios.
 

@@ -71,7 +71,7 @@ python3 -m http.server 4174 --directory ui
 open http://127.0.0.1:4174
 ```
 
-The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and simulation, workspace-to-policy assignments, revisioned global configuration controls, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A future `rewindd` supervisor will replace the fixture adapter through a localhost-only or Unix-socket API; the browser will never receive root privileges.
+The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and simulation, workspace-to-policy assignments, revisioned global configuration controls, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A future `rewindd` supervisor will replace the fixture adapter through a localhost-only or Unix-socket API; local authentication is intentionally post-demo, and the browser will never receive root privileges.
 
 ## Safety warning
 

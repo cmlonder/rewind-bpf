@@ -26,6 +26,10 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 
 These actions deliberately stop at the adapter boundary. They demonstrate the control-plane contract without granting the browser root access or pretending that fixture state is live runtime state.
 
+## Demo scope decision
+
+Local authentication is intentionally deferred until after the hackathon demo. The demo runs in fixture mode and does not expose a connected runtime, so authentication would add complexity without improving the jury flow. When `rewindd` is connected, authentication and authorization will be introduced at the Unix-socket/API boundary rather than inside browser components.
+
 ## Adapter boundary
 
 `data/fixture.js` is the Phase 1 adapter. A future `api-adapter.js` can replace it without changing the view components. The planned connected boundary is a local `rewindd` supervisor over a Unix socket or localhost-only API; the browser must never receive root privileges.
