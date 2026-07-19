@@ -37,7 +37,7 @@ export const siteData = {
       title: "Kernel evidence",
       tag: "SHIPPED",
       body: "eBPF tracepoints observe exec, open, writes, deletes, and descendant processes while the Go runtime owns the transaction lifecycle.",
-      detail: "Events carry sequence numbers, a userspace hash chain, a final stream digest, and a kernel-side dropped counter.",
+      detail: "Events carry sequence numbers, a userspace hash chain, a final stream digest, and a kernel-side dropped counter. The evidence verifier can run without the coordinator.",
       tone: "sage",
     },
     {

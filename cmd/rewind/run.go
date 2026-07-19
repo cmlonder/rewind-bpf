@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,6 +19,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/cgroup"
 	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/ebpfload"
+	"github.com/rewindbpf/rewind/internal/evidence"
 	"github.com/rewindbpf/rewind/internal/export"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
@@ -323,46 +323,14 @@ func handleVerify(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	file, err := os.Open(record.EventsPath)
-	if err != nil {
-		fatal(fmt.Sprintf("open events for verification: %v", err))
-	}
-	defer file.Close()
-	var journal []telemetry.JournalEvent
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 64*1024), 2*1024*1024)
-	for scanner.Scan() {
-		var value telemetry.JournalEvent
-		if err := json.Unmarshal(scanner.Bytes(), &value); err != nil {
-			fatal(fmt.Sprintf("decode event journal: %v", err))
-		}
-		journal = append(journal, value)
-	}
-	if err := scanner.Err(); err != nil {
-		fatal(fmt.Sprintf("read event journal: %v", err))
-	}
-	evidence, err := runstore.SummarizeEvents(record.EventsPath)
+	result, err := evidence.Verify(record)
 	if err != nil {
 		fatal(err.Error())
 	}
-	chainValid := telemetry.Verify(journal)
-	matchesRecord := evidence.Count == record.Events.Count && evidence.Bytes == record.Events.Bytes && evidence.SHA256 == record.Events.SHA256 && evidence.Complete == record.Events.Complete
-	result := struct {
-		RunID          string `json:"run_id"`
-		Count          uint64 `json:"count"`
-		Bytes          uint64 `json:"bytes"`
-		Dropped        uint64 `json:"dropped"`
-		Truncated      bool   `json:"truncated"`
-		Complete       bool   `json:"complete"`
-		StreamComplete bool   `json:"stream_complete"`
-		RecordComplete bool   `json:"record_complete"`
-		ChainValid     bool   `json:"chain_valid"`
-		MatchesRecord  bool   `json:"matches_record"`
-	}{record.Plan.Run.ID, evidence.Count, evidence.Bytes, record.Events.Dropped, record.Events.Truncated, evidence.Complete && record.Events.Complete && record.Events.Dropped == 0 && !record.Events.Truncated && chainValid && matchesRecord, evidence.Complete, record.Events.Complete, chainValid, matchesRecord}
 	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 		fatal(err.Error())
 	}
-	if !matchesRecord || !evidence.Complete || record.Events.Dropped > 0 || record.Events.Truncated || !chainValid {
+	if !result.Complete {
 		os.Exit(2)
 	}
 }

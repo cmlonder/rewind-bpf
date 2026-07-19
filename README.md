@@ -83,6 +83,7 @@ sudo rewind status --record ./runtime/record.json
 rewind inspect --record ./runtime/record.json
 sudo rewind events --record ./runtime/record.json
 rewind verify --record ./runtime/record.json
+rewind evidence verify --record ./runtime/record.json
 sudo rewind diff --record ./runtime/record.json
 rewind export --record ./runtime/record.json --output ./review-bundle.json
 sudo rewind rollback --record ./runtime/record.json
@@ -135,7 +136,7 @@ make test
 ./bin/rewind policy learn --events /tmp/rewind-events.jsonl --output /tmp/rewind-policy-suggestion.yaml
 ```
 
-The `run`, `status`, `events`, `verify`, `diff`, `export`, and `rollback` commands are wired for the disposable Linux VM. `policy learn` produces an audit-mode, review-only allowlist suggestion and skips secret-like, virtual, and broad paths. `commit` remains intentionally disabled until conflict-checked merge semantics are implemented and verified.
+The `run`, `status`, `events`, `verify`, `evidence verify`, `diff`, `export`, and `rollback` commands are wired for the disposable Linux VM. `policy learn` produces an audit-mode, review-only allowlist suggestion and skips secret-like, virtual, and broad paths. `evidence verify` is the read-only verification module boundary intended for a future separately packaged verifier. `commit` remains intentionally disabled until conflict-checked merge semantics are implemented and verified.
 
 VM-only run shape:
 

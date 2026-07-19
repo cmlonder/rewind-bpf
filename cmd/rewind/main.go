@@ -22,6 +22,7 @@ Usage:
   rewind inspect --record PATH
   rewind events --record PATH
   rewind verify --record PATH
+  rewind evidence verify --record PATH
   rewind diff --record PATH
   rewind export --record PATH --output PATH
   rewind capabilities
@@ -71,6 +72,8 @@ func main() {
 		handleEvents(os.Args[2:])
 	case "verify":
 		handleVerify(os.Args[2:])
+	case "evidence":
+		handleEvidence(os.Args[2:])
 	case "diff":
 		handleDiff(os.Args[2:])
 	case "export":
@@ -83,6 +86,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "rewind: unknown command %q\n\n%s", os.Args[1], usage)
 		os.Exit(2)
 	}
+}
+
+func handleEvidence(args []string) {
+	if len(args) < 1 || args[0] != "verify" {
+		fatal("usage: rewind evidence verify --record PATH")
+	}
+	handleVerify(args[1:])
 }
 
 func handleFixture(args []string) {

@@ -121,11 +121,12 @@ rewind commit RUN_ID
 rewind policy check POLICY
 rewind policy explain POLICY PATH
 rewind verify --record PATH
+rewind evidence verify --record PATH
 rewind diff --record PATH
 rewind export --record PATH --output PATH
 ```
 
-The dependency-free `site/` directory is a jury-facing presentation layer. It imports modular sections from `site/sections/` and links back to the canonical architecture, phase, and benchmark ledgers; it is not a second runtime or policy source.
+The dependency-free `site/` directory is a jury-facing presentation layer. It imports modular sections from `site/sections/` and links back to the canonical architecture, phase, and benchmark ledgers; it is not a second runtime or policy source. `internal/evidence` is a read-only verification boundary shared by `rewind verify` and `rewind evidence verify`, so a future standalone verifier does not need the protected-run coordinator.
 
 #### `rewindd` daemon
 
@@ -304,7 +305,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 7 benchmarks | Complete for MVP evidence | Warm/cold B0/B2/B4 results, storage footprint, telemetry growth, and charts are recorded in `benchmarks/RESULTS.md`; broader B1–B5 coverage is Phase 2 work |
 | Phase 2 P0 transaction journal | VM smoke complete | Prepared record, `mounted` lifecycle state, idempotent rollback/recovery, invoker-owned metadata, cgroup path, capability report, and parent-`SIGKILL` recovery are implemented; broader fault coverage remains |
 | Phase 2 process scope | VM smoke complete | cgroup-v2 scope is created per run, optional `pids.max`/`memory.max`/`cpu.max` limits are written before release, helper PID is admitted before release, descendants inherit the scope, and stale scopes are cleaned during rollback |
-| Phase 2 telemetry evidence | VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, sequence/hash chain, complete flag, and bounded `REWIND_EVENT_MAX_BYTES` truncation are persisted; multi-file rotation and independent verification remain |
+| Phase 2 telemetry evidence | VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, sequence/hash chain, complete flag, and bounded `REWIND_EVENT_MAX_BYTES` truncation are persisted; multi-file rotation remains |
 | Phase 2 merged diff | Implemented | `rewind diff --record PATH` compares the start manifest with the live merged view without mutating either tree |
 
 ### Initial B0 baseline (disposable VM)
