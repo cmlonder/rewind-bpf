@@ -69,8 +69,8 @@ The primary workflow runs inside the disposable Linux VM:
 sudo rewind run --workspace ./project --runtime-root ./runtime \
   --policy ./policy.yaml --record ./runtime/record.json -- agent-command
 sudo rewind status --record ./runtime/record.json
-  sudo rewind events --record ./runtime/record.json
-  rewind verify --record ./runtime/record.json
+sudo rewind events --record ./runtime/record.json
+rewind verify --record ./runtime/record.json
 sudo rewind diff --record ./runtime/record.json
 sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
