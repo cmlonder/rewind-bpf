@@ -62,6 +62,17 @@ open http://127.0.0.1:4173
 
 The page covers the shipped safety surface, reversible transaction flow, Phase 2 roadmap, competitor capability matrix, and measured B0/B2/B4 evidence. The Markdown ledgers remain canonical.
 
+## Control Plane UI
+
+The operational UI prototype lives in [`ui/`](ui/) and is tracked in [`docs/UI_ROADMAP.md`](docs/UI_ROADMAP.md). It is fixture-driven in Phase 1: no eBPF program, mount, process, workspace, or host file is touched. Preview it safely with:
+
+```bash
+python3 -m http.server 4174 --directory ui
+open http://127.0.0.1:4174
+```
+
+The first slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/export fixture actions, policy package preview, effective policy resolution, global configuration preview, and benchmark/evidence surfaces. A future `rewindd` supervisor will replace the fixture adapter through a localhost-only or Unix-socket API.
+
 ## Safety warning
 
 Do not run kernel, mount, or destructive tests directly on a personal host. RewindBPF integration tests must run in a disposable Ubuntu VM or an explicitly created test image. Do not bind-mount a real home directory, real project, `.env`, SSH keys, or personal data into a destructive test.
