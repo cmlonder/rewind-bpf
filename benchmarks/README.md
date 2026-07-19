@@ -2,6 +2,8 @@
 
 The benchmark design and B0–B5 comparison groups are defined in [docs/PROJECT_PLAN.md](../docs/PROJECT_PLAN.md).
 
+The external comparison ledger is [COMPETITOR_MATRIX.md](COMPETITOR_MATRIX.md). It covers nono, Tetragon, KubeArmor, AgentFS, and DeltaBox with feature overlap, fair benchmark dimensions, provenance, and an explicit no-ranking rule for non-comparable workloads.
+
 Planned tools:
 
 - `hyperfine`: macro-level timing
