@@ -31,6 +31,7 @@ type Plan struct {
 	Manifest       manifest.Manifest       `json:"manifest"`
 	ReadRules      policycompile.ReadRules `json:"read_rules"`
 	Landlock       *landlock.Plan          `json:"landlock,omitempty"`
+	Resources      policy.ResourcePolicy   `json:"resources,omitempty"`
 	OverlayBackend overlay.Backend         `json:"overlay_backend"`
 	CgroupPath     string                  `json:"cgroup_path,omitempty"`
 	Capabilities   capabilities.Report     `json:"capabilities,omitempty"`
@@ -88,7 +89,7 @@ func Build(config Config) (Plan, error) {
 	if backend != overlay.BackendFuse && backend != overlay.BackendKernel {
 		return Plan{}, fmt.Errorf("build run plan: unsupported overlay backend %q", backend)
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, OverlayBackend: backend}, nil
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend}, nil
 }
 
 func resolveWorkspace(value string) (string, error) {

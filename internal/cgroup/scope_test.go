@@ -58,3 +58,67 @@ func TestCloseWaitsForTerminatedMembers(t *testing.T) {
 		t.Fatalf("scope remains after close: %v", err)
 	}
 }
+
+func TestScopeConfigureWritesRequestedLimits(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "cgroup.controllers"), []byte("cpu memory pids"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scope, err := NewAt(root, "run_limits")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"pids.max", "memory.max", "cpu.max"} {
+		if err := os.WriteFile(filepath.Join(scope.Path(), name), nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := scope.Configure(Limits{PIDsMax: "128", MemoryMax: "268435456", CPUMax: "50000 100000"}); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"pids.max": "128\n", "memory.max": "268435456\n", "cpu.max": "50000 100000\n"} {
+		got, err := os.ReadFile(filepath.Join(scope.Path(), name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != want {
+			t.Errorf("%s = %q, want %q", name, got, want)
+		}
+	}
+	for _, name := range []string{"pids.max", "memory.max", "cpu.max"} {
+		if err := os.Remove(filepath.Join(scope.Path(), name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := scope.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestNewAtWithLimitsDelegatesControllers(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "cgroup.controllers"), []byte("cpu memory pids"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	parent := filepath.Join(root, "rewind")
+	if err := os.MkdirAll(parent, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(parent, "cgroup.subtree_control"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	scope, err := NewAtWithLimits(root, "run_delegate", Limits{PIDsMax: "64", MemoryMax: "1000", CPUMax: "1 100000"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	delegated, err := os.ReadFile(filepath.Join(parent, "cgroup.subtree_control"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(delegated) != "+pids +memory +cpu\n" {
+		t.Fatalf("delegated controllers = %q", delegated)
+	}
+	if err := scope.Close(); err != nil {
+		t.Fatal(err)
+	}
+}

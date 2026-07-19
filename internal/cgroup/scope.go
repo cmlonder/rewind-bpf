@@ -22,6 +22,12 @@ type Scope struct {
 	path string
 }
 
+type Limits struct {
+	PIDsMax   string
+	MemoryMax string
+	CPUMax    string
+}
+
 // FromPath reopens a persisted run scope for cleanup after the original
 // process has exited. The path is accepted only under the cgroup-v2 rewind
 // namespace, preventing a run record from targeting an arbitrary cgroup.
@@ -49,6 +55,13 @@ func New(runID string) (Scope, error) {
 // NewAt is injectable for unit tests and does not touch the host cgroup tree
 // unless the caller explicitly supplies a real cgroup mount.
 func NewAt(root, runID string) (Scope, error) {
+	return NewAtWithLimits(root, runID, Limits{})
+}
+
+// NewAtWithLimits enables the cgroup-v2 controllers needed by the requested
+// limits before creating the child scope. cgroup-v2 exposes controller files
+// only after the parent delegates those controllers to its children.
+func NewAtWithLimits(root, runID string, limits Limits) (Scope, error) {
 	if strings.TrimSpace(root) == "" {
 		return Scope{}, fmt.Errorf("create cgroup: root cannot be empty")
 	}
@@ -70,12 +83,59 @@ func NewAt(root, runID string) (Scope, error) {
 	if err := os.MkdirAll(parent, 0o755); err != nil {
 		return Scope{}, fmt.Errorf("create cgroup: create parent: %w", err)
 	}
+	if err := enableControllers(parent, limits); err != nil {
+		return Scope{}, err
+	}
 	name := "run-" + sanitize(runID)
 	path := filepath.Join(parent, name)
 	if err := os.Mkdir(path, 0o755); err != nil {
 		return Scope{}, fmt.Errorf("create cgroup %s: %w", path, err)
 	}
 	return Scope{path: path}, nil
+}
+
+func enableControllers(parent string, limits Limits) error {
+	var wanted []string
+	if strings.TrimSpace(limits.PIDsMax) != "" {
+		wanted = append(wanted, "pids")
+	}
+	if strings.TrimSpace(limits.MemoryMax) != "" {
+		wanted = append(wanted, "memory")
+	}
+	if strings.TrimSpace(limits.CPUMax) != "" {
+		wanted = append(wanted, "cpu")
+	}
+	if len(wanted) == 0 {
+		return nil
+	}
+	controlPath := filepath.Join(parent, "cgroup.subtree_control")
+	current, err := os.ReadFile(controlPath)
+	if err != nil {
+		return fmt.Errorf("create cgroup: read controller delegation: %w", err)
+	}
+	active := string(current)
+	var enable []string
+	for _, controller := range wanted {
+		if !containsWord(active, controller) {
+			enable = append(enable, "+"+controller)
+		}
+	}
+	if len(enable) == 0 {
+		return nil
+	}
+	if err := os.WriteFile(controlPath, []byte(strings.Join(enable, " ")+"\n"), 0o600); err != nil {
+		return fmt.Errorf("create cgroup: enable controllers %s: %w", strings.Join(wanted, ","), err)
+	}
+	return nil
+}
+
+func containsWord(value, wanted string) bool {
+	for _, item := range strings.Fields(value) {
+		if strings.TrimPrefix(item, "+") == wanted {
+			return true
+		}
+	}
+	return false
 }
 
 func sanitize(value string) string {
@@ -100,6 +160,33 @@ func (s Scope) AddPID(pid uint32) error {
 	}
 	if err := os.WriteFile(filepath.Join(s.path, "cgroup.procs"), []byte(strconv.FormatUint(uint64(pid), 10)), 0o600); err != nil {
 		return fmt.Errorf("add pid %d to cgroup %s: %w", pid, s.path, err)
+	}
+	return nil
+}
+
+// Configure applies only explicitly requested cgroup-v2 limits. Missing
+// controller files are an error instead of a silent downgrade, so a policy
+// cannot claim a resource boundary the kernel did not provide.
+func (s Scope) Configure(limits Limits) error {
+	if s.path == "" {
+		return fmt.Errorf("configure cgroup: scope is required")
+	}
+	values := []struct {
+		name  string
+		value string
+	}{
+		{"pids.max", limits.PIDsMax},
+		{"memory.max", limits.MemoryMax},
+		{"cpu.max", limits.CPUMax},
+	}
+	for _, item := range values {
+		if strings.TrimSpace(item.value) == "" {
+			continue
+		}
+		path := filepath.Join(s.path, item.name)
+		if err := os.WriteFile(path, []byte(strings.TrimSpace(item.value)+"\n"), 0o600); err != nil {
+			return fmt.Errorf("configure cgroup %s: %w", item.name, err)
+		}
 	}
 	return nil
 }

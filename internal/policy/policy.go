@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -18,9 +19,10 @@ const (
 )
 
 type Policy struct {
-	Read    ReadPolicy    `yaml:"read" json:"read"`
-	Write   WritePolicy   `yaml:"write" json:"write"`
-	Network NetworkPolicy `yaml:"network" json:"network"`
+	Read      ReadPolicy     `yaml:"read" json:"read"`
+	Write     WritePolicy    `yaml:"write" json:"write"`
+	Network   NetworkPolicy  `yaml:"network" json:"network"`
+	Resources ResourcePolicy `yaml:"resources" json:"resources"`
 }
 
 type ReadPolicy struct {
@@ -36,6 +38,15 @@ type WritePolicy struct {
 
 type NetworkPolicy struct {
 	Mode Mode `yaml:"mode" json:"mode"`
+}
+
+// ResourcePolicy maps directly to cgroup-v2 limits. Values are strings so the
+// kernel's special "max" value and cpu.max's "quota period" pair remain
+// explicit in the policy file.
+type ResourcePolicy struct {
+	PIDsMax   string `yaml:"pids_max" json:"pids_max"`
+	MemoryMax string `yaml:"memory_max" json:"memory_max"`
+	CPUMax    string `yaml:"cpu_max" json:"cpu_max"`
 }
 
 type DecisionExplanation struct {
@@ -77,7 +88,44 @@ func (p Policy) Validate() error {
 	if p.Write.Scope != "" && p.Write.Scope != "workspace" && p.Write.Scope != "system" {
 		return fmt.Errorf("write.scope must be workspace or system when set, got %q", p.Write.Scope)
 	}
+	return p.Resources.Validate()
+}
+
+func (r ResourcePolicy) Validate() error {
+	if err := validateLimit("resources.pids_max", r.PIDsMax, false); err != nil {
+		return err
+	}
+	if err := validateLimit("resources.memory_max", r.MemoryMax, false); err != nil {
+		return err
+	}
+	if strings.TrimSpace(r.CPUMax) == "" {
+		return nil
+	}
+	parts := strings.Fields(r.CPUMax)
+	if len(parts) != 2 || !validLimit(parts[0]) || !validPositive(parts[1]) {
+		return fmt.Errorf("resources.cpu_max must be '<quota> <period>' with positive integers or max")
+	}
 	return nil
+}
+
+func validateLimit(name, value string, required bool) error {
+	if strings.TrimSpace(value) == "" {
+		if required {
+			return fmt.Errorf("%s is required", name)
+		}
+		return nil
+	}
+	if !validLimit(strings.TrimSpace(value)) {
+		return fmt.Errorf("%s must be a positive integer or max", name)
+	}
+	return nil
+}
+
+func validLimit(value string) bool { return value == "max" || validPositive(value) }
+
+func validPositive(value string) bool {
+	number, err := strconv.ParseUint(value, 10, 64)
+	return err == nil && number > 0
 }
 
 func (p ReadPolicy) Validate() error {

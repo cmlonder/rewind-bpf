@@ -41,11 +41,29 @@ func TestReadPolicyModesAndDenyPrecedence(t *testing.T) {
 }
 
 func TestParseAndValidateYAML(t *testing.T) {
-	value, err := Parse([]byte("read:\n  mode: enforce\n  deny:\n    - '**/*.pem'\nwrite:\n  mode: rollback\n  scope: workspace\n"))
+	value, err := Parse([]byte("read:\n  mode: enforce\n  deny:\n    - '**/*.pem'\nwrite:\n  mode: rollback\n  scope: workspace\nresources:\n  pids_max: '128'\n  memory_max: '268435456'\n  cpu_max: '50000 100000'\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if value.Read.Mode != ModeEnforce || len(value.Read.Deny) != 1 {
 		t.Fatalf("unexpected policy: %+v", value)
+	}
+	if value.Resources.PIDsMax != "128" || value.Resources.CPUMax != "50000 100000" {
+		t.Fatalf("unexpected resource policy: %+v", value.Resources)
+	}
+}
+
+func TestResourcePolicyRejectsInvalidLimits(t *testing.T) {
+	for _, input := range []string{"0", "-1", "bytes", ""} {
+		value := Policy{Resources: ResourcePolicy{PIDsMax: input}}
+		if input == "" {
+			continue
+		}
+		if err := value.Validate(); err == nil {
+			t.Fatalf("PIDsMax %q should fail validation", input)
+		}
+	}
+	if err := (Policy{Resources: ResourcePolicy{CPUMax: "1000"}}).Validate(); err == nil {
+		t.Fatal("short cpu.max should fail validation")
 	}
 }

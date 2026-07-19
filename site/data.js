@@ -44,7 +44,7 @@ export const siteData = {
       number: "04",
       title: "Fail-closed recovery",
       tag: "SHIPPED",
-      body: "The run is scoped by cgroup-v2, gated until the sensor is attached, and recoverable after parent death or an already-torn-down FUSE mount.",
+      body: "The run is scoped by cgroup-v2, can apply pids/memory/CPU limits before release, and is recoverable after parent death or an already-torn-down FUSE mount.",
       detail: "A stale run is never silently treated as healthy. Recover drains descendants, removes the temporary layer, and preserves the lower marker.",
       tone: "paper",
     },
@@ -73,7 +73,7 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "Policy learn and a bounded single-file event cap are shipped. Next: multi-file rotation, independent evidence verifier, network namespace/proxy modes, resource budgets, and conflict-checked commit." },
+    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "Policy learn, bounded single-file evidence, and cgroup resource budgets are shipped. Next: multi-file rotation, independent evidence verifier, network namespace/proxy modes, and conflict-checked commit." },
     { phase: "AFTER", title: "P2: product surface", status: "Planned", body: "Portable signed profiles, content-addressed retention, a detachable supervisor, credential injection, remote evidence, and Linux distribution packaging." },
   ],
   competitors: [

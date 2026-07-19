@@ -90,9 +90,21 @@ func handleRun(args []string) {
 	if err := plan.Layout.Prepare(); err != nil {
 		fatal(fmt.Sprintf("prepare runtime layout: %v", err))
 	}
-	scope, err := cgroup.New(plan.Run.ID)
+	scope, err := cgroup.NewAtWithLimits("/sys/fs/cgroup", plan.Run.ID, cgroup.Limits{
+		PIDsMax:   plan.Resources.PIDsMax,
+		MemoryMax: plan.Resources.MemoryMax,
+		CPUMax:    plan.Resources.CPUMax,
+	})
 	if err != nil {
 		fatal(fmt.Sprintf("create process scope: %v", err))
+	}
+	if err := scope.Configure(cgroup.Limits{
+		PIDsMax:   plan.Resources.PIDsMax,
+		MemoryMax: plan.Resources.MemoryMax,
+		CPUMax:    plan.Resources.CPUMax,
+	}); err != nil {
+		_ = scope.Close()
+		fatal(fmt.Sprintf("configure process scope: %v", err))
 	}
 	plan.CgroupPath = scope.Path()
 	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
