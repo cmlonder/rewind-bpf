@@ -5,3 +5,4 @@ B4-rewind-protected,9181.7,3932.6,36726.2,15729.8,66.7,,,68.710,,,,0,0,64.34,"5 
 B4-direct-telemetry,,,,,,,,,,,0,2467528,16620,,"Direct fio PID telemetry validation; 16,403 write, 216 openat, 1 unlinkat"
 B0-native-ext4-cold,10918.6,4672.9,43674.0,18691.0,74.2,126.0,177.8,3.088,7.019,13.952,,,,,"3 repetitions; sync + drop_caches before each run; buffered fio"
 B2-fuse-only-cold,9776.8,4182.9,39106.7,16731.3,62.0,114.2,169.6,63.573,96.768,140.971,,,,,"3 repetitions; sync + drop_caches before each run; separate FUSE tree"
+B4-rewind-protected-cold,6401.7,2732.9,25606.3,10931.3,69.5,,,142.336,,,,,,17.6,"3 separate protected runs; sync + drop_caches; includes mount/helper/first-copy-up cost; not a steady-state hot-path comparison"

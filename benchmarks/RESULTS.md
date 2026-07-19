@@ -20,6 +20,8 @@ B4 throughput was approximately 11.1% below B0 and 0.4% above B2. The current re
 
 Three repetitions with `sync; echo 3 > /proc/sys/vm/drop_caches` before each run produced 43,674 KiB/s read and 18,691 KiB/s write for B0, versus 39,107 KiB/s read and 16,731 KiB/s write for B2. FUSE throughput was approximately 10.5% lower in the cold-cache control, consistent with the warm-cache result. The small three-run sample has higher variance and is reported as a control rather than a production performance guarantee.
 
+Three separate cold B4 protected runs measured 25,606 KiB/s read and 10,931 KiB/s write, with a mean wall time of 17.6 seconds per run. This was 34.5% below cold B2 because each B4 repetition created a fresh protected upper layer and included mount/helper/first-copy-up work, while the B2 control reused one mounted upper layer. It is therefore reported as lifecycle and first-copy-up cost, not as a steady-state hot-path overhead comparison.
+
 ## Telemetry result
 
 The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. A follow-up shell-to-`dd` smoke generated 46 events across two PIDs (15 `write`, 30 `openat`, and one `execve`), confirming descendant tracking. Cgroup-level scoping remains a future scale option.

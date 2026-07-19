@@ -372,6 +372,8 @@ The static footprint measurement is 5,670,919 bytes for the `rewind` binary and 
 
 The cold-cache control used `sync; echo 3 > /proc/sys/vm/drop_caches` before each of three repetitions. B0 averaged 43,674 KiB/s read and 18,691 KiB/s write; B2 averaged 39,107 KiB/s read and 16,731 KiB/s write, approximately 10.5% lower. This is consistent with the warm-cache comparison and should be presented as a VM control sample, not as a universal performance guarantee.
 
+Three separate cold B4 runs averaged 25,606 KiB/s read, 10,931 KiB/s write, and 17.6 seconds wall-clock. This includes a fresh mount, helper startup, and first copy-up for each run, so it is a lifecycle/first-copy-up measurement rather than a steady-state hot-path comparison. The benchmark presentation must keep these dimensions separate.
+
 ```bash
 REWIND_LANDLOCK_INTEGRATION=1 GOTOOLCHAIN=local go test ./internal/landlock -run TestLandlockSyntheticReadEnforcement -count=1 -v
 ```
