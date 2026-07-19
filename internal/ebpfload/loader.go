@@ -37,6 +37,7 @@ type Session struct {
 	collection *ebpf.Collection
 	links      []link.Link
 	events     *telemetry.Reader
+	dropped    *ebpf.Map
 }
 
 // Load parses and loads a telemetry object, scopes it to targetPID, and
@@ -94,6 +95,10 @@ func Load(objectPath, runID string, targetPID uint32) (*Session, error) {
 		return cleanup(fmt.Errorf("load eBPF sensors: create event reader: %w", err))
 	}
 	session.events = events
+	session.dropped = collection.Maps["rewind_dropped"]
+	if session.dropped == nil {
+		return cleanup(fmt.Errorf("load eBPF sensors: object missing rewind_dropped map"))
+	}
 	return session, nil
 }
 
@@ -102,6 +107,23 @@ func (s *Session) Events() *telemetry.Reader {
 		return nil
 	}
 	return s.events
+}
+
+// Dropped returns the aggregate per-CPU ring-buffer reserve failures.
+func (s *Session) Dropped() (uint64, error) {
+	if s == nil || s.dropped == nil {
+		return 0, fmt.Errorf("read dropped events: map is not initialized")
+	}
+	key := uint32(0)
+	var values []uint64
+	if err := s.dropped.Lookup(&key, &values); err != nil {
+		return 0, fmt.Errorf("read dropped events: lookup: %w", err)
+	}
+	var total uint64
+	for _, value := range values {
+		total += value
+	}
+	return total, nil
 }
 
 // Close detaches tracepoints before closing the collection. It is safe to

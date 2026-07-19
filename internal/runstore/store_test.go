@@ -62,3 +62,18 @@ func TestSummarizeEventsCountsBytesAndDetectsTruncation(t *testing.T) {
 		t.Fatal("expected incomplete final line")
 	}
 }
+
+func TestEventEvidenceWithDroppedMarksIncomplete(t *testing.T) {
+	evidence := EventEvidence{Count: 4, Bytes: 100, SHA256: "digest", Complete: true}
+	evidence = evidence.WithDropped(3)
+	if evidence.Dropped != 3 {
+		t.Fatalf("dropped = %d, want 3", evidence.Dropped)
+	}
+	if evidence.Complete {
+		t.Fatal("evidence with dropped events must be incomplete")
+	}
+	zero := (EventEvidence{Count: 4, Bytes: 100, SHA256: "digest", Complete: true}).WithDropped(0)
+	if zero.Dropped != 0 || !zero.Complete {
+		t.Fatalf("zero dropped events should preserve complete evidence: %+v", zero)
+	}
+}

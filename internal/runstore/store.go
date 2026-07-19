@@ -25,6 +25,7 @@ type Record struct {
 type EventEvidence struct {
 	Count    uint64 `json:"count"`
 	Bytes    uint64 `json:"bytes"`
+	Dropped  uint64 `json:"dropped,omitempty"`
 	SHA256   string `json:"sha256,omitempty"`
 	Complete bool   `json:"complete"`
 }
@@ -71,6 +72,17 @@ func SummarizeEvents(path string) (EventEvidence, error) {
 		}
 	}
 	return EventEvidence{Count: count, Bytes: totalBytes, SHA256: fmt.Sprintf("%x", hash.Sum(nil)), Complete: complete}, nil
+}
+
+// WithDropped marks the evidence incomplete when the kernel ring buffer had
+// to discard records. Keeping this transformation in runstore makes the
+// persisted completeness rule independent of the sensor implementation.
+func (e EventEvidence) WithDropped(dropped uint64) EventEvidence {
+	e.Dropped = dropped
+	if dropped > 0 {
+		e.Complete = false
+	}
+	return e
 }
 
 func Write(path string, record Record) error {

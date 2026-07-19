@@ -102,20 +102,20 @@ func handleRun(args []string) {
 	}
 	handle, err := coordinator.Start(context.Background(), &plan, command, *sensorObject)
 	if err != nil {
-		_ = persistRecord(*recordPath, plan, eventsPath)
+		_ = persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped())
 		fatal(err.Error())
 	}
-	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
+	if err := persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped()); err != nil {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist running run; transaction rolled back: %v", err))
 	}
 	waitErr := handle.Wait()
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
-		_ = persistRecord(*recordPath, plan, eventsPath)
+		_ = persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped())
 		fatal(errors.Join(waitErr, rollbackErr).Error())
 	}
-	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
+	if err := persistRecord(*recordPath, plan, eventsPath, telemetry.Dropped()); err != nil {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist successful run; transaction rolled back: %v", err))
 	}
@@ -159,7 +159,7 @@ func handleRollback(args []string) {
 	if err := coordinator.RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(err.Error())
 	}
-	if err := persistRecord(*recordPath, record.Plan, record.EventsPath); err != nil {
+	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, 0); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
@@ -185,7 +185,7 @@ func handleRecover(args []string) {
 	if err := (protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}, Scope: persistedScope(record.Plan.CgroupPath)}).RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(fmt.Sprintf("recover protected run: %v", err))
 	}
-	if err := persistRecord(*recordPath, record.Plan, record.EventsPath); err != nil {
+	if err := persistRecord(*recordPath, record.Plan, record.EventsPath, 0); err != nil {
 		fatal(err.Error())
 	}
 	fmt.Printf("run recovered and rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
@@ -205,11 +205,16 @@ func persistedScope(path string) protectedrun.ProcessScope {
 	return &scope
 }
 
-func persistRecord(path string, plan runplan.Plan, eventsPath string) error {
+func persistRecord(path string, plan runplan.Plan, eventsPath string, dropped ...uint64) error {
 	evidence, err := runstore.SummarizeEvents(eventsPath)
 	if err != nil {
 		return err
 	}
+	var droppedCount uint64
+	if len(dropped) > 0 {
+		droppedCount = dropped[0]
+	}
+	evidence = evidence.WithDropped(droppedCount)
 	return runstore.Write(path, runstore.Record{Plan: plan, EventsPath: eventsPath, Events: evidence})
 }
 
@@ -315,6 +320,8 @@ type telemetryAdapter struct {
 	done     chan struct{}
 	once     sync.Once
 	closeErr error
+	dropped  uint64
+	dropErr  error
 }
 
 func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, pid uint32) (io.Closer, error) {
@@ -371,16 +378,23 @@ func (a *telemetryAdapter) Close() error {
 			// record. Give the userspace reader a bounded drain window before
 			// closing the map, otherwise short runs can lose every event.
 			time.Sleep(100 * time.Millisecond)
+			a.dropped, a.dropErr = session.Dropped()
 			a.closeErr = session.Close()
 		}
 		if done != nil {
 			<-done
 		}
 		if file != nil {
-			a.closeErr = errors.Join(a.closeErr, file.Close())
+			a.closeErr = errors.Join(a.closeErr, a.dropErr, file.Close())
 		}
 	})
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.closeErr
+}
+
+func (a *telemetryAdapter) Dropped() uint64 {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	return a.dropped
 }

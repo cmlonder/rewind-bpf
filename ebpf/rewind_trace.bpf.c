@@ -13,6 +13,16 @@ struct {
 	__uint(max_entries, 1 << 24);
 } rewind_events SEC(".maps");
 
+/* A ring buffer reserve can fail under pressure. Keep the loss signal in a
+ * per-CPU counter so the userspace journal can distinguish an empty stream
+ * from an incomplete one without adding work to the hot path. */
+struct {
+	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+	__uint(max_entries, 1);
+	__type(key, __u32);
+	__type(value, __u64);
+} rewind_dropped SEC(".maps");
+
 // The userspace loader must set this before starting an agent run. A value of
 // zero is useful for a controlled telemetry smoke test, but production runs
 // should always scope events to the agent PID or cgroup.
@@ -61,8 +71,13 @@ static __always_inline int emit_event(__u32 operation, __u32 risk,
 		return 0;
 
 	event = bpf_ringbuf_reserve(&rewind_events, sizeof(*event), 0);
-	if (!event)
+	if (!event) {
+		__u32 key = 0;
+		__u64 *dropped = bpf_map_lookup_elem(&rewind_dropped, &key);
+		if (dropped)
+			(*dropped)++;
 		return 0;
+	}
 
 	event->pid = (__u32)(bpf_get_current_pid_tgid() >> 32);
 	event->operation = operation;
