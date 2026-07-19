@@ -73,8 +73,9 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "NEXT", title: "P1: policy and evidence depth", status: "In progress", body: "Policy learn, bounded evidence, ordered JSONL rotation, cgroup resource budgets, fail-closed network semantics, and a standalone evidence verifier are shipped. Next: an enforceable network backend, conflict-checked commit, backpressure, and signed or remote evidence." },
-    { phase: "AFTER", title: "P2: product surface", status: "Planned", body: "Portable signed profiles, content-addressed retention, a detachable supervisor, credential injection, remote evidence, and Linux distribution packaging." },
+    { phase: "NEXT", title: "P1: invisible secrets + explicit accept", status: "Next", body: "Make discard the default outcome, add a scoped credential broker and enforceable egress plane, then ship conflict-checked patch/branch acceptance. No raw credential enters the agent workspace." },
+    { phase: "PLATFORM", title: "P2: native macOS + Windows", status: "Planned", body: "Implement native transaction and policy adapters behind the same four promises: immutable project, invisible secrets, explicit acceptance, and fail-closed trust. WSL2 remains compatibility, not Windows host protection." },
+    { phase: "LATER", title: "P3: durable history + supervisor", status: "Planned", body: "Only after the safety core is stable: persistent checkpoints, retention, detachable sessions, signed profiles, remote evidence, and thin agent integrations." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],

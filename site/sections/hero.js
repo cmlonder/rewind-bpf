@@ -4,8 +4,8 @@ export function Hero() {
   return `<section class="hero section-shell" id="top" aria-labelledby="hero-title">
     <div class="hero-copy reveal">
       <div class="eyebrow"><span class="pulse-dot"></span>${siteData.status.label}<span class="eyebrow-rule"></span>${siteData.status.sublabel}</div>
-      <h1 id="hero-title">Give an agent<br /><em>an undo button.</em></h1>
-      <p class="hero-lede">RewindBPF is a Linux runtime that turns an autonomous agent’s filesystem session into a reversible, policy-controlled transaction.</p>
+      <h1 id="hero-title">Let agents work.<br /><em>Keep project and secrets yours.</em></h1>
+      <p class="hero-lede">RewindBPF gives an autonomous agent a disposable write layer and a policy-hidden view of sensitive paths, then asks for explicit acceptance before anything becomes permanent.</p>
       <div class="hero-actions"><a class="button button-primary" href="#system">See the system <span>↓</span></a><a class="button button-secondary" href="#benchmarks">Read the evidence <span>↗</span></a></div>
       <div class="hero-proof"><span class="proof-line"></span><span>Hot path: observe.</span><span>Slow path: copy-on-write.</span></div>
     </div>
