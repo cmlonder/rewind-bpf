@@ -24,7 +24,7 @@ Three separate cold B4 protected runs measured 25,606 KiB/s read and 10,931 KiB/
 
 ## Telemetry result
 
-The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. A follow-up shell-to-`dd` smoke generated 46 events across two PIDs (15 `write`, 30 `openat`, and one `execve`), confirming descendant tracking. The Phase 2 sensor-gate smoke generated 77 events (14,428 bytes) with `dropped=0`; a destructive synthetic smoke generated 39 events (7,334 bytes) with `dropped=0`. A background-child test failed closed at the cgroup drain gate and rolled back cleanly. Cgroup-v2 is now the primary run scope; PID tracking remains the event-correlation fallback.
+The direct-fio PID validation generated 16,620 events in a 2,467,528-byte JSONL log: 16,403 `write`, 216 `openat`, and one `unlinkat`. A follow-up shell-to-`dd` smoke generated 46 events across two PIDs (15 `write`, 30 `openat`, and one `execve`), confirming descendant tracking. The Phase 2 sensor-gate smoke generated 77 events (14,428 bytes) with `dropped=0`; a destructive synthetic smoke generated 39 events (7,334 bytes) with `dropped=0`. Each new event record carries a sequence number and userspace hash-chain link; the run record also stores a final SHA-256 over the JSONL stream. A background-child test failed closed at the cgroup drain gate and rolled back cleanly. Cgroup-v2 is now the primary run scope; PID tracking remains the event-correlation fallback.
 
 The static footprint was 5,670,919 bytes for the `rewind` binary and 21,352 bytes for the compiled eBPF object. The run record was 746 bytes. The telemetry stream averaged approximately 148.5 bytes per event for this JSONL format.
 

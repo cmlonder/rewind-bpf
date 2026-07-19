@@ -25,6 +25,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/protectedrun"
 	"github.com/rewindbpf/rewind/internal/runplan"
 	"github.com/rewindbpf/rewind/internal/runstore"
+	"github.com/rewindbpf/rewind/internal/telemetry"
 )
 
 func handleRun(args []string) {
@@ -322,6 +323,7 @@ type telemetryAdapter struct {
 	closeErr error
 	dropped  uint64
 	dropErr  error
+	chain    telemetry.Chain
 }
 
 func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, pid uint32) (io.Closer, error) {
@@ -359,7 +361,14 @@ func (a *telemetryAdapter) readLoop() {
 		if err != nil {
 			return
 		}
-		if err := encoder.Encode(value); err != nil {
+		journal, err := a.chain.Append(value)
+		if err != nil {
+			a.mu.Lock()
+			a.closeErr = err
+			a.mu.Unlock()
+			return
+		}
+		if err := encoder.Encode(journal); err != nil {
 			a.mu.Lock()
 			a.closeErr = err
 			a.mu.Unlock()

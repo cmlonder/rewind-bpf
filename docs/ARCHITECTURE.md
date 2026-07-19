@@ -298,7 +298,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 7 benchmarks | Complete for MVP evidence | Warm/cold B0/B2/B4 results, storage footprint, telemetry growth, and charts are recorded in `benchmarks/RESULTS.md`; broader B1–B5 coverage is Phase 2 work |
 | Phase 2 P0 transaction journal | VM smoke complete | Prepared record, `mounted` lifecycle state, idempotent rollback/recovery, invoker-owned metadata, cgroup path, capability report, and parent-`SIGKILL` recovery are implemented; broader fault coverage remains |
 | Phase 2 process scope | VM smoke complete | cgroup-v2 scope is created per run, helper PID is admitted before release, descendants inherit the scope, and stale scopes are cleaned during rollback |
-| Phase 2 telemetry evidence | VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, and complete flag are persisted; rotation and hash chaining remain |
+| Phase 2 telemetry evidence | VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, sequence/hash chain, and complete flag are persisted; rotation and independent verification remain |
 | Phase 2 merged diff | Implemented | `rewind diff --record PATH` compares the start manifest with the live merged view without mutating either tree |
 
 ### Initial B0 baseline (disposable VM)

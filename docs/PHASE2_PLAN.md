@@ -47,10 +47,10 @@ The first P0 slice is now implemented and verified in the disposable VM:
 - Read-only `capabilities` probe persisted in the run plan.
 - Invoker-owned record and event log after privileged execution.
 - Helper start gate that releases the agent only after sensor attachment.
-- Event count, byte count, SHA-256 digest, kernel-side dropped-event count, and complete/truncated JSONL evidence flag.
+- Event count, byte count, SHA-256 digest, kernel-side dropped-event count, sequence numbers, a userspace hash chain, and complete/truncated JSONL evidence flag.
 - Read-only `diff --record` manifest comparison for a live merged view.
 
-The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. Remaining P0 items are open-descriptor semantics and broader lifecycle fault coverage; ring-buffer loss accounting is implemented, while bounded rotation and tamper-evident chaining remain P1.
+The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. Remaining P0 items are open-descriptor semantics and broader lifecycle fault coverage; bounded rotation and independent evidence verification remain P1.
 
 ## 3. Research and competitive findings
 
