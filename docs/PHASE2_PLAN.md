@@ -30,6 +30,16 @@ P0 is now organized by user outcome, with a runtime workstream and a matching Co
 
 P0 scope excludes durable snapshot history, detachable sessions, registry features, and local authentication. Those are post-demo/productisation work unless required by a connected deployment boundary.
 
+### P1 implementation boundary
+
+The first product-core slice adds three explicit, portable contracts:
+
+- `internal/netpolicy` compiles allowlisted domains into pure preview decisions. It does not claim kernel egress enforcement until a platform backend exists.
+- `internal/credentials` exposes capability references and a refusing broker. Raw values have no representation in policy, leases, argv, or workspace files.
+- `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before any future apply operation.
+
+The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This keeps the demo honest while preserving the API shape for native backends.
+
 This is deliberately narrower than “protect the whole operating system” or “zero overhead.” OverlayFS protects filesystem changes inside the selected boundary. Landlock protects the selected read/write hierarchy. eBPF supplies low-cost telemetry and optional enforcement where the kernel supports it. Network, kernel state, devices, external services, and already-open descriptors remain explicit safety boundaries.
 
 ## 2. What the MVP proved, and what it did not

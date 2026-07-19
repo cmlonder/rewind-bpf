@@ -67,3 +67,28 @@ func TestResourcePolicyRejectsInvalidLimits(t *testing.T) {
 		t.Fatal("short cpu.max should fail validation")
 	}
 }
+
+func TestNetworkPolicyParsesDomainsAndCredentialReferences(t *testing.T) {
+	value, err := Parse([]byte("network:\n  mode: audit\n  allow_domains:\n    - api.example.com\n  credentials:\n    - name: github\n      scopes: [read:org]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(value.Network.AllowDomains) != 1 || value.Network.AllowDomains[0] != "api.example.com" {
+		t.Fatalf("unexpected domains: %+v", value.Network.AllowDomains)
+	}
+	if len(value.Network.CredentialRefs) != 1 || value.Network.CredentialRefs[0].Name != "github" {
+		t.Fatalf("unexpected credentials: %+v", value.Network.CredentialRefs)
+	}
+}
+
+func TestNetworkPolicyRejectsUnsafeDomainsAndDuplicateCredentials(t *testing.T) {
+	for _, input := range []string{
+		"network:\n  allow_domains: ['https://example.com']\n",
+		"network:\n  allow_domains: ['example..com']\n",
+		"network:\n  credentials:\n    - name: github\n      scopes: [read]\n    - name: github\n      scopes: [write]\n",
+	} {
+		if _, err := Parse([]byte(input)); err == nil {
+			t.Fatalf("expected policy validation error for %q", input)
+		}
+	}
+}

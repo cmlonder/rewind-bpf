@@ -37,7 +37,16 @@ type WritePolicy struct {
 }
 
 type NetworkPolicy struct {
-	Mode Mode `yaml:"mode" json:"mode"`
+	Mode           Mode            `yaml:"mode" json:"mode"`
+	AllowDomains   []string        `yaml:"allow_domains" json:"allow_domains"`
+	CredentialRefs []CredentialRef `yaml:"credentials" json:"credentials"`
+}
+
+// CredentialRef names a broker-managed capability. The raw secret is never a
+// policy value and must not be placed in argv, the workspace, or this struct.
+type CredentialRef struct {
+	Name   string   `yaml:"name" json:"name"`
+	Scopes []string `yaml:"scopes" json:"scopes"`
 }
 
 // ResourcePolicy maps directly to cgroup-v2 limits. Values are strings so the
@@ -82,6 +91,9 @@ func (p Policy) Validate() error {
 	if err := validateMode("network.mode", p.Network.Mode, true); err != nil {
 		return err
 	}
+	if err := p.Network.Validate(); err != nil {
+		return err
+	}
 	if p.Write.Mode != "" && p.Write.Mode != "rollback" {
 		return fmt.Errorf("write.mode must be rollback when set, got %q", p.Write.Mode)
 	}
@@ -89,6 +101,44 @@ func (p Policy) Validate() error {
 		return fmt.Errorf("write.scope must be workspace or system when set, got %q", p.Write.Scope)
 	}
 	return p.Resources.Validate()
+}
+
+func (n NetworkPolicy) Validate() error {
+	for _, domain := range n.AllowDomains {
+		if err := validateDomain(domain); err != nil {
+			return fmt.Errorf("network.allow_domains: %w", err)
+		}
+	}
+	seen := make(map[string]struct{}, len(n.CredentialRefs))
+	for _, ref := range n.CredentialRefs {
+		name := strings.TrimSpace(ref.Name)
+		if name == "" {
+			return fmt.Errorf("network.credentials name cannot be empty")
+		}
+		if _, ok := seen[name]; ok {
+			return fmt.Errorf("network.credentials contains duplicate %q", name)
+		}
+		seen[name] = struct{}{}
+		for _, scope := range ref.Scopes {
+			if strings.TrimSpace(scope) == "" {
+				return fmt.Errorf("network.credentials[%s] scope cannot be empty", name)
+			}
+		}
+	}
+	return nil
+}
+
+func validateDomain(value string) error {
+	domain := strings.ToLower(strings.TrimSpace(value))
+	if domain == "" || strings.ContainsAny(domain, "/ @") || strings.Contains(domain, "..") || strings.HasPrefix(domain, ".") || strings.HasSuffix(domain, ".") {
+		return fmt.Errorf("invalid domain %q", value)
+	}
+	for _, part := range strings.Split(domain, ".") {
+		if part == "" || strings.HasPrefix(part, "-") || strings.HasSuffix(part, "-") {
+			return fmt.Errorf("invalid domain %q", value)
+		}
+	}
+	return nil
 }
 
 func (r ResourcePolicy) Validate() error {
