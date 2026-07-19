@@ -308,27 +308,41 @@ Live events use SSE first, with polling as a fallback. The supervisor owns Unix-
 - Respect `prefers-reduced-motion` and preserve functional status feedback.
 - Implement default, hover, focus-visible, active, disabled, loading, error, and success states for every action.
 
-## 11. Implementation phases and exit criteria
+## 11. Current implementation status
 
-### Phase 1 — Fixture-driven control room
+The dependency-free `ui/` prototype now covers the Phase 1 control room and the fixture-safe portion of Phases 2–3:
+
+- transaction search/filtering and run-detail navigation;
+- rollback, recover, and export confirmation dialogs with explicit impact copy;
+- policy package creation, selection, preview copy, and deterministic simulation;
+- workspace creation/editing, policy assignment, and boundary-test feedback;
+- revisioned global configuration controls with active-run isolation;
+- evidence, benchmark, and audit surfaces suitable for a jury walkthrough;
+- responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
+
+The remaining work is the connected supervisor contract: persistent storage, Unix-socket authorization, live SSE/polling, signed policy packages, conflict-checked commit, and end-to-end reconnect/recovery behavior. Those belong to the runtime/API boundary, not to a browser-only fixture.
+
+## 12. Implementation phases and exit criteria
+
+### Phase 1 — Fixture-driven control room — delivered
 
 Deliver Overview, Runs, Run Detail, timeline, filesystem diff, evidence panel, action rail, fixture adapter, responsive shell, and accessibility baseline.
 
 Exit: a juror can follow a synthetic destructive run from start to rollback without reading the CLI.
 
-### Phase 2 — Safe local actions
+### Phase 2 — Safe local actions — fixture slice delivered
 
 Add rollback, recover, export, progress states, native dialog confirmations, and action audit fixtures.
 
 Exit: every action has a visible safety explanation and deterministic success/error state.
 
-### Phase 3 — Policy and configuration
+### Phase 3 — Policy and configuration — fixture slice delivered
 
 Add global config, policy package CRUD, workspace assignments, effective-policy resolver, policy simulation, revision history, and audit log.
 
 Exit: an operator can create a package, simulate it, assign it to a workspace, and see the immutable snapshot used by a new run.
 
-### Phase 4 — Supervisor integration
+### Phase 4 — Supervisor integration — next runtime boundary
 
 Add `rewindd`, Unix-socket API, SSE event stream, local authorization, signed packages, and persistent action audit.
 
@@ -338,7 +352,7 @@ Exit: UI state matches runtime state under refresh, reconnect, supervisor restar
 
 Add remote package registry, organization profiles, role-based approval, signed/remote evidence, Linux packaging, and conflict-checked commit.
 
-## 12. What the UI must not become
+## 13. What the UI must not become
 
 - A generic card-grid SaaS dashboard.
 - A terminal emulator with root privileges.
@@ -347,7 +361,7 @@ Add remote package registry, organization profiles, role-based approval, signed/
 - A commit button before conflict-safe merge semantics exist.
 - A second, divergent policy source that disagrees with the CLI/runtime.
 
-## 13. First code slice
+## 14. First code slice
 
 The first implementation keeps the current dependency-free ES module approach and adds a separate `ui/` application. It ships:
 

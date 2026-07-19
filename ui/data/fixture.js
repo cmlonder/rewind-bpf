@@ -40,6 +40,16 @@ export const fixture = {
     { name: "developer-safe", version: "0.8.2", state: "available", description: "Fast iteration with sensitive-read audit", reads: "audit", writes: "rollback", network: "off", assigned: 1, updated: "Yesterday" },
     { name: "hackathon-demo", version: "0.4.0", state: "available", description: "Small, explainable profile for the live jury flow", reads: "enforce", writes: "rollback", network: "audit", assigned: 1, updated: "Jul 18" },
   ],
+  workspaces: [
+    { name: "payments-api", path: "/workspaces/payments-api", policy: "strict-agent@1.3.0", status: "protected", lastRun: "08e0ef80", agent: "agent --task refactor-auth", network: "audit" },
+    { name: "rewind-demo", path: "/workspaces/rewind-demo", policy: "hackathon-demo@0.4.0", status: "protected", lastRun: "d1b08d60", agent: "demo-agent --dangerous", network: "audit" },
+    { name: "docs-site", path: "/workspaces/docs-site", policy: "developer-safe@0.8.2", status: "protected", lastRun: "—", agent: "agent --task docs", network: "off" },
+    { name: "scratch", path: "/workspaces/scratch", policy: "none", status: "unassigned", lastRun: "—", agent: "not configured", network: "off" },
+  ],
+  config: {
+    revision: 42,
+    values: { overlay: "fuse-overlayfs", readMode: "enforce", writeMode: "rollback", network: "audit", eventCap: "unlimited", rotation: "512 KiB", retention: "7 days", truncation: "fail closed" },
+  },
   effectivePolicy: [["read.mode", "enforce", "strict-agent@1.3.0"], ["read.deny", "**/*.env · **/*.pem · /home/*/.ssh/**", "package"], ["write.mode", "rollback", "global default"], ["write.scope", "workspace", "workspace override"], ["network.mode", "audit", "package"], ["resources", "256 PIDs · 512 MiB · 50% CPU", "global default"]],
   audit: [["10:42:18", "Run started", "strict-agent@1.3.0", "system"], ["10:41:52", "Policy assigned", "payments-api", "cemal"], ["10:39:10", "Evidence exported", "run_d1b08d60", "cemal"]],
 };
