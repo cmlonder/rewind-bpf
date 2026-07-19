@@ -185,7 +185,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Add `audit` mode that records denied-intent events without blocking; add `enforce` mode that denies before the operation.
 - Keep Landlock as the default unprivileged filesystem enforcement backend.
 - Add an optional BPF-LSM enforcement adapter for kernels with active `bpf` LSM; never silently select it when `/sys/kernel/security/lsm` does not contain `bpf`.
-- Add a policy “learn” command that converts observed paths into a reviewable allowlist; never auto-allow secrets or broad parent directories.
+- Add a policy “learn” command that converts observed paths into a reviewable allowlist; never auto-allow secrets or broad parent directories. The read-only `policy explain` preview is implemented first, with deny-before-allow precedence.
 
 **Tests**
 

@@ -110,6 +110,7 @@ make test
 ./bin/rewind manifest create /tmp/rewind-fixture /tmp/rewind-manifest.json
 ./bin/rewind manifest verify /tmp/rewind-fixture /tmp/rewind-manifest.json
 ./bin/rewind policy check policies/example.yaml
+./bin/rewind policy explain policies/example.yaml /workspace/.env
 ```
 
 The `run`, `status`, `events`, and `rollback` commands are now wired for the disposable Linux VM. `commit` remains intentionally disabled until diff/export semantics are implemented and verified.

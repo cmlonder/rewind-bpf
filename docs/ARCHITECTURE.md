@@ -354,9 +354,9 @@ Stage 1 is intentionally host-safe and kernel-free:
 
 - `internal/fixture` creates synthetic workspace, fake secret, and fake PII files.
 - `internal/manifest` records portable file structure, mode, size, symlink target, and SHA-256 content hashes.
-- `internal/policy` parses YAML, validates `off/audit/enforce`, supports recursive `**` globs, and evaluates allow-over-deny decisions.
+- `internal/policy` parses YAML, validates `off/audit/enforce`, supports recursive `**` globs, and evaluates deterministic deny-before-allow decisions.
 - `internal/runid` creates unique run identifiers for later lifecycle state.
-- The CLI supports `fixture create`, `manifest create`, `manifest verify`, and `policy check`.
+- The CLI supports `fixture create`, `manifest create`, `manifest verify`, `policy check`, and read-only `policy explain` previews.
 
 Verified Stage 1 commands:
 
@@ -579,7 +579,7 @@ This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PI
 
 `internal/policycompile` expands the user-facing read globs against the start-of-run manifest and returns deterministic exact-path rules. This keeps glob matching and filesystem traversal in userspace; the future BPF-LSM program will receive bounded fixed-size keys instead of arbitrary patterns.
 
-The compiler preserves allow-over-deny precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. In `enforce` mode it also emits deterministic allowed-file and allowed-directory lists for Landlock’s allowlist model. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.
+The compiler preserves deny-before-allow precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. In `enforce` mode it also emits deterministic allowed-file and allowed-directory lists for Landlock’s allowlist model. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.
 
 ## 28. Stage 5 read enforcement preparation
 

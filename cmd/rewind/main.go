@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,6 +27,7 @@ Usage:
   rewind sensor attach --object PATH --run-id ID --pid PID   (VM-only telemetry smoke test)
   rewind helper [--plan-file PATH] -- <agent-command>       (internal child helper)
   rewind policy check <policy.yaml>
+  rewind policy explain <policy.yaml> <path>
   rewind fixture create <directory>
   rewind manifest create <directory> [manifest.json]
   rewind manifest verify <directory> <manifest.json>
@@ -144,14 +146,29 @@ func handleManifest(args []string) {
 }
 
 func handlePolicy(args []string) {
-	if len(args) != 2 || args[0] != "check" {
-		fatal("usage: rewind policy check <policy.yaml>")
+	if len(args) < 2 {
+		fatal("usage: rewind policy check <policy.yaml> | rewind policy explain <policy.yaml> <path>")
 	}
 	value, err := policy.Load(args[1])
 	if err != nil {
 		fatal(err.Error())
 	}
-	fmt.Printf("policy valid: read=%s deny=%d allow=%d network=%s\n", value.Read.Mode, len(value.Read.Deny), len(value.Read.Allow), value.Network.Mode)
+	switch args[0] {
+	case "check":
+		if len(args) != 2 {
+			fatal("usage: rewind policy check <policy.yaml>")
+		}
+		fmt.Printf("policy valid: read=%s deny=%d allow=%d network=%s\n", value.Read.Mode, len(value.Read.Deny), len(value.Read.Allow), value.Network.Mode)
+	case "explain":
+		if len(args) != 3 {
+			fatal("usage: rewind policy explain <policy.yaml> <path>")
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(value.Read.Explain(args[2])); err != nil {
+			fatal(fmt.Sprintf("encode policy explanation: %v", err))
+		}
+	default:
+		fatal("unknown policy command")
+	}
 }
 
 func fatal(message string) {

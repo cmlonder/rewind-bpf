@@ -22,10 +22,10 @@ func TestMatchSupportsRecursivePatterns(t *testing.T) {
 	}
 }
 
-func TestReadPolicyModesAndAllowOverride(t *testing.T) {
+func TestReadPolicyModesAndDenyPrecedence(t *testing.T) {
 	read := ReadPolicy{Mode: ModeEnforce, Deny: []string{"**/.env"}, Allow: []string{"/workspace/.env"}}
-	if got := read.Decision("/workspace/.env"); got != "allow" {
-		t.Fatalf("allow override: got %q", got)
+	if got := read.Decision("/workspace/.env"); got != "deny" {
+		t.Fatalf("deny must beat allow: got %q", got)
 	}
 	if got := read.Decision("/other/.env"); got != "deny" {
 		t.Fatalf("deny decision: got %q", got)
@@ -33,6 +33,10 @@ func TestReadPolicyModesAndAllowOverride(t *testing.T) {
 	read.Mode = ModeAudit
 	if got := read.Decision("/other/.env"); got != "audit" {
 		t.Fatalf("audit decision: got %q", got)
+	}
+	explanation := read.Explain("/workspace/.env")
+	if explanation.Rule != "deny" || explanation.MatchedPattern != "**/.env" || explanation.Decision != "audit" {
+		t.Fatalf("unexpected explanation: %+v", explanation)
 	}
 }
 

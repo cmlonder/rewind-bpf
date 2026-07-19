@@ -38,6 +38,13 @@ type NetworkPolicy struct {
 	Mode Mode `yaml:"mode" json:"mode"`
 }
 
+type DecisionExplanation struct {
+	Path           string `json:"path"`
+	Decision       string `json:"decision"`
+	MatchedPattern string `json:"matched_pattern,omitempty"`
+	Rule           string `json:"rule"`
+}
+
 func Load(path string) (Policy, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -115,24 +122,35 @@ func Match(pattern, candidate string) bool {
 }
 
 func (p ReadPolicy) Decision(candidate string) string {
-	for _, pattern := range p.Allow {
-		if Match(pattern, candidate) {
-			return "allow"
-		}
-	}
+	return p.Explain(candidate).Decision
+}
+
+// Explain applies deny-before-allow precedence and returns the exact rule
+// that produced the decision. This is used by policy preview tooling so a
+// user can review a pattern without launching an agent.
+func (p ReadPolicy) Explain(candidate string) DecisionExplanation {
+	result := DecisionExplanation{Path: candidate, Decision: "allow", Rule: "default"}
 	for _, pattern := range p.Deny {
 		if Match(pattern, candidate) {
+			result.MatchedPattern = pattern
+			result.Rule = "deny"
 			switch p.Mode {
 			case ModeAudit:
-				return "audit"
+				result.Decision = "audit"
 			case ModeEnforce:
-				return "deny"
-			default:
-				return "allow"
+				result.Decision = "deny"
 			}
+			return result
 		}
 	}
-	return "allow"
+	for _, pattern := range p.Allow {
+		if Match(pattern, candidate) {
+			result.MatchedPattern = pattern
+			result.Rule = "allow"
+			return result
+		}
+	}
+	return result
 }
 
 func split(value string) []string {
