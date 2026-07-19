@@ -321,14 +321,16 @@ func handleVerify(args []string) {
 	chainValid := telemetry.Verify(journal)
 	matchesRecord := evidence.Count == record.Events.Count && evidence.Bytes == record.Events.Bytes && evidence.SHA256 == record.Events.SHA256 && evidence.Complete == record.Events.Complete
 	result := struct {
-		RunID         string `json:"run_id"`
-		Count         uint64 `json:"count"`
-		Bytes         uint64 `json:"bytes"`
-		Dropped       uint64 `json:"dropped"`
-		Complete      bool   `json:"complete"`
-		ChainValid    bool   `json:"chain_valid"`
-		MatchesRecord bool   `json:"matches_record"`
-	}{record.Plan.Run.ID, evidence.Count, evidence.Bytes, record.Events.Dropped, evidence.Complete, chainValid, matchesRecord}
+		RunID          string `json:"run_id"`
+		Count          uint64 `json:"count"`
+		Bytes          uint64 `json:"bytes"`
+		Dropped        uint64 `json:"dropped"`
+		Complete       bool   `json:"complete"`
+		StreamComplete bool   `json:"stream_complete"`
+		RecordComplete bool   `json:"record_complete"`
+		ChainValid     bool   `json:"chain_valid"`
+		MatchesRecord  bool   `json:"matches_record"`
+	}{record.Plan.Run.ID, evidence.Count, evidence.Bytes, record.Events.Dropped, evidence.Complete && record.Events.Complete && record.Events.Dropped == 0 && chainValid && matchesRecord, evidence.Complete, record.Events.Complete, chainValid, matchesRecord}
 	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
 		fatal(err.Error())
 	}
