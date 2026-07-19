@@ -100,6 +100,13 @@ Implement patch/branch export and conflict-checked apply. Acceptance must compar
 
 ### Track D — Native platform adapters
 
+The cross-platform implementation is capability-driven and fail-closed. The
+shared policy, manifest, evidence, and acceptance schemas are portable; the
+transaction backend is not assumed portable. macOS uses a planned
+Seatbelt/EndpointSecurity + APFS adapter, while Windows uses a planned native
+process/filesystem policy + disposable-workspace adapter. WSL2 is explicitly a
+compatibility path, not Windows-host protection.
+
 Preserve one user-facing contract while using native primitives per platform:
 
 - Linux: OverlayFS/FUSE + Landlock/eBPF + cgroup-v2.
