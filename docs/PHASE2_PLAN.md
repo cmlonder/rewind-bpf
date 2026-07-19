@@ -33,7 +33,7 @@ This is deliberately narrower than “protect the whole operating system” or �
 2. Cgroup-v2 is now the primary process identity and drain boundary; PID descendant tracking remains in the eBPF sensor for event correlation and compatibility.
 3. The event stream is JSONL and can grow much faster than the run record; kernel-side reserve failures are now counted and make evidence incomplete, while backpressure, rotation, and tamper evidence remain future work.
 4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
-5. There is no conflict-aware `commit`/export path. “Discard upper” is safe; merging arbitrary agent changes into a live workspace is not yet safe.
+5. There is no conflict-aware `commit` path. “Discard upper” is safe; the review-only `export` path is implemented, while merging arbitrary agent changes into a live workspace is not yet safe.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
 7. Network and capability policy are represented in the policy model but are not equivalent to filesystem rollback.
 
@@ -50,7 +50,7 @@ The first P0 slice is now implemented and verified in the disposable VM:
 - Event count, byte count, SHA-256 digest, kernel-side dropped-event count, sequence numbers, a userspace hash chain, and complete/truncated JSONL evidence flag.
 - Read-only `diff --record` manifest comparison for a live merged view.
 
-The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. An open-descriptor crash smoke wrote through fd 9 in the merged layer, was forcibly terminated, and recovered with the lower marker unchanged. A VM-only small-ring stress test intentionally dropped 37 events from 50,000 writes; the run record remained `dropped=37`, `complete=false` after rollback, and `rewind verify` exited 2. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. Remaining P0 work is broader lifecycle fault coverage; bounded rotation and independent evidence verification remain P1.
+The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. An open-descriptor crash smoke wrote through fd 9 in the merged layer, was forcibly terminated, and recovered with the lower marker unchanged. A VM-only small-ring stress test intentionally dropped 37 events from 50,000 writes; the run record remained `dropped=37`, `complete=false` after rollback, and `rewind verify` exited 2. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. The review-only `rewind export` path and `policy learn` suggestion workflow are now implemented; remaining P0 work is broader lifecycle fault coverage, while bounded rotation and independent evidence verification remain P1.
 
 ## 3. Research and competitive findings
 
@@ -187,7 +187,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Add `audit` mode that records denied-intent events without blocking; add `enforce` mode that denies before the operation.
 - Keep Landlock as the default unprivileged filesystem enforcement backend.
 - Add an optional BPF-LSM enforcement adapter for kernels with active `bpf` LSM; never silently select it when `/sys/kernel/security/lsm` does not contain `bpf`.
-- Add a policy “learn” command that converts observed paths into a reviewable allowlist; never auto-allow secrets or broad parent directories. The read-only `policy explain` preview is implemented first, with deny-before-allow precedence.
+- Add a policy “learn” command that converts observed paths into a reviewable allowlist; never auto-allow secrets or broad parent directories. Implemented: output defaults to `audit`, refuses to overwrite an existing file, and filters secret-like, virtual, and broad paths. The read-only `policy explain` preview keeps deny-before-allow precedence.
 
 **Tests**
 

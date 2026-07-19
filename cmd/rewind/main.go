@@ -2,13 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
 	"github.com/rewindbpf/rewind/internal/fixture"
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/policy"
+	"github.com/rewindbpf/rewind/internal/policylearn"
 )
 
 const usage = `RewindBPF — AI Agent Safety Runtime
@@ -29,6 +32,7 @@ Usage:
   rewind helper [--plan-file PATH] -- <agent-command>       (internal child helper)
   rewind policy check <policy.yaml>
   rewind policy explain <policy.yaml> <path>
+  rewind policy learn --events PATH --output PATH [--max-paths N]
   rewind fixture create <directory>
   rewind manifest create <directory> [manifest.json]
   rewind manifest verify <directory> <manifest.json>
@@ -149,29 +153,69 @@ func handleManifest(args []string) {
 }
 
 func handlePolicy(args []string) {
-	if len(args) < 2 {
-		fatal("usage: rewind policy check <policy.yaml> | rewind policy explain <policy.yaml> <path>")
-	}
-	value, err := policy.Load(args[1])
-	if err != nil {
-		fatal(err.Error())
+	if len(args) == 0 {
+		fatal("usage: rewind policy check <policy.yaml> | rewind policy explain <policy.yaml> <path> | rewind policy learn --events PATH --output PATH")
 	}
 	switch args[0] {
 	case "check":
 		if len(args) != 2 {
 			fatal("usage: rewind policy check <policy.yaml>")
 		}
+		value, err := policy.Load(args[1])
+		if err != nil {
+			fatal(err.Error())
+		}
 		fmt.Printf("policy valid: read=%s deny=%d allow=%d network=%s\n", value.Read.Mode, len(value.Read.Deny), len(value.Read.Allow), value.Network.Mode)
 	case "explain":
 		if len(args) != 3 {
 			fatal("usage: rewind policy explain <policy.yaml> <path>")
 		}
+		value, err := policy.Load(args[1])
+		if err != nil {
+			fatal(err.Error())
+		}
 		if err := json.NewEncoder(os.Stdout).Encode(value.Read.Explain(args[2])); err != nil {
 			fatal(fmt.Sprintf("encode policy explanation: %v", err))
 		}
+	case "learn":
+		handlePolicyLearn(args[1:])
 	default:
 		fatal("unknown policy command")
 	}
+}
+
+func handlePolicyLearn(args []string) {
+	flags := flag.NewFlagSet("policy learn", flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	eventsPath := flags.String("events", "", "JSONL telemetry event path")
+	outputPath := flags.String("output", "-", "suggested policy output path, or - for stdout")
+	maxPaths := flags.Int("max-paths", policylearn.DefaultMaxPaths, "maximum exact paths to suggest")
+	if err := flags.Parse(args); err != nil {
+		fatal("usage: rewind policy learn --events PATH --output PATH [--max-paths N]")
+	}
+	if flags.NArg() != 0 || *eventsPath == "" || *maxPaths <= 0 {
+		fatal("usage: rewind policy learn --events PATH --output PATH [--max-paths N]")
+	}
+	file, err := os.Open(filepath.Clean(*eventsPath))
+	if err != nil {
+		fatal(fmt.Sprintf("open events: %v", err))
+	}
+	report, learnErr := policylearn.Learn(file, *maxPaths)
+	closeErr := file.Close()
+	if learnErr != nil {
+		fatal(learnErr.Error())
+	}
+	if closeErr != nil {
+		fatal(fmt.Sprintf("close events: %v", closeErr))
+	}
+	data, err := policylearn.Render(report)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := policylearn.WriteSuggestion(*outputPath, data); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Fprintf(os.Stderr, "policy suggestion: %d candidate paths from %d read events\n", len(report.Candidates), report.ReadEvents)
 }
 
 func fatal(message string) {

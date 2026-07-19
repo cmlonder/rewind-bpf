@@ -123,9 +123,10 @@ make test
 ./bin/rewind manifest verify /tmp/rewind-fixture /tmp/rewind-manifest.json
 ./bin/rewind policy check policies/example.yaml
 ./bin/rewind policy explain policies/example.yaml /workspace/.env
+./bin/rewind policy learn --events /tmp/rewind-events.jsonl --output /tmp/rewind-policy-suggestion.yaml
 ```
 
-The `run`, `status`, `events`, `verify`, `diff`, `export`, and `rollback` commands are wired for the disposable Linux VM. `commit` remains intentionally disabled until conflict-checked merge semantics are implemented and verified.
+The `run`, `status`, `events`, `verify`, `diff`, `export`, and `rollback` commands are wired for the disposable Linux VM. `policy learn` produces an audit-mode, review-only allowlist suggestion and skips secret-like, virtual, and broad paths. `commit` remains intentionally disabled until conflict-checked merge semantics are implemented and verified.
 
 VM-only run shape:
 
