@@ -300,10 +300,60 @@ func (m Manager) Unmount(ctx context.Context, l Layout) error {
 	if err := l.Validate(); err != nil {
 		return err
 	}
+	command := "umount"
+	args := []string{l.Merged}
 	if m.backend() == BackendFuse {
-		return m.runner().Run(ctx, "fusermount3", "-u", l.Merged)
+		command = "fusermount3"
+		args = []string{"-u", l.Merged}
 	}
-	return m.runner().Run(ctx, "umount", l.Merged)
+	// FUSE may still be completing the final userspace request when the agent
+	// exits. Give the mount a short, bounded settle window; never use a lazy
+	// unmount and never discard upper/work while the mount remains busy.
+	for attempt := 0; ; attempt++ {
+		err := m.runner().Run(ctx, command, args...)
+		if err == nil {
+			if _, realRunner := m.runner().(ExecRunner); realRunner {
+				if err := waitForUnmount(ctx, m.runner(), l.Merged); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+		if !unmountBusy(err) || attempt >= 20 {
+			return err
+		}
+		timer := time.NewTimer(25 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func waitForUnmount(ctx context.Context, runner Runner, mountpoint string) error {
+	for attempt := 0; attempt < 200; attempt++ {
+		if err := runner.Run(ctx, "mountpoint", "-q", mountpoint); err != nil {
+			return nil
+		}
+		timer := time.NewTimer(25 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	return fmt.Errorf("unmount %s did not settle before timeout", mountpoint)
+}
+
+func unmountBusy(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "device or resource busy") || strings.Contains(message, "resource busy")
 }
 
 // Rollback discards only the validated upper/work directories after unmount.

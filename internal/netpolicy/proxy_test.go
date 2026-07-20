@@ -2,6 +2,7 @@ package netpolicy
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -44,5 +45,35 @@ func TestProxyEnforcesAllowlistForHTTPClients(t *testing.T) {
 	_ = blocked.Body.Close()
 	if blocked.StatusCode != http.StatusForbidden {
 		t.Fatalf("blocked status=%d", blocked.StatusCode)
+	}
+}
+
+func TestProxyCloseDrainsActiveConnections(t *testing.T) {
+	plan, err := Compile(policy.NetworkPolicy{Mode: policy.ModeEnforce, AllowDomains: []string{"127.0.0.1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy, err := ListenProxy(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() { _ = proxy.Serve(ctx) }()
+	proxyURL, _ := url.Parse(proxy.URL())
+	conn, err := net.Dial("tcp", proxyURL.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	closed := make(chan error, 1)
+	go func() { closed <- proxy.Close() }()
+	select {
+	case err := <-closed:
+		if err != nil {
+			t.Fatalf("close proxy: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("proxy close did not drain active connection")
 	}
 }

@@ -7,13 +7,14 @@ import "fmt"
 type Operation string
 
 const (
-	Execve    Operation = "execve"
-	OpenAt    Operation = "openat"
-	Read      Operation = "read"
-	Write     Operation = "write"
-	UnlinkAt  Operation = "unlinkat"
-	RenameAt2 Operation = "renameat2"
-	Truncate  Operation = "truncate"
+	Execve         Operation = "execve"
+	OpenAt         Operation = "openat"
+	Read           Operation = "read"
+	Write          Operation = "write"
+	UnlinkAt       Operation = "unlinkat"
+	RenameAt2      Operation = "renameat2"
+	Truncate       Operation = "truncate"
+	NetworkConnect Operation = "network_connect"
 )
 
 // Numeric operation codes are the stable wire values used by the eBPF ring
@@ -27,6 +28,7 @@ const (
 	OperationCodeUnlinkAt
 	OperationCodeRenameAt2
 	OperationCodeTruncate
+	OperationCodeNetworkConnect
 )
 
 type Decision string
@@ -73,6 +75,8 @@ func OperationCode(value Operation) (uint32, bool) {
 		return OperationCodeRenameAt2, true
 	case Truncate:
 		return OperationCodeTruncate, true
+	case NetworkConnect:
+		return OperationCodeNetworkConnect, true
 	default:
 		return 0, false
 	}
@@ -94,6 +98,8 @@ func OperationFromCode(code uint32) (Operation, bool) {
 		return RenameAt2, true
 	case OperationCodeTruncate:
 		return Truncate, true
+	case OperationCodeNetworkConnect:
+		return NetworkConnect, true
 	default:
 		return "", false
 	}
@@ -189,7 +195,7 @@ func (e Event) Validate() error {
 
 func validOperation(value Operation) bool {
 	switch value {
-	case Execve, OpenAt, Read, Write, UnlinkAt, RenameAt2, Truncate:
+	case Execve, OpenAt, Read, Write, UnlinkAt, RenameAt2, Truncate, NetworkConnect:
 		return true
 	default:
 		return false

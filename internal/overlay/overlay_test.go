@@ -144,6 +144,36 @@ func TestFuseUnmountUsesFusermount(t *testing.T) {
 	}
 }
 
+type settlingRunner struct {
+	calls int
+}
+
+func (r *settlingRunner) Run(_ context.Context, command string, args ...string) error {
+	r.calls++
+	if command != "fusermount3" || len(args) != 2 || args[0] != "-u" {
+		return fmt.Errorf("unexpected unmount command %s %v", command, args)
+	}
+	if r.calls < 3 {
+		return fmt.Errorf("fusermount3: device or resource busy")
+	}
+	return nil
+}
+
+func TestFuseUnmountWaitsForBusyMountToSettle(t *testing.T) {
+	runner := &settlingRunner{}
+	layout, err := NewLayout(filepath.Join(t.TempDir(), "run"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager := Manager{Runner: runner, Backend: BackendFuse}
+	if err := manager.Unmount(context.Background(), layout); err != nil {
+		t.Fatal(err)
+	}
+	if runner.calls != 3 {
+		t.Fatalf("unmount attempts=%d, want 3", runner.calls)
+	}
+}
+
 func TestRollbackDoesNotRemoveLowerAndRequiresUnmount(t *testing.T) {
 	runner := &fakeRunner{}
 	layout, err := NewLayout(filepath.Join(t.TempDir(), "run"))

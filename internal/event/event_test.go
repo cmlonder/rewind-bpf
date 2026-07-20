@@ -67,6 +67,12 @@ func TestWireCodesAreStable(t *testing.T) {
 	if decoded, ok := OperationFromCode(OperationCodeRenameAt2); !ok || decoded != RenameAt2 {
 		t.Fatalf("decoded operation = %q, ok=%v", decoded, ok)
 	}
+	if operation, ok := OperationCode(NetworkConnect); !ok || operation != OperationCodeNetworkConnect {
+		t.Fatalf("network operation code = %d, ok=%v", operation, ok)
+	}
+	if decoded, ok := OperationFromCode(OperationCodeNetworkConnect); !ok || decoded != NetworkConnect {
+		t.Fatalf("decoded network operation = %q, ok=%v", decoded, ok)
+	}
 	if decoded, ok := DecisionFromCode(DecisionCodeDeny); !ok || decoded != Deny {
 		t.Fatalf("decoded decision = %q, ok=%v", decoded, ok)
 	}

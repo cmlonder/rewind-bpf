@@ -17,6 +17,8 @@ type Proxy struct {
 	ln     net.Listener
 	closed chan struct{}
 	mu     sync.Mutex
+	conns  map[net.Conn]struct{}
+	wg     sync.WaitGroup
 	Audit  func(host string, decision Decision)
 }
 
@@ -25,7 +27,7 @@ func ListenProxy(plan Plan) (*Proxy, error) {
 	if err != nil {
 		return nil, fmt.Errorf("listen network policy proxy: %w", err)
 	}
-	return &Proxy{Plan: plan, ln: ln, closed: make(chan struct{})}, nil
+	return &Proxy{Plan: plan, ln: ln, closed: make(chan struct{}), conns: make(map[net.Conn]struct{})}, nil
 }
 
 func (p *Proxy) URL() string {
@@ -50,7 +52,14 @@ func (p *Proxy) Serve(ctx context.Context) error {
 			}
 			return fmt.Errorf("accept network policy proxy: %w", err)
 		}
-		go p.handle(conn)
+		if !p.track(conn) {
+			continue
+		}
+		go func() {
+			defer p.wg.Done()
+			defer p.untrack(conn)
+			p.handle(conn)
+		}()
 	}
 }
 
@@ -59,14 +68,50 @@ func (p *Proxy) Close() error {
 		return nil
 	}
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	select {
 	case <-p.closed:
+		p.mu.Unlock()
 		return nil
 	default:
 		close(p.closed)
 	}
-	return p.ln.Close()
+	listenerErr := p.ln.Close()
+	// Closing the listener does not close connections accepted before it. A
+	// keep-alive client or CONNECT tunnel must not outlive the protected run,
+	// otherwise cleanup can race an active proxy handler and filesystem
+	// unmount. Close the bounded set of active connections, then wait for every
+	// handler to leave before returning to the run coordinator.
+	connections := make([]net.Conn, 0, len(p.conns))
+	for conn := range p.conns {
+		connections = append(connections, conn)
+	}
+	p.mu.Unlock()
+	for _, conn := range connections {
+		_ = conn.Close()
+	}
+	p.wg.Wait()
+	return listenerErr
+}
+
+func (p *Proxy) track(conn net.Conn) bool {
+	p.mu.Lock()
+	select {
+	case <-p.closed:
+		p.mu.Unlock()
+		_ = conn.Close()
+		return false
+	default:
+	}
+	p.conns[conn] = struct{}{}
+	p.wg.Add(1)
+	p.mu.Unlock()
+	return true
+}
+
+func (p *Proxy) untrack(conn net.Conn) {
+	p.mu.Lock()
+	delete(p.conns, conn)
+	p.mu.Unlock()
 }
 
 func (p *Proxy) handle(conn net.Conn) {

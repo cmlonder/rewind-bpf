@@ -160,27 +160,43 @@ func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []st
 }
 
 func (h *Handle) Wait() error {
+	return h.wait(nil)
+}
+
+// WaitWith waits for the agent and invokes beforeSensorClose after the agent
+// exits but before telemetry is closed. This gives an external userspace
+// boundary (for example, the network policy proxy) a chance to drain its
+// handlers while the evidence writer is still available.
+func (h *Handle) WaitWith(beforeSensorClose func() error) error {
+	return h.wait(beforeSensorClose)
+}
+
+func (h *Handle) wait(beforeSensorClose func() error) error {
 	if h == nil || h.process == nil {
 		return fmt.Errorf("wait protected run: process is not started")
 	}
 	err := h.process.Wait()
 	h.waited = true
+	var beforeCloseErr error
+	if beforeSensorClose != nil {
+		beforeCloseErr = beforeSensorClose()
+	}
 	closeErr := h.closeSensor()
 	scopeErr := h.closeScope()
 	if err != nil {
 		if transitionErr := h.plan.Run.Transition(lifecycle.Failed); transitionErr != nil {
 			err = errors.Join(err, transitionErr)
 		}
-		return errors.Join(err, closeErr, scopeErr)
+		return errors.Join(err, beforeCloseErr, closeErr, scopeErr)
 	}
 	if scopeErr != nil {
 		_ = h.plan.Run.Transition(lifecycle.Failed)
-		return errors.Join(scopeErr, closeErr)
+		return errors.Join(scopeErr, beforeCloseErr, closeErr)
 	}
 	if transitionErr := h.plan.Run.Transition(lifecycle.Succeeded); transitionErr != nil {
-		return errors.Join(transitionErr, closeErr)
+		return errors.Join(transitionErr, beforeCloseErr, closeErr)
 	}
-	return closeErr
+	return errors.Join(beforeCloseErr, closeErr)
 }
 
 func (h *Handle) Rollback(ctx context.Context) error {

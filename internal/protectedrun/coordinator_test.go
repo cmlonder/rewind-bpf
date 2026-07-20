@@ -106,6 +106,31 @@ func TestStartWaitAndRollbackLifecycle(t *testing.T) {
 	}
 }
 
+func TestWaitWithRunsBeforeSensorClose(t *testing.T) {
+	overlayRunner := &fakeOverlay{}
+	started := false
+	starter := &fakeStarter{process: &fakeProcess{pid: 43}}
+	sensor := &fakeSensor{}
+	coordinator := Coordinator{Overlay: overlayRunner, Starter: starter, Sensor: sensor}
+	plan := testPlan(t)
+	handle, err := coordinator.Start(context.Background(), plan, []string{"synthetic-agent"}, "trace.o")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := handle.WaitWith(func() error {
+		started = true
+		if sensor.closed {
+			return errors.New("sensor closed before drain callback")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !started || !sensor.closed {
+		t.Fatalf("beforeClose=%v sensorClosed=%v", started, sensor.closed)
+	}
+}
+
 func TestStartFailureRollsBackAndKillsAgent(t *testing.T) {
 	overlayRunner := &fakeOverlay{}
 	process := &fakeProcess{pid: 7, waitErr: errors.New("agent failed")}

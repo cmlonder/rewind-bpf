@@ -20,6 +20,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/cgroup"
 	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/ebpfload"
+	"github.com/rewindbpf/rewind/internal/event"
 	"github.com/rewindbpf/rewind/internal/evidence"
 	"github.com/rewindbpf/rewind/internal/export"
 	"github.com/rewindbpf/rewind/internal/history"
@@ -149,6 +150,11 @@ func handleRun(args []string) {
 		if err != nil {
 			fatal(fmt.Sprintf("start network policy proxy: %v", err))
 		}
+		networkProxy.Audit = func(host string, decision netpolicy.Decision) {
+			if err := telemetry.RecordNetwork(host, decision); err != nil {
+				telemetry.markError(err)
+			}
+		}
 		proxyCtx, cancel := context.WithCancel(context.Background())
 		stopNetworkProxy = cancel
 		go func() { _ = networkProxy.Serve(proxyCtx) }()
@@ -177,11 +183,12 @@ func handleRun(args []string) {
 		closeNetworkProxy()
 		fatal(fmt.Sprintf("persist running history: %v", err))
 	}
-	waitErr := handle.Wait()
-	// The proxy is only needed while the agent is running. Close it before any
-	// post-run persistence or fatal path; fatal exits immediately and does not
-	// execute deferred cleanup.
-	closeNetworkProxy()
+	// Drain proxy handlers before closing telemetry so userspace network
+	// decisions are persisted in the same evidence chain as kernel events.
+	waitErr := handle.WaitWith(func() error {
+		closeNetworkProxy()
+		return nil
+	})
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
@@ -572,6 +579,9 @@ type telemetryAdapter struct {
 	rotateBytes uint64
 
 	mu        sync.Mutex
+	writerMu  sync.Mutex
+	runID     string
+	pid       uint32
 	session   *ebpfload.Session
 	file      *os.File
 	paths     []string
@@ -597,6 +607,7 @@ func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, p
 	}
 	a.mu.Lock()
 	a.session, a.file, a.done = session, file, make(chan struct{})
+	a.runID, a.pid = runID, pid
 	a.paths, a.nextIndex = []string{a.path}, 1
 	a.writer = &telemetry.JournalWriter{Destination: file, MaxBytes: a.maxBytes, RotateBytes: a.rotateBytes, Rotate: a.rotate}
 	a.mu.Unlock()
@@ -640,7 +651,7 @@ func (a *telemetryAdapter) rotate() (io.Writer, error) {
 
 func (a *telemetryAdapter) readLoop() {
 	a.mu.Lock()
-	session, done, writer := a.session, a.done, a.writer
+	session, done := a.session, a.done
 	a.mu.Unlock()
 	defer close(done)
 	for {
@@ -648,18 +659,71 @@ func (a *telemetryAdapter) readLoop() {
 		if err != nil {
 			return
 		}
-		if err := writer.Append(value); err != nil {
-			a.mu.Lock()
-			a.closeErr = err
-			a.mu.Unlock()
+		if err := a.append(value); err != nil {
+			a.markError(err)
 			return
 		}
-		if writer.Truncated {
-			a.mu.Lock()
-			a.truncated = true
-			a.mu.Unlock()
-		}
 	}
+}
+
+func (a *telemetryAdapter) append(value event.Event) error {
+	a.writerMu.Lock()
+	defer a.writerMu.Unlock()
+	a.mu.Lock()
+	writer := a.writer
+	a.mu.Unlock()
+	if writer == nil {
+		return fmt.Errorf("append telemetry event: writer is not initialized")
+	}
+	if err := writer.Append(value); err != nil {
+		return err
+	}
+	if writer.Truncated {
+		a.mu.Lock()
+		a.truncated = true
+		a.mu.Unlock()
+	}
+	return nil
+}
+
+func (a *telemetryAdapter) markError(err error) {
+	if err == nil {
+		return
+	}
+	a.mu.Lock()
+	a.closeErr = errors.Join(a.closeErr, err)
+	a.truncated = true
+	a.mu.Unlock()
+}
+
+// RecordNetwork adds a policy decision to the same ordered, hash-chained
+// evidence stream as kernel events. The proxy is a userspace boundary, so its
+// PID is the scoped agent PID captured when the sensor attaches.
+func (a *telemetryAdapter) RecordNetwork(host string, decision netpolicy.Decision) error {
+	a.mu.Lock()
+	runID, pid := a.runID, a.pid
+	a.mu.Unlock()
+	if runID == "" {
+		return fmt.Errorf("record network event: telemetry is not attached")
+	}
+	if pid == 0 {
+		pid = uint32(os.Getpid())
+	}
+	eventDecision := event.Allow
+	if decision == netpolicy.Deny {
+		eventDecision = event.Deny
+	} else if decision == netpolicy.Audit {
+		eventDecision = event.Audit
+	}
+	return a.append(event.Event{
+		RunID:       runID,
+		PID:         pid,
+		Operation:   event.NetworkConnect,
+		Path:        host,
+		TimestampNS: uint64(time.Now().UnixNano()),
+		Decision:    eventDecision,
+		Risk:        event.Medium,
+	})
 }
 
 func (a *telemetryAdapter) Close() error {

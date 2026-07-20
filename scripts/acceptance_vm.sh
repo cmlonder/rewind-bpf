@@ -117,6 +117,11 @@ test "$(cat "$ROOT/network/runtime/merged/denied.status")" = 403
 sudo "$BIN" rollback --record "$ROOT/network/runtime/record.json"
 kill "$SERVER_PID" 2>/dev/null || true
 SERVER_PID=""
+sudo tail -10 "$ROOT/network/runtime/events.jsonl"
+sudo grep -q '"operation":"network_connect"' "$ROOT/network/runtime/events.jsonl"
+test "$(sudo jq -s '[.[] | select(.operation == "network_connect")] | length' "$ROOT/network/runtime/events.jsonl")" -eq 2
+sudo jq -s -e 'any(.[]; .operation == "network_connect" and .decision == "allow")' "$ROOT/network/runtime/events.jsonl" >/dev/null
+sudo jq -s -e 'any(.[]; .operation == "network_connect" and .decision == "deny")' "$ROOT/network/runtime/events.jsonl" >/dev/null
 echo "proxy network allow/deny: PASS"
 
 # 4. Bounded evidence must fail verification rather than look complete.

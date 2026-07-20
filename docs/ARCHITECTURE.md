@@ -138,7 +138,7 @@ The daemon is expected to run with narrowly scoped Linux capabilities inside the
 
 The kernel data plane observes target process/cgroup activity and emits compact events through a ring buffer. It does not create snapshots after the fact. Candidate observation points include `execve`, `openat/openat2`, `unlinkat`, `renameat2`, `write`, `pwrite`, `truncate`, and `ftruncate`.
 
-For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime accepts network `off` and `audit`; `network.mode: enforce` fails closed until a network namespace/proxy backend is configured.
+For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; each proxy decision is appended to the run evidence chain. Raw sockets and non-proxy-aware clients remain unsupported and must be treated as a degraded boundary.
 
 #### OverlayFS transaction
 
@@ -700,8 +700,10 @@ On 2026-07-20, `REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm` passed in the
 same Ubuntu 24.04 ARM64 VM after rebuilding the Go binary and eBPF object. The
 matrix covered read denial plus recursive deletion/discard, review and explicit
 commit, destination-drift conflict refusal, proxy allow/deny for a local HTTP
-server versus `example.invalid`, and bounded-evidence refusal. The complete
-evidence case verified with `dropped=0`; the intentionally capped case recorded
+server versus `example.invalid`, and bounded-evidence refusal. The network run
+persisted two `network_connect` decisions (one allow and one deny) in the same
+hash-chained JSONL evidence stream as kernel events. The complete evidence case
+verified with `dropped=0`; the intentionally capped case recorded
 `truncated=true`, `complete=false`, and caused verification to exit non-zero.
 The script creates only a generated temporary directory and performs cleanup
 of that exact directory with the privileged unmount path.
