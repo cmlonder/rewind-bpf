@@ -25,6 +25,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     action: (request) => executeAction(root, token.trim(), request),
     createPolicy: (value) => createResource(root, token.trim(), "policies", value),
     assignWorkspace: (value) => createResource(root, token.trim(), "workspaces", value),
+    uploadPolicyBundle: (value) => uploadPolicyBundle(root, token.trim(), value),
   };
 }
 
@@ -33,6 +34,18 @@ async function createResource(baseUrl, token, resource, value) {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
     body: JSON.stringify(value),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
+}
+
+export async function uploadPolicyBundle(baseUrl, token, signed) {
+  const root = baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}/v1/policy-bundles`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify(signed),
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);

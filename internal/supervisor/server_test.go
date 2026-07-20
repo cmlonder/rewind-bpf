@@ -1,6 +1,8 @@
 package supervisor
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,6 +14,8 @@ import (
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/history"
+	"github.com/rewindbpf/rewind/internal/policy"
+	"github.com/rewindbpf/rewind/internal/policybundle"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
 
@@ -102,6 +106,47 @@ func TestRejectedConfigMutationIsAudited(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !strings.Contains(string(audit), `"action":"policy_create"`) || !strings.Contains(string(audit), `"ok":false`) {
+		t.Fatalf("audit=%s", audit)
+	}
+}
+
+func TestSignedPolicyBundleImportRequiresValidSignature(t *testing.T) {
+	dir := t.TempDir()
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := policybundle.Sign(policybundle.Bundle{Name: "signed-agent", Version: "1.0.0", Policy: policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeAudit}}}, private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err := json.Marshal(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditPath := filepath.Join(dir, "audit.jsonl")
+	server := Server{AuthToken: "secret", Config: controlplane.Open(filepath.Join(dir, "config.json")), AuditPath: auditPath, AuditMu: &sync.Mutex{}}
+	request := httptest.NewRequest(http.MethodPost, "/v1/policy-bundles", strings.NewReader(string(encoded)))
+	request.Header.Set("Authorization", "Bearer secret")
+	created := httptest.NewRecorder()
+	server.Handler().ServeHTTP(created, request)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", created.Code, created.Body.String())
+	}
+	signed.Signature = "tampered"
+	encoded, _ = json.Marshal(signed)
+	request = httptest.NewRequest(http.MethodPost, "/v1/policy-bundles", strings.NewReader(string(encoded)))
+	request.Header.Set("Authorization", "Bearer secret")
+	refused := httptest.NewRecorder()
+	server.Handler().ServeHTTP(refused, request)
+	if refused.Code != http.StatusConflict || !strings.Contains(refused.Body.String(), "signature") {
+		t.Fatalf("status=%d body=%s", refused.Code, refused.Body.String())
+	}
+	audit, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(audit), `"action":"policy_bundle_import"`) || !strings.Contains(string(audit), `"ok":false`) {
 		t.Fatalf("audit=%s", audit)
 	}
 }

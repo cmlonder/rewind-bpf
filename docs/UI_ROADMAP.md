@@ -333,7 +333,7 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
 The remaining connected work is end-to-end reconnect/recovery behavior and
-signed policy upload UX. P4 now has a bounded history contract, signed policy
+trusted policy distribution. P4 now has a bounded history contract, signed policy
 provenance, a token-authenticated Unix-socket server, an optional loopback HTTP
 bridge, snapshot and follow-mode event endpoints, local policy/workspace config
 writes, a browser adapter, and a fixture-backed retention view. The socket,

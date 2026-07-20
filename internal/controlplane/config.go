@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/rewindbpf/rewind/internal/policy"
+	"github.com/rewindbpf/rewind/internal/policybundle"
 )
 
 var identifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$`)
@@ -24,6 +25,7 @@ type PolicyPackage struct {
 	Description string        `json:"description,omitempty"`
 	Policy      policy.Policy `json:"policy"`
 	Signed      bool          `json:"signed"`
+	SignerKeyID string        `json:"signer_key_id,omitempty"`
 	UpdatedAt   time.Time     `json:"updated_at"`
 }
 
@@ -71,6 +73,25 @@ func (s *Store) CreatePolicy(value PolicyPackage) error {
 		value.UpdatedAt = time.Now().UTC()
 		snapshot.Policies = append(snapshot.Policies, value)
 		return nil
+	})
+}
+
+// CreateSignedPolicy verifies the self-contained Ed25519 envelope before it is
+// admitted to the local policy catalog. Trust distribution is deliberately
+// separate: callers that need an allow-list can verify the envelope against
+// trusted keys before calling this method.
+func (s *Store) CreateSignedPolicy(signed policybundle.Signed) error {
+	bundle, err := policybundle.Verify(signed)
+	if err != nil {
+		return err
+	}
+	return s.CreatePolicy(PolicyPackage{
+		Name:        bundle.Name,
+		Version:     bundle.Version,
+		Description: bundle.Description,
+		Policy:      bundle.Policy,
+		Signed:      true,
+		SignerKeyID: signed.KeyID,
 	})
 }
 

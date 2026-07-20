@@ -68,6 +68,7 @@ function handleAction(action, element) {
   if (action === "copy-policy") return copyPolicy();
   if (action === "simulate-policy") return openSimulation();
   if (action === "new-policy") return openPolicyEditor();
+  if (action === "import-policy") return openSignedPolicyImport();
   if (action === "new-workspace") return openWorkspaceEditor();
   if (action === "edit-workspace") return openWorkspaceEditor(element.closest(".workspace-card")?.querySelector("h2")?.textContent);
   if (action === "simulate-workspace") return setToast("Boundary test: 2 denied · 3 allowed · 1 audited.", "success");
@@ -235,6 +236,37 @@ function openPolicyEditor() {
     }).catch((error) => setToast(`Policy package refused: ${error.message}`, "error"));
     return save;
   } });
+}
+
+function openSignedPolicyImport() {
+  if (!state.supervisor) {
+    setToast("Connect the local supervisor before importing signed bundles.", "neutral");
+    return;
+  }
+  openModal("Import signed policy bundle", `<form id="policy-bundle-form" class="modal-form"><label>Signed bundle JSON<textarea name="bundle" rows="12" spellcheck="false" required placeholder='{"version":1,"key_id":"…","public_key":"…","payload":"…","signature":"…"}'></textarea></label><div class="form-note">The supervisor verifies the Ed25519 signature and records the package as signed. Unsigned or tampered envelopes are refused and audited.</div></form>`, { confirm: "Verify and import", onConfirm: () => {
+    const form = document.querySelector("#policy-bundle-form");
+    if (!form?.reportValidity()) return false;
+    let signed;
+    try { signed = JSON.parse(new FormData(form).get("bundle")); } catch (_) {
+      setToast("Bundle is not valid JSON.", "error");
+      return false;
+    }
+    const save = state.supervisor.uploadPolicyBundle(signed);
+    save.then(() => {
+      const imported = policyFromSignedEnvelope(signed);
+      if (imported) fixture.policies.unshift(imported);
+      closeModal(); render(); setToast("Signed policy bundle verified and imported.", "success");
+    }).catch((error) => setToast(`Signed bundle refused: ${error.message}`, "error"));
+    return save;
+  } });
+}
+
+function policyFromSignedEnvelope(signed) {
+  try {
+    const bytes = Uint8Array.from(atob(signed.payload), (character) => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes));
+    return { name: payload.name, version: payload.version, state: "available", signed: true, description: payload.description || "Verified policy bundle", reads: payload.policy?.read?.mode || "off", writes: payload.policy?.write?.mode || "rollback", network: payload.policy?.network?.mode || "off", assigned: 0, updated: "just now" };
+  } catch (_) { return null; }
 }
 
 function openWorkspaceEditor(name = "") {

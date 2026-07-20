@@ -19,6 +19,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/platform"
+	"github.com/rewindbpf/rewind/internal/policybundle"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
 
@@ -134,6 +135,33 @@ func (s Server) Handler() http.Handler {
 		}
 		writeJSON(w, http.StatusCreated, Response{OK: true, State: "assigned", Message: value.Name})
 	})
+	mux.HandleFunc("/v1/policy-bundles", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "policy bundles require POST"})
+			return
+		}
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		var signed policybundle.Signed
+		if err := json.NewDecoder(io.LimitReader(r.Body, 2<<20)).Decode(&signed); err != nil {
+			response := Response{OK: false, State: "refused", Message: "invalid signed policy bundle"}
+			s.recordAudit(Request{Action: "policy_bundle_import"}, response, err)
+			writeJSON(w, http.StatusBadRequest, response)
+			return
+		}
+		if err := s.importSignedPolicy(signed); err != nil {
+			response := Response{OK: false, State: "refused", Message: err.Error()}
+			s.recordAudit(Request{Action: "policy_bundle_import"}, response, err)
+			writeJSON(w, http.StatusConflict, response)
+			return
+		}
+		bundle, _ := policybundle.Verify(signed)
+		response := Response{OK: true, State: "created", Message: bundle.Name + "@" + bundle.Version}
+		s.recordAudit(Request{Action: "policy_bundle_import", Policy: bundle.Name + "@" + bundle.Version}, response, nil)
+		writeJSON(w, http.StatusCreated, response)
+	})
 	mux.HandleFunc("/v1/audit", s.auditLog)
 	mux.HandleFunc("/v1/events", s.events)
 	mux.HandleFunc("/v1/actions", func(w http.ResponseWriter, r *http.Request) {
@@ -215,6 +243,13 @@ func (s Server) assignWorkspace(value controlplane.Workspace) error {
 	}
 	s.recordAudit(Request{Action: "workspace_assign", Workspace: value.Name, Policy: value.Policy}, Response{OK: true, State: "assigned", Message: value.Name}, nil)
 	return nil
+}
+
+func (s Server) importSignedPolicy(signed policybundle.Signed) error {
+	if s.Config == nil || !s.Config.Enabled() {
+		return fmt.Errorf("control-plane config store is disabled")
+	}
+	return s.Config.CreateSignedPolicy(signed)
 }
 
 func (s Server) recordAudit(request Request, response Response, actionErr error) {

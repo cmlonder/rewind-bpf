@@ -1,10 +1,13 @@
 package controlplane
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
 	"path/filepath"
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/policy"
+	"github.com/rewindbpf/rewind/internal/policybundle"
 )
 
 func testPolicy() policy.Policy {
@@ -53,5 +56,31 @@ func TestStoreRejectsUnsafeWorkspace(t *testing.T) {
 	}
 	if err := store.AssignWorkspace(Workspace{Name: "root", Path: "/", Policy: "none"}); err == nil {
 		t.Fatal("root workspace unexpectedly accepted")
+	}
+}
+
+func TestStoreImportsVerifiedSignedPolicy(t *testing.T) {
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := policybundle.Sign(policybundle.Bundle{Name: "signed-agent", Version: "1.0.0", Description: "verified", Policy: testPolicy()}, private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := Open(filepath.Join(t.TempDir(), "config.json"))
+	if err := store.CreateSignedPolicy(signed); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Policies) != 1 || !snapshot.Policies[0].Signed || snapshot.Policies[0].Name != "signed-agent" || snapshot.Policies[0].SignerKeyID != signed.KeyID {
+		t.Fatalf("snapshot=%+v", snapshot)
+	}
+	signed.Signature = "invalid"
+	if err := store.CreateSignedPolicy(signed); err == nil {
+		t.Fatal("tampered signed policy unexpectedly accepted")
 	}
 }

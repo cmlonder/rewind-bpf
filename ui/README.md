@@ -19,6 +19,7 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Review the timeline, upper-layer diff, evidence health, and benchmark context.
 - Open a confirmation dialog for rollback, recovery, and export actions.
 - Create and select versioned policy packages, copy a policy preview, and simulate deny/allow/audit outcomes.
+- Import an Ed25519-signed policy bundle through the connected supervisor; invalid or tampered envelopes are refused and audited.
 - Add or edit workspace assignments and run a fixture boundary test before a future run.
 - Edit global runtime settings through revisioned controls; active runs remain unchanged.
 - Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
@@ -26,7 +27,8 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 
 These actions deliberately stop at the fixture adapter until a supervisor is
 connected. When connected to the explicit loopback HTTP bridge, policy and
-workspace forms persist validated local config, rollback/recovery/commit
+workspace forms persist validated local config, signed bundle imports are
+verified by the supervisor, rollback/recovery/commit
 confirmations POST authenticated intents, and the run detail view follows its
 authenticated SSE evidence stream; the browser still never receives root access
 or performs privileged work.
