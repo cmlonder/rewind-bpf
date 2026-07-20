@@ -22,6 +22,17 @@ python3 benchmarks/plot_results.py
 
 This writes `benchmarks/results_chart.svg`. The script uses only the Python standard library; no plotting package is required.
 
+The final presentation ledger is derived with:
+
+```bash
+python3 benchmarks/normalize_results.py
+```
+
+This writes `results_normalized.csv` with storage amplification, evidence
+bytes per event, lifecycle wall time, and read/write gaps versus B0. Blank
+values are intentional when a dimension was not measured for that control;
+the normalizer never invents a zero.
+
 To normalize a new raw run into the ledger, use the collector instead of
 manually copying fio values:
 

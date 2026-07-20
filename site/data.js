@@ -74,10 +74,10 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy, fail-closed deny, and namespace broker backends, raw/packet socket refusal plus socket-deny evidence, opt-in short-lived external-command credential leases with an authenticated metadata endpoint, conflict-checked commit, authenticated supervisor, history retention, detachable local session leases, AES-256-GCM evidence envelopes, multi-key trust rotation, signed policy import, reconnecting browser event stream, text/full-fidelity patch exports, checksummed release metadata with local Ed25519 signing, clean-branch Git acceptance, and signed evidence hand-off are shipped. Privileged VM egress evidence, native secret-manager adapters, KMS/object-store restore, and distributed session coordination remain." },
+    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy, fail-closed deny, and namespace broker backends, raw/packet socket refusal plus socket-deny evidence, opt-in short-lived external-command credential leases with an authenticated metadata endpoint, conflict-checked commit, authenticated supervisor, history retention, detachable local session leases, AES-256-GCM evidence envelopes, multi-key trust rotation, signed policy import, reconnecting browser event stream, text/full-fidelity patch exports, checksummed release metadata with local Ed25519 signing, clean-branch Git acceptance, and signed evidence hand-off are shipped. Operational resolver refresh/leak tests, native secret-manager adapters, KMS/object-store restore, and distributed session coordination remain." },
     { phase: "P2", title: "P2: native macOS adapter", status: "Prepared / manual gate", body: "Read-only APFS/Seatbelt/diskutil probes plus a Seatbelt process wrapper and native contract are shipped. EndpointSecurity signing, APFS disposable rollback, and destructive acceptance on disposable storage remain deliberately fail-closed." },
     { phase: "P3", title: "P3: native Windows adapter", status: "Prepared / manual gate", body: "Cross-build, capability refusal, and a kill-on-close Job Object helper are ready. A signed minifilter, restricted-token launch, disposable VHDX workspace, and Windows VM acceptance are still required before host enforcement." },
-    { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams with reconnect, signed policy provenance, encrypted hand-off/fetch, multi-process leases, agent lifecycle identity, deterministic PII pre-read enforcement, and a checkpoint graph foundation are shipped. SDK-specific adapters, remote registry/KMS, streaming PII coverage, privileged egress evidence, and live multi-agent orchestration remain." },
+    { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams with reconnect, signed policy provenance, encrypted hand-off/fetch, multi-process leases, agent lifecycle identity, deterministic PII pre-read enforcement, checkpoint graph foundation, and the trusted registry/action-token control-plane UX are shipped. SDK-specific adapters, registry server durability/KMS, streaming PII coverage, and live multi-agent orchestration remain." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],
@@ -90,6 +90,7 @@ export const siteData = {
     ["08", "Control plane contract", "Durable history, an authenticated Unix-socket/HTTP supervisor with lifecycle actions, signed policy imports, reconnecting event follow, and a browser adapter that never receives root access."],
     ["09", "Evidence hand-off", "Checksum-indexed tar.gz bundles carry the run record and ordered event logs without copying workspace contents or arbitrary host paths; verification and optional detached signatures support remote review hand-off."],
     ["10", "Release integrity", "Cross-platform artifacts, SHA256SUMS, release metadata, release bundle packaging, and detached Ed25519 signing with optional pinned-key verification."],
+    ["11", "Operator trust", "Two-minute one-time action challenges for destructive UI intents plus pinned HTTPS registry verification and signer rotation metadata."],
   ],
   competitors: [
     { name: "RewindBPF", relation: "This project", model: "OverlayFS transaction + eBPF evidence", cow: "Yes", kernel: "Yes", rollback: "Yes", read: "Yes", agent: "Yes", highlight: true },
@@ -100,15 +101,14 @@ export const siteData = {
     { name: "DeltaBox", relation: "Research reference", model: "Layered OS checkpoint / rollback", cow: "Yes", kernel: "Research", rollback: "Research", read: "Research", agent: "Yes" },
   ],
   benchmarks: [
-    { label: "B0 · native ext4", read: 10334.2, write: 4421.0, readLabel: "10,334", writeLabel: "4,421", note: "No overlay · no sensor" },
-    { label: "B2 · FUSE only", read: 9143.8, write: 3915.4, readLabel: "9,144", writeLabel: "3,915", note: "COW layer cost" },
-    { label: "B4 · protected run", read: 9181.7, write: 3932.6, readLabel: "9,182", writeLabel: "3,933", note: "FUSE + eBPF + helper" },
-    { label: "B0/B2/B4 · cold control", read: 10918.6, write: 4672.9, readLabel: "10,919", writeLabel: "4,673", note: "Cold values are separate controls; B4 includes mount/copy-up cost" },
+    { label: "B0 · native ext4", read: 10334.2, write: 4421.0, readLabel: "10,334", writeLabel: "4,421", note: "No overlay · no sensor · 1.0000× storage" },
+    { label: "B2 · FUSE only", read: 9143.8, write: 3915.4, readLabel: "9,144", writeLabel: "3,915", note: "COW layer · 11.52% read gap · 1.0000× storage" },
+    { label: "B4 · protected run", read: 9181.7, write: 3932.6, readLabel: "9,182", writeLabel: "3,933", note: "FUSE + eBPF + helper · 1.0003× storage" },
   ],
-  telemetryBenchmark: { label: "B5 · telemetry-only", events: "16,620", bytes: "2.47 MiB", note: "Direct fio PID validation · no OverlayFS protection" },
+  telemetryBenchmark: { label: "B5 · telemetry-only", events: "16,620", bytes: "2.47 MiB", average: "148.47 B/event", note: "Direct fio PID validation · no OverlayFS protection" },
   evidence: [
     ["16,620", "events in direct fio telemetry smoke"],
-    ["148.5 B", "average JSONL bytes per event"],
+    ["148.47 B", "average JSONL bytes per event"],
     ["37", "intentional drops surfaced as incomplete"],
     ["1.0×", "full-file copy-up amplification measured"],
     ["16,620", "events in the protected telemetry run"],

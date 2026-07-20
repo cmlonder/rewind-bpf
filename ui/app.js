@@ -3,11 +3,12 @@ import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, reconnectAttempts: 0, connection: "fixture" };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
 function currentRun() { return getRun(state.selectedRun); }
+function escapeUI(value) { return String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[character])); }
 
 function render() {
   app.innerHTML = AppShell({ view: state.view, run: currentRun(), fixture, connection: state.connection });
@@ -72,9 +73,9 @@ function handleAction(action, element) {
   if (action === "simulate-credentials") return openCredentialLeaseCheck();
   if (action === "retention") return openRetentionEditor();
   if (action === "session") return openSessionEditor();
-  if (action === "rollback") return openConfirm({ title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: () => runSupervisorAction("rollback", rollback) });
-  if (action === "commit") return openConfirm({ title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: () => runSupervisorAction("commit", commitRun, "COMMIT") });
-  if (action === "recover") return openConfirm({ title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success")) });
+  if (action === "rollback") return openActionTokenConfirm({ action: "rollback", title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: () => runSupervisorAction("rollback", rollback) });
+  if (action === "commit") return openActionTokenConfirm({ action: "commit", title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: () => runSupervisorAction("commit", commitRun, "COMMIT") });
+  if (action === "recover") return openActionTokenConfirm({ action: "recover", title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success")) });
   if (action === "export") return setToast("Review bundle prepared in fixture mode.", "success");
   if (action === "copy-policy") return copyPolicy();
   if (action === "export-policy-bundle") return exportPolicyBundle();
@@ -91,7 +92,11 @@ function handleAction(action, element) {
   if (action === "pii-rescan") return setToast("Post-run PII scan queued: new files are hashed, redacted, and attached to the run record.", "success");
   if (action === "remote-restore") return setToast("Remote bundle restored after digest verification; retry budget remains bounded.", "success");
   if (action === "adapter-test") return setToast("Codex, OpenHands, and Claude adapter preflight passed: identity and lifecycle hooks are ready.", "success");
-  if (action === "checkpoint-rollback") return openConfirm({ title: "Rollback dependent checkpoints?", kicker: "GRAPH-AWARE RECOVERY", body: "Rewind will order descendants before parents and refuse ambiguous dependencies.", confirm: "Rollback graph", tone: "orange", onConfirm: () => setToast("Checkpoint rollback plan accepted in fixture mode.", "success") });
+  if (action === "checkpoint-rollback") return openActionTokenConfirm({ action: "graph-rollback", title: "Rollback dependent checkpoints?", kicker: "GRAPH-AWARE RECOVERY", body: "Rewind will order descendants before parents and refuse ambiguous dependencies.", confirm: "Rollback graph", tone: "orange", onConfirm: () => setToast("Checkpoint rollback plan accepted in fixture mode.", "success") });
+  if (action === "trust-settings") return openTrustSettings();
+  if (action === "verify-registry") return verifyTrustedRegistry();
+  if (action === "import-registry-policy") return openRegistryImport();
+  if (action === "rotate-trust-key") return openTrustKeyRotation();
 }
 
 function openSupervisorConnector() {
@@ -411,6 +416,74 @@ function openConfigEditor(key) {
 }
 
 function openConfirm({ title, kicker, body, confirm, tone, onConfirm }) { openModal(title, `<div class="confirm-copy"><span class="confirm-mark confirm-${tone}">!</span><div><span class="panel-kicker">${kicker}</span><p>${body}</p></div></div>`, { confirm, tone, onConfirm }); }
+
+function issueActionToken(action, runId = currentRun()?.id || "fixture") {
+  const random = new Uint8Array(4);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(random);
+  else random.set([17, 42, 91, 203]);
+  const suffix = [...random].map((value) => value.toString(16).padStart(2, "0")).join("").toUpperCase();
+  const token = `RW-${action.slice(0, 4).toUpperCase()}-${suffix}`;
+  state.actionTokens.set(token, { action, runId, expiresAt: Date.now() + 120000 });
+  return token;
+}
+
+function openActionTokenConfirm({ action, title, kicker, body, confirm, tone = "orange", onConfirm }) {
+  const token = issueActionToken(action);
+  openModal(title, `<div class="confirm-copy"><span class="confirm-mark confirm-${tone}">!</span><div><span class="panel-kicker">${kicker}</span><p>${body}</p></div></div><div class="action-token-panel"><span class="panel-kicker">ONE-TIME ACTION TOKEN · EXPIRES IN 2 MIN</span><code>${token}</code><label for="action-token-input">Type the token to authorize this browser intent</label><input id="action-token-input" name="action_token" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="${token}" /></div>`, { confirm, tone, onConfirm: () => {
+    const input = document.querySelector("#action-token-input");
+    const record = state.actionTokens.get(token);
+    if (!record || record.expiresAt < Date.now() || input?.value.trim().toUpperCase() !== token) {
+      setToast("Action token mismatch or expired. No supervisor request was sent.", "error");
+      input?.focus();
+      return false;
+    }
+    state.actionTokens.delete(token);
+    return onConfirm();
+  } });
+}
+
+function openTrustSettings() {
+  const registry = fixture.registry;
+  openModal("Trusted registry settings", `<form id="trust-form" class="modal-form"><label>Registry endpoint<input name="endpoint" type="url" value="${escapeUI(registry.endpoint)}" pattern="https://.*" required /></label><label>Current signer key ID<input name="key" value="${escapeUI(registry.keys[0]?.id || "rewind-prod-2026")}" required /></label><label>Previous signer key ID<input name="previous" value="${escapeUI(registry.keys[1]?.id || "rewind-previous-2025")}" /></label><div class="form-note">Only HTTPS endpoints and pinned Ed25519 key IDs are accepted in this UI. The browser stores metadata only; private keys and bearer tokens never enter the page.</div></form>`, { confirm: "Save trust profile", onConfirm: () => {
+    const form = document.querySelector("#trust-form");
+    if (!form?.reportValidity()) return false;
+    const data = new FormData(form);
+    registry.endpoint = String(data.get("endpoint")).trim();
+    registry.keys = [{ id: String(data.get("key")).trim(), state: "current" }, ...(String(data.get("previous") || "").trim() ? [{ id: String(data.get("previous")).trim(), state: "previous" }] : [])];
+    registry.state = "needs-verification";
+    closeModal(); render(); setToast("Trust profile saved. Verify the registry before importing a policy.", "neutral");
+  } });
+}
+
+function verifyTrustedRegistry() {
+  const registry = fixture.registry;
+  registry.lastVerified = "just now";
+  registry.state = "verified";
+  openModal("Registry verification", `<div class="verification-stack"><div><span>ENDPOINT</span><strong>${registry.endpoint}</strong><b class="check-badge">✓ HTTPS</b></div><div><span>SIGNER TRUST</span><strong>${registry.keys.map((key) => key.id).join(" · ")}</strong><b class="check-badge">✓ PINNED</b></div><div><span>POLICY ENVELOPE</span><strong>Ed25519 signature + versioned payload</strong><b class="check-badge">✓ VALID</b></div><p class="form-note">Verification passed at ${registry.lastVerified}. A remote envelope is not active until it is imported and assigned to a workspace.</p></div>`, { confirm: "Close", onConfirm: closeModal });
+}
+
+function openRegistryImport() {
+  const registry = fixture.registry;
+  openModal("Fetch trusted policy", `<form id="registry-import-form" class="modal-form"><label>Package name<input name="name" value="strict-agent" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" required /></label><label>Version<input name="version" value="1.3.0" pattern="[0-9]+\\.[0-9]+\\.[0-9]+" required /></label><label>Trust key<select name="key">${registry.keys.map((key) => `<option>${escapeUI(key.id)}</option>`).join("")}</select></label><div class="form-note">Fetch is simulated in fixture mode. A connected supervisor should perform the HTTPS request and verify the signed envelope before persistence.</div></form>`, { confirm: "Fetch & verify", onConfirm: () => {
+    const form = document.querySelector("#registry-import-form");
+    if (!form?.reportValidity()) return false;
+    const data = new FormData(form);
+    fixture.policies.unshift({ name: data.get("name"), version: data.get("version"), state: "available", signed: true, signerKeyId: data.get("key"), description: "Imported from the trusted policy registry", reads: "enforce", writes: "rollback", network: "audit", assigned: 0, updated: "just now" });
+    closeModal(); render(); setToast(`Verified ${data.get("name")}@${data.get("version")} from the pinned registry.`, "success");
+  } });
+}
+
+function openTrustKeyRotation() {
+  openModal("Rotate trusted signer", `<form id="rotate-key-form" class="modal-form"><label>New signer key ID<input name="key" value="rewind-next-2027" required /></label><label>Retire previous key<select name="retire"><option value="no">Keep previous key during rollout</option><option value="yes">Remove previous key now</option></select></label><div class="form-note">Rotation keeps the current key and optional previous key visible until an operator explicitly retires it. This is trust metadata, not a private-key import.</div></form>`, { confirm: "Apply rotation", onConfirm: () => {
+    const form = document.querySelector("#rotate-key-form");
+    if (!form?.reportValidity()) return false;
+    const data = new FormData(form);
+    const current = fixture.registry.keys[0];
+    fixture.registry.keys = [{ id: String(data.get("key")).trim(), state: "current" }, ...(data.get("retire") === "yes" ? [] : [{ id: current.id, state: "previous" }])];
+    fixture.registry.state = "needs-verification";
+    closeModal(); render(); setToast("Signer rotation staged. Verify the registry before use.", "neutral");
+  } });
+}
 
 function openModal(title, body, { confirm, tone = "orange", onConfirm }) {
   closeModal();

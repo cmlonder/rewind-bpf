@@ -20,8 +20,8 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, full-fidelity Git patch export, manifest conflict checks, and clean-branch `rewind branch apply`; `rewind commit --confirm`; supervisor commit requires confirmation | Remote review workflow and richer provider adapters |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, optional supervisor public-key allow-list enforcement, and a fail-closed HTTPS registry client with retry, size bound, and pinned-key verification | Registry server durability, revocation, and organization trust distribution |
 | Local supervisor | **Shipped / Linux** | Permissioned Unix socket, token auth, health/capabilities/history, status/rollback/recover/commit, snapshot/follow events, redacted action audit, history pruning, and expiring acquire/heartbeat/takeover/release session leases; `--session-backend sqlite` selects the WAL-backed store | Runtime-enforced multi-operator policy and distributed session deployment |
-| Control Plane UI | **Shipped / fixture + authenticated bridge** | Responsive operational views, local policy/workspace config store, loopback HTTP supervisor bridge, bearer-authenticated rollback/recover/commit and policy/workspace writes, authenticated SSE evidence follow with reconnect backoff, signed policy bundle import, credential lease metadata flow, retention pruning, and detachable session controls | Trusted remote registry, local action-token UX |
-| Public jury site | **Shipped** | Static modular single-page narrative, honest competitor matrix, roadmap, and measured benchmark ledger | Publish/deploy automation and post-hackathon content updates |
+| Control Plane UI | **Shipped / fixture + authenticated bridge** | Responsive operational views, local policy/workspace config store, loopback HTTP supervisor bridge, bearer-authenticated rollback/recover/commit and policy/workspace writes, authenticated SSE evidence follow with reconnect backoff, signed policy bundle import, credential lease metadata flow, retention pruning, detachable session controls, one-time in-memory action-token challenges, and trusted registry metadata/verification UX | Connected registry endpoint and server-side action-intent policy |
+| Public jury site | **Shipped** | Static modular single-page narrative, honest competitor matrix, roadmap, measured normalized benchmark ledger, storage/evidence/lifecycle callouts, and explicit local/S3 publish automation | External hosting credentials and post-hackathon content updates |
 | Linux release/bootstrap | **Shipped / signed locally** | VM bootstrap, release Make targets, cross-build checks, SHA256SUMS, release metadata, and detached Ed25519 signature/verification with optional pinned public key | Public registry trust, key rotation/revocation, and package repository |
 | macOS native backend | **Prepared / manual gate** | Read-only APFS/Seatbelt/diskutil prerequisite plan, platform CLI, fail-closed capability report, Seatbelt profile/command wrapper, and native contract; no destructive operation is enabled | EndpointSecurity telemetry, APFS disposable-volume rollback, signed helper, and destructive tests on disposable storage |
 | Windows native backend | **Prepared / manual gate** | Cross-build, fail-closed capability report, read-only PowerShell/fsutil prerequisite plan, Job Object/restricted-token contract, and kill-on-close Job Object helper; WSL2 remains compatibility mode | Signed filesystem minifilter, restricted-token launch integration, disposable VHDX workspace, and Windows VM tests |
@@ -37,7 +37,7 @@ The **Linux demo and product-core feature set is complete enough to enter the ve
 
 Before running the full regression suite, only these implementation items are still in the current Linux scope:
 
-1. Keep the documentation/site status synchronized with the shipped supervisor, commit path, proxy backend, event rotation, branch acceptance, and evidence bundles.
+1. Keep the documentation/site status synchronized with the shipped supervisor, commit path, proxy backend, event rotation, branch acceptance, evidence bundles, normalized benchmark ledger, and trust UX.
 2. Add and maintain contract tests for every `partial` or `unavailable` capability so unsupported paths fail closed.
 3. Run the disposable-VM acceptance matrix and `make benchmark-verify`; do not run privileged or destructive tests on the development Mac.
 
@@ -46,7 +46,8 @@ Everything else in the table is a deliberately staged post-demo/productisation i
 ## Verification evidence
 
 On 2026-07-20, the disposable Ubuntu 24.04 ARM64 VM passed
-`REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm` after rebuilding the Go binary
+`REWIND_VM_CONFIRM=VM_ONLY make final-vm` after bootstrapping packages,
+rebuilding the Go binary
 and eBPF object. The gate covered:
 
 - Landlock sensitive-read denial and recursive delete rollback;

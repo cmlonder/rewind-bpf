@@ -19,8 +19,8 @@ cp -- "$OBJECT" "$BUNDLE_DIR/rewind_trace.bpf.o"
 cp -- "$POLICY" "$BUNDLE_DIR/policy.example.yaml"
 
 if command -v sha256sum >/dev/null 2>&1; then
-  (cd "$BUNDLE_DIR" && sha256sum ./*) > "$BUNDLE_DIR/SHA256SUMS"
+  (cd "$BUNDLE_DIR" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum) > "$BUNDLE_DIR/SHA256SUMS"
 else
-  (cd "$BUNDLE_DIR" && shasum -a 256 ./*) > "$BUNDLE_DIR/SHA256SUMS"
+  (cd "$BUNDLE_DIR" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 shasum -a 256) > "$BUNDLE_DIR/SHA256SUMS"
 fi
 printf 'RELEASE_BUNDLE=PASS path=%s\n' "$BUNDLE_DIR"

@@ -14,6 +14,12 @@ Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITE
 
 The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
 
+The final benchmark package is reproducible from the checked-in ledger:
+`python3 benchmarks/normalize_results.py && python3 benchmarks/plot_results.py && make benchmark-verify`.
+The normalized CSV makes storage amplification, telemetry bytes per event,
+lifecycle wall time, and B0-relative throughput gaps explicit. Blank cells mean
+that a dimension was not measured for that control; they are not estimates.
+
 Release builds are cross-compiled with `make release`; `make release-manifest` adds `bin/SHA256SUMS` and `bin/release-metadata.txt`. In the Linux VM, `REWIND_EBPF_OBJECT=ebpf/rewind_trace.bpf.o make release-bundle` packages all binaries, the compiled eBPF object, an example policy, and a bundle checksum file. For a detached Ed25519 signature, generate a key outside the repository and run `REWIND_RELEASE_PRIVATE_KEY=/secure/path/release.key make release-sign`; this writes `bin/SHA256SUMS.sig` and records the signing status without copying the private key. Verify with `rewind release verify --input bin/SHA256SUMS --signature bin/SHA256SUMS.sig --public-key /secure/path/release.pub`. An embedded public key proves integrity, while a pinned key proves publisher identity; public registry trust, rotation, and revocation remain deployment responsibilities.
 
 ## Competitive landscape
@@ -127,10 +133,12 @@ After building the binary and eBPF object inside that VM, run the repeatable
 synthetic acceptance matrix with:
 
 ```bash
-REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm
+REWIND_VM_CONFIRM=VM_ONLY make final-vm
 ```
 
-This gate is VM-only and covers rollback/read denial, evidence bundle
+This one-command gate bootstraps the disposable Ubuntu VM, rebuilds the Go
+binary and CO-RE object, creates the release bundle, runs the jury scenario,
+and covers rollback/read denial, evidence bundle
 create/verify, review/commit, clean-branch acceptance, destination-drift
 refusal, proxy/raw-socket semantics, strict namespace isolation, real
 allow-listed veth/IPSet/NAT egress, and incomplete-evidence refusal. Run

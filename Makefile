@@ -2,7 +2,7 @@ BIN_DIR := bin
 BIN := $(BIN_DIR)/rewind
 EVIDENCE_BIN := $(BIN_DIR)/rewind-evidence
 
-.PHONY: build test fmt clean release release-manifest release-sign release-bundle publish-site benchmark-verify bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm mac-safe-smoke jury-demo-vm
+.PHONY: build test fmt clean release release-manifest release-sign release-bundle publish-site benchmark-verify bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm mac-safe-smoke jury-demo-vm final-vm
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -39,6 +39,8 @@ publish-site:
 	./scripts/publish_site.sh site
 
 benchmark-verify:
+	python3 benchmarks/normalize_results.py
+	python3 benchmarks/plot_results.py
 	./scripts/benchmark_verify.sh benchmarks
 
 bootstrap:
@@ -58,3 +60,6 @@ mac-safe-smoke:
 
 jury-demo-vm:
 	./scripts/jury_demo_vm.sh
+
+final-vm:
+	REWIND_VM_CONFIRM=VM_ONLY ./scripts/final_vm_gate.sh

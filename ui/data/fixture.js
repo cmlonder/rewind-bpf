@@ -78,6 +78,21 @@ export const fixture = {
       { platform: "Windows", state: "manual gate", detail: "Job Object + minifilter + VHDX" },
     ],
   },
+  registry: {
+    state: "verified",
+    endpoint: "https://registry.rewind.example/v1",
+    lastVerified: "today · 10:39",
+    keys: [
+      { id: "rewind-prod-2026", state: "current" },
+      { id: "rewind-previous-2025", state: "previous" },
+    ],
+    checks: [
+      ["Endpoint transport", "HTTPS + bounded retry", "verified"],
+      ["Signer trust", "2 pinned Ed25519 keys", "verified"],
+      ["Envelope admission", "signature before persistence", "verified"],
+      ["Browser authority", "metadata only · no root", "ready"],
+    ],
+  },
 };
 
 export function getRun(id) { return fixture.runs.find((run) => run.id === id) || fixture.runs[0]; }

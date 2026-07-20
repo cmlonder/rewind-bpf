@@ -57,24 +57,25 @@ def render(rows: list[dict[str, str]]) -> str:
         '<style>text{font-family:Inter,Arial,sans-serif;fill:#172033}.title{font-size:17px;font-weight:700}.axis{stroke:#94a3b8;stroke-width:1}.tick,.unit{font-size:10px;fill:#64748b}.label{font-size:11px}.value{font-size:9px}.legend{font-size:12px}</style>',
         '<rect width="1200" height="720" fill="#ffffff"/>',
         '<text x="48" y="34" font-size="24" font-weight="700">RewindBPF benchmark summary</text>',
-        '<text x="48" y="56" font-size="12" fill="#64748b">Five-run buffered fio measurements captured in the disposable Ubuntu VM</text>',
+        '<text x="48" y="56" font-size="12" fill="#64748b">Five-run buffered fio measurements · normalized storage, evidence, and lifecycle ledger</text>',
     ]
     lines += panel(rows, 48, 78, 520, 250, "Throughput", ("read_bw_kib_s", "write_bw_kib_s"), "KiB/s")
     lines += panel(rows, 610, 78, 520, 250, "p50 completion latency", ("read_p50_us", "write_p50_us"), "microseconds")
     lines += panel(rows, 48, 380, 520, 250, "IOPS", ("read_iops", "write_iops"), "operations/s")
-    lines += panel(rows, 610, 380, 520, 250, "Upper layer size", ("upper_bytes",), "bytes")
+    lines += panel(rows, 610, 380, 520, 250, "Storage amplification", ("storage_amplification_x",), "x workload bytes")
     legend_x = 850
     for index, variant in enumerate(LABELS):
         x = legend_x + index * 100
         lines.append(f'<rect x="{x}" y="646" width="12" height="12" fill="{COLORS[variant]}"/>')
         lines.append(f'<text x="{x + 17}" y="657" class="legend">{LABELS[variant]}</text>')
+    lines.append('<text x="48" y="690" font-size="10" fill="#64748b">B5 telemetry: 16,620 events · 148.47 B/event · B4 protected wrapper: 64.34 s lifecycle wall time</text>')
     lines.append('</svg>')
     return "\n".join(lines) + "\n"
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, default=Path(__file__).with_name("results_summary.csv"))
+    parser.add_argument("--input", type=Path, default=Path(__file__).with_name("results_normalized.csv"))
     parser.add_argument("--output", type=Path, default=Path(__file__).with_name("results_chart.svg"))
     args = parser.parse_args()
     args.output.write_text(render(load_rows(args.input)), encoding="utf-8")

@@ -29,6 +29,9 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Show the optional content PII scanner as audit-only: findings are hashed/redacted and the scanner never changes read permissions.
 - Select a generic, Codex, OpenHands, or Claude Code adapter per workspace; the adapter is an auditable launch identity, not an SDK wrapper yet.
 - Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
+- Use the Trust & Actions screen to understand one-time action-token challenges,
+  edit a pinned HTTPS registry profile, verify signer rotation, and preview a
+  signed policy fetch without exposing bearer tokens or private keys.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
 
 These actions deliberately stop at the fixture adapter until a supervisor is
@@ -38,7 +41,9 @@ verified by the supervisor, rollback/recovery/commit
 confirmations POST authenticated intents, and the run detail view follows its
 authenticated SSE evidence stream. Credential lease responses contain only an
 opaque ID/scope/expiry marker, and the browser still never receives root access
-or performs privileged work.
+or performs privileged work. Destructive browser intents additionally require
+an in-memory, two-minute, one-time action token; the token is a human intent
+challenge, not a replacement for supervisor bearer authentication.
 
 ## Demo scope decision
 

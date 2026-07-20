@@ -332,7 +332,14 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining connected work is trusted policy distribution. P4 now has a bounded
+The trusted policy distribution UX is now present in the control plane. It shows
+the pinned HTTPS endpoint, current/previous Ed25519 signer IDs, verification
+checks, staged rotation, and a fixture-safe fetch/import flow. Destructive
+browser intents use an in-memory two-minute one-time action token before an
+authenticated supervisor request; this token is intentionally separate from
+the bearer credential and is not a replacement for server authorization.
+
+P4 now has a bounded
 history contract, signed policy provenance, encrypted evidence hand-off,
 multi-key trust rotation, a token-authenticated Unix-socket server, an optional
 loopback HTTP bridge, snapshot and follow-mode event endpoints, local
