@@ -43,6 +43,21 @@ Before running the full regression suite, only these implementation items are st
 
 Everything else in the table is a deliberately staged post-demo/productisation item, not a hidden unfinished P0 feature.
 
+## Verification evidence
+
+On 2026-07-20, the disposable Ubuntu 24.04 ARM64 VM passed
+`REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm` after rebuilding the Go binary
+and eBPF object. The gate covered:
+
+- Landlock sensitive-read denial and recursive delete rollback;
+- review plus explicit conflict-checked commit;
+- destination drift refusal with no partial apply;
+- proxy allow/deny for a local HTTP endpoint and `example.invalid`; and
+- bounded-event evidence marked incomplete and rejected by verification.
+
+Host-side `go test ./...`, `go vet ./...`, UI syntax checks, and shell syntax
+checks also pass. Privileged OverlayFS/eBPF tests remain VM-only by design.
+
 ## Recommended next phases
 
 ### P0 — Verification gate (current)
