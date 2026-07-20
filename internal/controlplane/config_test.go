@@ -3,6 +3,8 @@ package controlplane
 import (
 	"crypto/ed25519"
 	"crypto/rand"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -82,5 +84,40 @@ func TestStoreImportsVerifiedSignedPolicy(t *testing.T) {
 	signed.Signature = "invalid"
 	if err := store.CreateSignedPolicy(signed); err == nil {
 		t.Fatal("tampered signed policy unexpectedly accepted")
+	}
+}
+
+func TestStoreRejectsTamperedPersistedSignedEnvelope(t *testing.T) {
+	_, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := policybundle.Sign(policybundle.Bundle{Name: "durable-agent", Version: "1.0.0", Policy: testPolicy()}, private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "config.json")
+	store := Open(path)
+	if err := store.CreateSignedPolicy(signed); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var snapshot Snapshot
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	snapshot.Policies[0].SignedBundle.Signature = "tampered"
+	data, err = json.Marshal(snapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Snapshot(); err == nil {
+		t.Fatal("tampered persisted envelope unexpectedly accepted")
 	}
 }

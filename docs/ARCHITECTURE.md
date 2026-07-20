@@ -697,8 +697,10 @@ validate names, versions, paths, and policy references, and are recorded in the
 redacted supervisor audit without storing workspace contents.
 
 Signed policy bundle imports use `POST /v1/policy-bundles`. The supervisor
-verifies the Ed25519 envelope before persistence and records the signer key ID
-alongside the package. `--trusted-policy-keys` can provide a comma-separated
+verifies the Ed25519 envelope before persistence, stores the signed envelope
+for later verification, and records the signer key ID alongside the package.
+Config reads re-verify stored envelopes and fail closed if their signature or
+metadata has been tampered with. `--trusted-policy-keys` can provide a comma-separated
 allow-list of raw public-key files; when configured, signatures from any other
 key are refused and audited. Omitting the allow-list is an explicit local-demo
 mode: cryptographic integrity is checked, but organization-level trust is not

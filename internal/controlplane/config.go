@@ -20,13 +20,14 @@ var identifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{1,63}$`)
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 type PolicyPackage struct {
-	Name        string        `json:"name"`
-	Version     string        `json:"version"`
-	Description string        `json:"description,omitempty"`
-	Policy      policy.Policy `json:"policy"`
-	Signed      bool          `json:"signed"`
-	SignerKeyID string        `json:"signer_key_id,omitempty"`
-	UpdatedAt   time.Time     `json:"updated_at"`
+	Name         string               `json:"name"`
+	Version      string               `json:"version"`
+	Description  string               `json:"description,omitempty"`
+	Policy       policy.Policy        `json:"policy"`
+	Signed       bool                 `json:"signed"`
+	SignerKeyID  string               `json:"signer_key_id,omitempty"`
+	SignedBundle *policybundle.Signed `json:"signed_bundle,omitempty"`
+	UpdatedAt    time.Time            `json:"updated_at"`
 }
 
 type Workspace struct {
@@ -86,12 +87,13 @@ func (s *Store) CreateSignedPolicy(signed policybundle.Signed) error {
 		return err
 	}
 	return s.CreatePolicy(PolicyPackage{
-		Name:        bundle.Name,
-		Version:     bundle.Version,
-		Description: bundle.Description,
-		Policy:      bundle.Policy,
-		Signed:      true,
-		SignerKeyID: signed.KeyID,
+		Name:         bundle.Name,
+		Version:      bundle.Version,
+		Description:  bundle.Description,
+		Policy:       bundle.Policy,
+		Signed:       true,
+		SignerKeyID:  signed.KeyID,
+		SignedBundle: &signed,
 	})
 }
 
@@ -149,6 +151,18 @@ func (s *Store) readLocked() (Snapshot, error) {
 	}
 	if snapshot.Workspaces == nil {
 		snapshot.Workspaces = []Workspace{}
+	}
+	for _, value := range snapshot.Policies {
+		if !value.Signed || value.SignedBundle == nil {
+			continue
+		}
+		bundle, err := policybundle.Verify(*value.SignedBundle)
+		if err != nil {
+			return Snapshot{}, fmt.Errorf("verify stored signed policy %s@%s: %w", value.Name, value.Version, err)
+		}
+		if bundle.Name != value.Name || bundle.Version != value.Version || value.SignerKeyID != value.SignedBundle.KeyID {
+			return Snapshot{}, fmt.Errorf("stored signed policy %s@%s metadata mismatch", value.Name, value.Version)
+		}
 	}
 	return snapshot, nil
 }
