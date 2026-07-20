@@ -633,6 +633,12 @@ This verifies the Stage 4 path end to end: the eBPF tracepoints attached, the PI
 
 The compiler preserves deny-before-allow precedence, supports `off`/`audit`/`enforce`, rejects paths that exceed the 255-byte kernel key budget, and can compile a root-scoped system policy inside the disposable VM. In `enforce` mode it also emits deterministic allowed-file and allowed-directory lists for Landlock’s allowlist model. The first MVP intentionally covers paths present in the start manifest; matching newly created sensitive paths requires a later dynamic rule update or a broader kernel matcher.
 
+`rewind pii scan` is an optional, deterministic audit tool outside the protected
+run hot path. It scans bounded text files for common PII/token patterns, stores
+only SHA-256 value hashes in findings, and can emit a redacted copy. It is not a
+read-policy substitute: path-based Landlock enforcement remains the mechanism
+that denies sensitive reads, and the scanner never grants access.
+
 ## 28. Stage 5 read enforcement preparation
 
 The current VM reports `lockdown,capability,landlock,yama` in `/sys/kernel/security/lsm`. Therefore the MVP enforcement choice is:

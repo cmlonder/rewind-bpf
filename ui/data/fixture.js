@@ -42,14 +42,14 @@ export const fixture = {
     { name: "hackathon-demo", version: "0.4.0", state: "available", signed: true, description: "Small, explainable profile for the live jury flow", reads: "enforce", writes: "rollback", network: "audit", assigned: 1, updated: "Jul 18" },
   ],
   workspaces: [
-    { name: "payments-api", path: "/workspaces/payments-api", policy: "strict-agent@1.3.0", status: "protected", lastRun: "08e0ef80", agent: "agent --task refactor-auth", network: "audit" },
-    { name: "rewind-demo", path: "/workspaces/rewind-demo", policy: "hackathon-demo@0.4.0", status: "protected", lastRun: "d1b08d60", agent: "demo-agent --dangerous", network: "audit" },
-    { name: "docs-site", path: "/workspaces/docs-site", policy: "developer-safe@0.8.2", status: "protected", lastRun: "—", agent: "agent --task docs", network: "off" },
-    { name: "scratch", path: "/workspaces/scratch", policy: "none", status: "unassigned", lastRun: "—", agent: "not configured", network: "off" },
+    { name: "payments-api", path: "/workspaces/payments-api", policy: "strict-agent@1.3.0", status: "protected", lastRun: "08e0ef80", agent: "agent --task refactor-auth", adapter: "codex", network: "audit" },
+    { name: "rewind-demo", path: "/workspaces/rewind-demo", policy: "hackathon-demo@0.4.0", status: "protected", lastRun: "d1b08d60", agent: "demo-agent --dangerous", adapter: "generic", network: "audit" },
+    { name: "docs-site", path: "/workspaces/docs-site", policy: "developer-safe@0.8.2", status: "protected", lastRun: "—", agent: "agent --task docs", adapter: "openhands", network: "off" },
+    { name: "scratch", path: "/workspaces/scratch", policy: "none", status: "unassigned", lastRun: "—", agent: "not configured", adapter: "generic", network: "off" },
   ],
   config: {
     revision: 42,
-    values: { overlay: "fuse-overlayfs", readMode: "enforce", writeMode: "rollback", network: "audit", eventCap: "unlimited", rotation: "512 KiB", retention: "7 days", truncation: "fail closed", encryption: "AES-256-GCM", trustRotation: "2 pinned keys", remoteRetention: "signed HTTPS", session: "reconnectable" },
+    values: { overlay: "fuse-overlayfs", readMode: "enforce", writeMode: "rollback", network: "audit", eventCap: "unlimited", rotation: "512 KiB", retention: "7 days", truncation: "fail closed", encryption: "AES-256-GCM", trustRotation: "2 pinned keys", remoteRetention: "signed HTTPS", session: "reconnectable", pii: "audit-only" },
   },
   history: [
     { id: "d1b08d60", state: "rolled_back", workspace: "rewind-demo", updated: "2 min ago", size: "128 MiB upper" },

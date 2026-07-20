@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rewindbpf/rewind/internal/agent"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policybundle"
 )
@@ -31,10 +32,11 @@ type PolicyPackage struct {
 }
 
 type Workspace struct {
-	Name      string    `json:"name"`
-	Path      string    `json:"path"`
-	Policy    string    `json:"policy"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Name      string     `json:"name"`
+	Path      string     `json:"path"`
+	Policy    string     `json:"policy"`
+	Adapter   agent.Kind `json:"adapter,omitempty"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 type Snapshot struct {
@@ -207,6 +209,9 @@ func validateWorkspace(value Workspace) error {
 	}
 	if strings.TrimSpace(value.Policy) == "" {
 		return fmt.Errorf("workspace policy is required; use none to leave unassigned")
+	}
+	if _, err := agent.Resolve(string(value.Adapter)); err != nil {
+		return err
 	}
 	return nil
 }

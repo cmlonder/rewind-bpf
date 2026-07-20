@@ -87,6 +87,7 @@ function handleAction(action, element) {
   if (action === "view-revisions") return setToast("Revision history is already visible in this fixture.", "neutral");
   if (action === "inspect-audit") return setToast("Audit event details are available after supervisor integration.", "neutral");
   if (action === "config-change") return openConfigEditor(element.dataset.configKey);
+  if (action === "pii-scan") return setToast("PII scan is audit-only: findings are hashed and redacted; it never broadens read access.", "neutral");
 }
 
 function openSupervisorConnector() {
@@ -260,6 +261,7 @@ function remoteWorkspace(item) {
     status: "protected",
     lastRun: "—",
     agent: "not configured",
+    adapter: item.adapter || "generic",
     network: "reported by policy",
   };
 }
@@ -383,15 +385,15 @@ function bundleName(bundle) {
 }
 
 function openWorkspaceEditor(name = "") {
-  openModal(name ? `Edit ${name}` : "Add workspace", `<form id="workspace-form" class="modal-form"><label>Workspace name<input name="name" value="${name}" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" maxlength="64" required /></label><label>Workspace path<input name="path" value="/workspaces/${name || "new-project"}" pattern="/[A-Za-z0-9._~/-]+" maxlength="240" required /></label><label>Policy package<select name="policy"><option>strict-agent@1.3.0</option><option>developer-safe@0.8.2</option><option>hackathon-demo@0.4.0</option></select></label><div class="form-note">Assignment is stored as a revision and used by new runs only.</div></form>`, { confirm: name ? "Save assignment" : "Add workspace", onConfirm: () => {
+  openModal(name ? `Edit ${name}` : "Add workspace", `<form id="workspace-form" class="modal-form"><label>Workspace name<input name="name" value="${name}" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" maxlength="64" required /></label><label>Workspace path<input name="path" value="/workspaces/${name || "new-project"}" pattern="/[A-Za-z0-9._~/-]+" maxlength="240" required /></label><label>Policy package<select name="policy"><option>strict-agent@1.3.0</option><option>developer-safe@0.8.2</option><option>hackathon-demo@0.4.0</option></select></label><label>Agent adapter<select name="adapter"><option>generic</option><option>codex</option><option>openhands</option><option>claude-code</option></select></label><div class="form-note">The adapter records agent identity; it never rewrites the operator command. Assignment applies to new runs only.</div></form>`, { confirm: name ? "Save assignment" : "Add workspace", onConfirm: () => {
     const form = document.querySelector("#workspace-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
-    const value = { name: data.get("name"), path: data.get("path"), policy: data.get("policy") };
+    const value = { name: data.get("name"), path: data.get("path"), policy: data.get("policy"), adapter: data.get("adapter") };
     const save = state.supervisor ? state.supervisor.assignWorkspace(value) : Promise.resolve();
     save.then(() => {
       const existing = fixture.workspaces.find((workspace) => workspace.name === name);
-      if (existing) { existing.path = value.path; existing.policy = value.policy; } else fixture.workspaces.push({ name: value.name, path: value.path, policy: value.policy, status: "protected", lastRun: "—", agent: "not configured", network: "off" });
+      if (existing) { existing.path = value.path; existing.policy = value.policy; existing.adapter = value.adapter; } else fixture.workspaces.push({ name: value.name, path: value.path, policy: value.policy, status: "protected", lastRun: "—", agent: "not configured", adapter: value.adapter, network: "off" });
       closeModal(); render(); setToast(state.supervisor ? "Workspace assignment persisted by supervisor." : "Workspace assignment saved for future runs.", "success");
     }).catch((error) => setToast(`Workspace assignment refused: ${error.message}`, "error"));
     return save;
@@ -399,7 +401,7 @@ function openWorkspaceEditor(name = "") {
 }
 
 function openConfigEditor(key) {
-  const labels = { overlay: ["Overlay backend", ["fuse-overlayfs", "kernel-overlayfs"]], readMode: ["Default read mode", ["off", "audit", "enforce"]], writeMode: ["Write behavior", ["rollback"]], network: ["Network mode", ["off", "audit", "enforce"]], eventCap: ["Total event cap", ["unlimited", "1 MiB", "16 MiB"]], rotation: ["Rotation size", ["256 KiB", "512 KiB", "1 MiB"]], retention: ["Retention", ["24 hours", "7 days", "30 days"]], truncation: ["On truncation", ["fail closed", "audit only"]], encryption: ["Bundle encryption", ["AES-256-GCM", "off"]], trustRotation: ["Trust rotation", ["2 pinned keys", "1 pinned key"]], remoteRetention: ["Remote hand-off", ["signed HTTPS", "local only"]], session: ["Session", ["reconnectable", "single-owner"]] };
+  const labels = { overlay: ["Overlay backend", ["fuse-overlayfs", "kernel-overlayfs"]], readMode: ["Default read mode", ["off", "audit", "enforce"]], writeMode: ["Write behavior", ["rollback"]], network: ["Network mode", ["off", "audit", "enforce"]], eventCap: ["Total event cap", ["unlimited", "1 MiB", "16 MiB"]], rotation: ["Rotation size", ["256 KiB", "512 KiB", "1 MiB"]], retention: ["Retention", ["24 hours", "7 days", "30 days"]], truncation: ["On truncation", ["fail closed", "audit only"]], encryption: ["Bundle encryption", ["AES-256-GCM", "off"]], trustRotation: ["Trust rotation", ["2 pinned keys", "1 pinned key"]], remoteRetention: ["Remote hand-off", ["signed HTTPS", "local only"]], session: ["Session", ["reconnectable", "single-owner"]], pii: ["Content PII scan", ["audit-only", "off"]] };
   const [label, options] = labels[key] || [key, [fixture.config.values[key]]];
   openModal(`Edit ${label}`, `<form id="config-form" class="modal-form"><label>${label}<select name="value">${options.map((option) => `<option ${option === fixture.config.values[key] ? "selected" : ""}>${option}</option>`).join("")}</select></label><div class="form-note">This creates revision ${fixture.config.revision + 1}; active runs remain unchanged.</div></form>`, { confirm: "Save revision", onConfirm: () => { const value = new FormData(document.querySelector("#config-form")).get("value"); fixture.config.values[key] = value; fixture.config.revision += 1; closeModal(); render(); setToast(`${label} updated in revision ${fixture.config.revision}.`, "success"); } });
 }

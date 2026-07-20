@@ -119,7 +119,7 @@ Modes:
 
 Users write glob patterns; a policy compiler turns them into filesystem hierarchy and access rules. Avoid running expensive regex matching on every read syscall. Use Landlock and/or BPF LSM for enforcement. eBPF tracepoints are useful for audit and telemetry but should not be presented as the sole deny mechanism.
 
-The first MVP provides path-based access control. Automatic content-based PII classification and redaction are future work.
+The first MVP provides path-based access control. An optional bounded audit scanner now detects common PII/token patterns without returning raw values; runtime content-based enforcement, configurable classifiers, and leakage benchmarks remain future work.
 
 ### 5.3 Privilege, network, and resource policies
 
@@ -257,7 +257,7 @@ Primary invariant:
 
 ### Out of scope or later
 
-- Automatic PII classification/redaction for all file contents.
+- Mandatory automatic PII classification/redaction for all file contents (the optional bounded audit scanner is not enforcement).
 - Absolute rollback of live-host kernel, device, or network state.
 - Production-grade conflict-aware merge.
 - Multi-filesystem and network-filesystem guarantees.

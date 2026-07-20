@@ -26,6 +26,8 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Edit global runtime settings through revisioned controls; active runs remain unchanged.
 - Inspect broker status and request metadata-only credential leases when an opt-in provider is configured.
 - Apply keep-latest history pruning and manage expiring reconnect/takeover session leases through the authenticated supervisor.
+- Show the optional content PII scanner as audit-only: findings are hashed/redacted and the scanner never changes read permissions.
+- Select a generic, Codex, OpenHands, or Claude Code adapter per workspace; the adapter is an auditable launch identity, not an SDK wrapper yet.
 - Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
 

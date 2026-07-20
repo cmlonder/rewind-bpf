@@ -39,6 +39,8 @@ Usage:
   rewind release verify --input PATH --signature PATH [--public-key PATH]
   rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
   rewind history prune --path PATH --keep N
+  rewind pii scan --path PATH [--output PATH --redact-output PATH]
+  rewind agent list
   rewind rollback --record PATH
   rewind recover --record PATH
   rewind commit --record PATH --confirm
@@ -109,6 +111,10 @@ func main() {
 		handleSupervisor(os.Args[2:])
 	case "history":
 		handleHistory(os.Args[2:])
+	case "pii":
+		handlePII(os.Args[2:])
+	case "agent":
+		handleAgent(os.Args[2:])
 	case "commit":
 		handleCommit(os.Args[2:])
 	default:

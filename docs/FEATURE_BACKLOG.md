@@ -25,10 +25,10 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Linux release/bootstrap | **Shipped / signed locally** | VM bootstrap, release Make targets, cross-build checks, SHA256SUMS, release metadata, and detached Ed25519 signature/verification with optional pinned public key | Public registry trust, key rotation/revocation, and package repository |
 | macOS native backend | **Prepared / manual gate** | Read-only APFS/Seatbelt/diskutil prerequisite plan, platform CLI, and fail-closed capability report; no destructive operation is enabled | Native Seatbelt/EndpointSecurity + APFS disposable-volume implementation and destructive tests on disposable storage |
 | Windows native backend | **Not implemented** | Cross-build and fail-closed unavailable backend only; WSL2 remains compatibility mode | Native process/filesystem policy + disposable workspace implementation and Windows VM tests |
-| Agent integrations | **Not implemented** | Generic `-- <agent-command>` wrapper | Tested adapters for Codex CLI/OpenHands/Claude Code or a stable adapter SDK |
+| Agent integrations | **Partial / contract** | `--agent-adapter` validates and persists `generic`, `codex`, `openhands`, or `claude-code` identity without rewriting the operator command; `rewind agent list` exposes the registry | Tested launch semantics, lifecycle callbacks, and SDK-specific adapters |
 | Durable remote retention | **Partial / encrypted signed hand-off** | Bounded local history and keep-latest pruning, AES-256-GCM encrypted evidence envelopes, checksum-indexed archives, detached Ed25519 signatures, multi-key trust rotation, and explicit HTTPS publish | Object-store durability, KMS-backed key lifecycle, and restore automation |
 | Detachable/ghost sessions | **Shipped / local lease** | Expiring authenticated acquire/heartbeat/takeover/release owner leases, reconnectable event follow, and redacted session audit | Runtime-enforced multi-operator coordination and distributed lease storage |
-| Content-aware PII protection | **Not implemented** | Path-pattern protection only | Classifier/redactor with deterministic policy and leakage benchmarks |
+| Content-aware PII protection | **Partial / audit-only** | Deterministic bounded scanner detects email, phone, SSN, credit-card, and API-token patterns; findings contain hashes only and optional redacted output; it never broadens read access | Runtime pre-read enforcement, configurable classifiers, and leakage benchmarks |
 | Multi-agent/checkpoint graph | **Not implemented** | One transaction per run | Child transactions, dependency-aware merge, and multiple rewind points |
 
 ## What this means before tests
@@ -98,4 +98,4 @@ Implement and test Windows-native process/filesystem policy and a disposable wor
 
 ### P4 — Scale and ecosystem
 
-Add detachable sessions, remote retention/registry, agent adapters, multi-agent transaction graphs, content-aware PII controls, and checkpoint research.
+Add distributed detachable sessions, remote retention/registry, SDK-specific agent adapters, multi-agent transaction graphs, runtime content-aware PII controls, and checkpoint research. Local leases, encrypted hand-off, adapter identity, and deterministic audit scanning are already shipped.

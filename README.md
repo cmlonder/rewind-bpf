@@ -130,6 +130,10 @@ The primary workflow runs inside the disposable Linux VM:
 sudo rewind run --workspace ./project --runtime-root ./runtime \
   --policy ./policy.yaml --record ./runtime/record.json \
   --history ./runtime/history.json -- agent-command
+rewind pii scan --path ./project --output ./runtime/pii-findings.json
+# Optional single-file redaction:
+rewind pii scan --path ./project/config.env --redact-output ./runtime/config.env.redacted
+rewind agent list
 sudo rewind status --record ./runtime/record.json
 rewind inspect --record ./runtime/record.json
 sudo rewind events --record ./runtime/record.json
@@ -161,6 +165,8 @@ sudo rewind branch apply --record ./runtime/record.json --repo ./project \
 ```
 
 Successful runs discard the temporary upper/work layer by default. Add `--on-success review` when you explicitly need to inspect the merged view before choosing export or discard. The agent always sees a merged workspace backed by an OverlayFS lower/upper pair; the protected lower layer is never modified before acceptance. `export` writes a review-only JSON bundle containing before/after manifests and changes; `--format patch` renders regular text-file changes as a non-mutating unified diff, while `--format git-patch` uses Git’s read-only `--no-index --binary` mode for full-fidelity binary, directory, and mode changes. The JSON bundle remains canonical for machine inspection, and neither patch format merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns. Network policy supports an explicit loopback proxy backend for proxy-aware HTTP/HTTPS clients; `network.mode: audit` persists observations and `network.mode: enforce` applies allow/deny decisions. Enforce runs deny raw/packet sockets; `--network-backend deny` additionally blocks IPv4/IPv6/packet socket creation and connect attempts for non-proxy-aware clients, leaving only Unix-domain IPC. The default credential broker refuses raw secret exposure; the opt-in external command provider can issue short-lived one-shot leases without putting secret contents in policy, argv, or workspace. Candidate acceptance is conflict-checked against the immutable base before `rewind commit --confirm` applies regular-file and directory changes. The optional Git branch adapter requires a clean checkout of the named branch, runs Git patch preflight, refuses `.git` metadata changes, and only creates a commit when `--commit` and `--confirm` are both present.
+
+The optional `rewind pii scan` command is an audit/redaction helper, not a read-enforcement layer. It scans bounded text files for common email, phone, SSN, credit-card, and API-token patterns, writes only truncated SHA-256 value hashes to findings, and can produce a redacted single-file copy. It never grants access and never places raw matches in evidence. Choose an adapter identity with `--agent-adapter generic|codex|openhands|claude-code`; the identity is persisted in the run plan while the operator-owned command remains unchanged. SDK-specific launch semantics are intentionally a later integration gate.
 
 Signed policy provenance is available without putting secrets in the package:
 

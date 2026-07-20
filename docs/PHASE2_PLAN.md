@@ -172,7 +172,9 @@ These are product hypotheses to validate, not current claims:
 - Reversing network requests, cloud mutations, kernel/device state, database transactions, or external side effects.
 - A generic VM/container replacement.
 - Automatic semantic judgement of whether an agent’s code change is “good.”
-- Content inspection or PII classification of every file.
+- Mandatory content inspection or PII classification of every file. An optional
+  bounded audit scanner may run out-of-band, but it must never replace path
+  policy or silently grant access.
 - Rootless system-wide protection on arbitrary host filesystems without a tested kernel/filesystem capability matrix.
 - Claiming zero overhead; report measured overhead by backend and workload.
 
@@ -335,7 +337,7 @@ flowchart LR
 - Ship Linux x86_64 and ARM64 release artifacts with capability diagnostics.
 - Add `diff`, `inspect`, policy learning, and a documented commit/export preview.
 - Publish reproducible benchmark scripts and raw anonymised result bundles.
-- Integrate one real agent adapter (OpenHands, Claude Code, Codex CLI, or a generic command wrapper) without coupling core packages to that agent.
+- Integrate one real agent adapter (OpenHands, Claude Code, Codex CLI, or a generic command wrapper) without coupling core packages to that agent. The current release ships the identity/validation contract; SDK-specific launch and lifecycle semantics remain the acceptance gate.
 
 ### 31–60 days: team and CI workflow
 

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rewindbpf/rewind/internal/agent"
 	"github.com/rewindbpf/rewind/internal/capabilities"
 	"github.com/rewindbpf/rewind/internal/landlock"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
@@ -25,6 +26,7 @@ type Config struct {
 	RuntimeRoots   []string
 	OverlayBackend overlay.Backend
 	NetworkBackend string
+	AgentAdapter   string
 }
 
 type Plan struct {
@@ -39,6 +41,7 @@ type Plan struct {
 	Capabilities   capabilities.Report     `json:"capabilities,omitempty"`
 	HistoryPath    string                  `json:"history_path,omitempty"`
 	Network        netpolicy.Plan          `json:"network"`
+	AgentAdapter   agent.Kind              `json:"agent_adapter"`
 }
 
 // Build validates and composes all pre-execution state. The workspace is used
@@ -52,6 +55,10 @@ func Build(config Config) (Plan, error) {
 	}
 	if err := config.Policy.Validate(); err != nil {
 		return Plan{}, fmt.Errorf("build run plan: policy: %w", err)
+	}
+	agentSpec, err := agent.Resolve(config.AgentAdapter)
+	if err != nil {
+		return Plan{}, fmt.Errorf("build run plan: %w", err)
 	}
 	networkPlan, err := netpolicy.Compile(config.Policy.Network)
 	if err != nil {
@@ -109,7 +116,7 @@ func Build(config Config) (Plan, error) {
 	if backend != overlay.BackendFuse && backend != overlay.BackendKernel {
 		return Plan{}, fmt.Errorf("build run plan: unsupported overlay backend %q", backend)
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan}, nil
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind}, nil
 }
 
 func resolveWorkspace(value string) (string, error) {

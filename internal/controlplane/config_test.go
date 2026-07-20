@@ -61,6 +61,27 @@ func TestStoreRejectsUnsafeWorkspace(t *testing.T) {
 	}
 }
 
+func TestStorePersistsWorkspaceAgentAdapter(t *testing.T) {
+	store := Open(filepath.Join(t.TempDir(), "config.json"))
+	if err := store.AssignWorkspace(Workspace{Name: "demo", Path: "/workspaces/demo", Policy: "none", Adapter: "codex"}); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Workspaces) != 1 || snapshot.Workspaces[0].Adapter != "codex" {
+		t.Fatalf("workspaces=%+v", snapshot.Workspaces)
+	}
+}
+
+func TestStoreRejectsUnknownWorkspaceAgentAdapter(t *testing.T) {
+	store := Open(filepath.Join(t.TempDir(), "config.json"))
+	if err := store.AssignWorkspace(Workspace{Name: "demo", Path: "/workspaces/demo", Policy: "none", Adapter: "unknown"}); err == nil {
+		t.Fatal("expected unknown adapter error")
+	}
+}
+
 func TestStoreImportsVerifiedSignedPolicy(t *testing.T) {
 	_, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

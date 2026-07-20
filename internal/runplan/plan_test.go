@@ -51,6 +51,24 @@ func TestBuildComposesOverlayManifestAndLandlockPlan(t *testing.T) {
 	}
 }
 
+func TestBuildPersistsAgentAdapterIdentity(t *testing.T) {
+	workspace := t.TempDir()
+	plan, err := Build(Config{Workspace: workspace, RuntimeRoot: filepath.Join(t.TempDir(), "run"), AgentAdapter: "codex"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.AgentAdapter != "codex" {
+		t.Fatalf("agent adapter=%q, want codex", plan.AgentAdapter)
+	}
+}
+
+func TestBuildRejectsUnknownAgentAdapter(t *testing.T) {
+	_, err := Build(Config{Workspace: t.TempDir(), RuntimeRoot: filepath.Join(t.TempDir(), "run"), AgentAdapter: "unknown"})
+	if err == nil || !strings.Contains(err.Error(), "unsupported agent adapter") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestBuildRejectsWorkspaceRuntimeOverlap(t *testing.T) {
 	workspace := t.TempDir()
 	if _, err := Build(Config{Workspace: workspace, RuntimeRoot: filepath.Join(workspace, "run")}); err == nil {

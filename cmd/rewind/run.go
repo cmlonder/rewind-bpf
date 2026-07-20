@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rewindbpf/rewind/internal/agent"
 	"github.com/rewindbpf/rewind/internal/capabilities"
 	"github.com/rewindbpf/rewind/internal/cgroup"
 	"github.com/rewindbpf/rewind/internal/diff"
@@ -49,6 +50,7 @@ func handleRun(args []string) {
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
 	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy, deny, or namespace")
+	agentAdapter := flags.String("agent-adapter", "generic", "agent adapter: generic, codex, openhands, or claude-code")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	historyPath := flags.String("history", "", "optional durable run history JSON path")
 	if err := flags.Parse(args); err != nil {
@@ -57,6 +59,13 @@ func handleRun(args []string) {
 	command := flags.Args()
 	if len(command) == 0 || strings.TrimSpace(*workspace) == "" || strings.TrimSpace(*runtimeRoot) == "" || strings.TrimSpace(*policyPath) == "" || strings.TrimSpace(*recordPath) == "" {
 		fatal("usage: rewind run --workspace PATH --runtime-root PATH --policy PATH --record PATH [--sensor-object PATH] [--runtime-roots PATHS] [--overlay-backend fuse|kernel] -- <agent-command>")
+	}
+	agentSpec, err := agent.Resolve(*agentAdapter)
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := agent.ValidateCommand(agentSpec, command); err != nil {
+		fatal(err.Error())
 	}
 	if *overlayBackend != string(overlay.BackendFuse) && *overlayBackend != string(overlay.BackendKernel) {
 		fatal(fmt.Sprintf("unsupported overlay backend %q (want fuse or kernel)", *overlayBackend))
@@ -75,6 +84,7 @@ func handleRun(args []string) {
 		RuntimeRoots:   splitCSV(*runtimeRoots),
 		OverlayBackend: overlay.Backend(*overlayBackend),
 		NetworkBackend: *networkBackend,
+		AgentAdapter:   string(agentSpec.Kind),
 	})
 	if err != nil {
 		fatal(err.Error())
