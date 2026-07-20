@@ -16,7 +16,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | eBPF evidence | **Shipped / Linux** | CO-RE trace sensor, start gate, sequence numbers, hash chain, dropped-event accounting, bounded cap, ordered rotation, standalone verifier | Kernel-side backpressure policy and remote signed evidence storage |
 | Crash and stale-run recovery | **Shipped / Linux** | Parent death, open descriptors, stale FUSE mount, child drain, idempotent rollback/recover | Power-loss/startup matrix across filesystems |
 | Network policy | **Partial / fail-closed** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs deny raw/packet sockets; explicit `deny` and Linux `namespace` backends refuse non-proxy-aware egress | Allow-listed network namespace/cgroup egress enforcement and broader non-proxy-aware allow coverage |
-| Credential safety | **Partial / broker MVP** | Capability-only references, default refusal, and an opt-in external command provider with short-lived one-shot leases, expiry, revoke, and no secret in lease JSON/argv/workspace | Native keychain/secret-manager adapters, scoped injection protocol, and leakage tests against real providers |
+| Credential safety | **Partial / broker MVP** | Capability-only references, default refusal, an opt-in external command provider with short-lived one-shot leases, expiry/revoke, no secret in lease JSON/argv/workspace, and an authenticated supervisor `POST /v1/credential-leases` metadata endpoint | Native keychain/secret-manager adapters, scoped injection protocol, and leakage tests against real providers |
 | Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, full-fidelity Git patch export, manifest conflict checks, and clean-branch `rewind branch apply`; `rewind commit --confirm`; supervisor commit requires confirmation | Remote review workflow and richer provider adapters |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, and optional supervisor public-key allow-list enforcement | Remote registry, revocation, and organization trust distribution |
 | Local supervisor | **Shipped / Linux** | Permissioned Unix socket, token auth, health/capabilities/history, status/rollback/recover/commit, snapshot/follow events, redacted action audit | Detachable process sessions and operator takeover/reconnect |
@@ -78,10 +78,11 @@ Run unit, static, UI, and disposable-VM integration tests; verify rollback, read
 ### P1 — Linux productisation
 
 The local fail-closed network boundary, signed evidence hand-off, release signing,
-authenticated supervisor, and connected Control Plane mutation are shipped. The
-remaining P1 gates are an allow-listed network namespace/cgroup backend for
-non-proxy-aware clients, one real credential provider, and remote review/object
-storage with retention, encryption, and trust rotation.
+authenticated supervisor, connected Control Plane mutation, isolated Linux network
+namespace backend, and opt-in command-provider credential lease endpoint are
+shipped. The remaining P1 gates are allow-listed namespace/cgroup egress, a real
+platform credential provider, and remote review/object storage with retention,
+encryption, and trust rotation.
 
 ### P2 — Native macOS
 

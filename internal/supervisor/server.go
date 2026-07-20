@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
+	"github.com/rewindbpf/rewind/internal/credentials"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/platform"
@@ -39,6 +40,7 @@ type Server struct {
 	CORSOrigin        string
 	Config            *controlplane.Store
 	TrustedPolicyKeys []ed25519.PublicKey
+	CredentialBroker  credentials.Broker
 }
 
 func (s Server) Handler() http.Handler {
@@ -182,6 +184,41 @@ func (s Server) Handler() http.Handler {
 		response := Response{OK: true, State: "created", Message: bundle.Name + "@" + bundle.Version}
 		s.recordAudit(Request{Action: "policy_bundle_import", Policy: bundle.Name + "@" + bundle.Version}, response, nil)
 		writeJSON(w, http.StatusCreated, response)
+	})
+	mux.HandleFunc("/v1/credential-leases", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "credential leases require POST"})
+			return
+		}
+		if s.CredentialBroker == nil {
+			response := Response{OK: false, State: "refused", Message: "credential broker is unavailable"}
+			s.recordAudit(Request{Action: "credential_lease"}, response, nil)
+			writeJSON(w, http.StatusNotImplemented, response)
+			return
+		}
+		var request CredentialLeaseRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 64<<10)).Decode(&request); err != nil || strings.TrimSpace(request.Ref) == "" {
+			response := Response{OK: false, State: "refused", Message: "invalid credential lease request"}
+			s.recordAudit(Request{Action: "credential_lease"}, response, nil)
+			writeJSON(w, http.StatusBadRequest, response)
+			return
+		}
+		lease, err := s.CredentialBroker.Issue(credentials.Request{Ref: request.Ref, Scopes: append([]string(nil), request.Scopes...)})
+		if err != nil {
+			response := Response{OK: false, State: "refused", Message: err.Error()}
+			s.recordAudit(Request{Action: "credential_lease"}, response, err)
+			writeJSON(w, http.StatusConflict, response)
+			return
+		}
+		// Lease intentionally contains only opaque metadata. The broker keeps
+		// any secret bytes in its runtime-only store.
+		response := Response{OK: true, State: "issued", Message: lease.ID}
+		s.recordAudit(Request{Action: "credential_lease"}, response, nil)
+		writeJSON(w, http.StatusCreated, lease)
 	})
 	mux.HandleFunc("/v1/audit", s.auditLog)
 	mux.HandleFunc("/v1/events", s.events)

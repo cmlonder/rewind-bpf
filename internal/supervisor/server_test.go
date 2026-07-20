@@ -13,11 +13,18 @@ import (
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
+	"github.com/rewindbpf/rewind/internal/credentials"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policybundle"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
+
+type testCredentialBroker struct{}
+
+func (testCredentialBroker) Issue(request credentials.Request) (credentials.Lease, error) {
+	return credentials.Lease{ID: "lease-test", Ref: request.Ref, Scopes: request.Scopes, SecretExposed: false}, nil
+}
 
 func TestHandlerHealthAndReadOnlyActionBoundary(t *testing.T) {
 	server := Server{History: history.Open(filepath.Join(t.TempDir(), "history.json")), AuthToken: "secret"}
@@ -57,6 +64,25 @@ func TestHTTPBridgeRequiresAuthForReadEndpointsAndSetsCORS(t *testing.T) {
 	server.Handler().ServeHTTP(preflight, httptest.NewRequest(http.MethodOptions, "/v1/actions", nil))
 	if preflight.Code != http.StatusNoContent {
 		t.Fatalf("preflight status=%d", preflight.Code)
+	}
+}
+
+func TestCredentialLeaseEndpointRequiresAuthAndNeverReturnsSecret(t *testing.T) {
+	server := Server{AuthToken: "secret", RequireAuth: true, CredentialBroker: testCredentialBroker{}}
+	unauthorized := httptest.NewRecorder()
+	server.Handler().ServeHTTP(unauthorized, httptest.NewRequest(http.MethodPost, "/v1/credential-leases", strings.NewReader(`{"ref":"github"}`)))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status=%d", unauthorized.Code)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/v1/credential-leases", strings.NewReader(`{"ref":"github","scopes":["read:org"]}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || !strings.Contains(response.Body.String(), "lease-test") {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), `"secret":"`) || !strings.Contains(response.Body.String(), `"secret_exposed":false`) {
+		t.Fatalf("credential response leaked or omitted safety marker: %s", response.Body.String())
 	}
 }
 

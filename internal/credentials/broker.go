@@ -16,11 +16,11 @@ type Request struct {
 }
 
 type Lease struct {
-	ID            string
-	Ref           string
-	Scopes        []string
-	ExpiresAt     time.Time
-	SecretExposed bool
+	ID            string    `json:"id"`
+	Ref           string    `json:"ref"`
+	Scopes        []string  `json:"scopes,omitempty"`
+	ExpiresAt     time.Time `json:"expires_at"`
+	SecretExposed bool      `json:"secret_exposed"`
 }
 
 type Broker interface {

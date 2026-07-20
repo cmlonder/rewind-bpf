@@ -5,6 +5,11 @@ package supervisor
 
 import "fmt"
 
+type CredentialLeaseRequest struct {
+	Ref    string   `json:"ref"`
+	Scopes []string `json:"scopes,omitempty"`
+}
+
 type Request struct {
 	Action       string `json:"action"`
 	RunID        string `json:"run_id,omitempty"`

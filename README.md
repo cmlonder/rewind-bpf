@@ -183,6 +183,14 @@ supervisor has an authenticated authorization layer:
 sudo rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json
 ```
 
+The supervisor keeps credential issuance disabled unless an operator explicitly
+configures `--credential-provider-command PATH`. With that opt-in flag, an
+authenticated `POST /v1/credential-leases` request can obtain a short-lived,
+scoped lease; the response contains only lease metadata and never the provider's
+secret bytes. The provider command receives `REWIND_CREDENTIAL_REF` and
+`REWIND_CREDENTIAL_SCOPES` as metadata and its output remains in the runtime-only
+broker.
+
 For the browser Control Plane, expose an optional loopback-only HTTP bridge. It
 requires an exact CORS origin and bearer token; non-loopback bind addresses are
 refused:

@@ -16,8 +16,10 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
+	"github.com/rewindbpf/rewind/internal/credentials"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/supervisor"
 )
@@ -35,8 +37,10 @@ func handleSupervisor(args []string) {
 	httpListen := flags.String("http-listen", "", "optional loopback HTTP bridge address, e.g. 127.0.0.1:8787")
 	corsOrigin := flags.String("cors-origin", "", "optional exact browser origin allowed for the HTTP bridge")
 	trustedPolicyKeys := flags.String("trusted-policy-keys", "", "optional comma-separated raw Ed25519 public-key files for signed policy imports")
+	credentialProvider := flags.String("credential-provider-command", "", "optional command-provider executable for short-lived credential leases")
+	credentialTimeout := flags.Duration("credential-provider-timeout", 10*time.Second, "timeout for the credential provider command")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,...]")
+		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,... --credential-provider-command PATH]")
 	}
 	if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
 		fatal(err.Error())
@@ -61,6 +65,16 @@ func handleSupervisor(args []string) {
 	trustedKeys, err := loadTrustedPolicyKeys(*trustedPolicyKeys)
 	if err != nil {
 		fatal(err.Error())
+	}
+	var credentialBroker credentials.Broker
+	if strings.TrimSpace(*credentialProvider) != "" {
+		if *credentialTimeout <= 0 {
+			fatal("--credential-provider-timeout must be positive")
+		}
+		credentialBroker = &credentials.ManagedBroker{
+			Provider: credentials.CommandProvider{Path: strings.TrimSpace(*credentialProvider), Timeout: *credentialTimeout},
+			TTL:      5 * time.Minute,
+		}
 	}
 	token, err := loadSupervisorToken(*tokenPath)
 	if err != nil {
@@ -87,6 +101,7 @@ func handleSupervisor(args []string) {
 		AuthToken:         token,
 		Config:            controlplane.Open(*configPath),
 		TrustedPolicyKeys: trustedKeys,
+		CredentialBroker:  credentialBroker,
 		AuditPath:         *historyPath + ".actions.jsonl",
 		AuditMu:           &sync.Mutex{},
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {
