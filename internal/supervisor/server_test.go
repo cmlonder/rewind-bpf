@@ -87,6 +87,25 @@ func TestConfigEndpointsRequireAuthAndPersistValidatedChanges(t *testing.T) {
 	}
 }
 
+func TestRejectedConfigMutationIsAudited(t *testing.T) {
+	auditPath := filepath.Join(t.TempDir(), "audit.jsonl")
+	server := Server{AuthToken: "secret", Config: controlplane.Open(filepath.Join(t.TempDir(), "config.json")), AuditPath: auditPath, AuditMu: &sync.Mutex{}}
+	request := httptest.NewRequest(http.MethodPost, "/v1/policies", strings.NewReader(`{"name":"bad name","version":"1.0.0","policy":{"read":{"mode":"audit"}}}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	audit, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(audit), `"action":"policy_create"`) || !strings.Contains(string(audit), `"ok":false`) {
+		t.Fatalf("audit=%s", audit)
+	}
+}
+
 func TestAuthenticatedActionWithoutRuntimeHandlerRefuses(t *testing.T) {
 	server := Server{AuthToken: "secret"}
 	recorder := httptest.NewRecorder()

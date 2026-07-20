@@ -94,6 +94,7 @@ func (s Server) Handler() http.Handler {
 			return
 		}
 		if err := s.createPolicy(value); err != nil {
+			s.recordAudit(Request{Action: "policy_create", Policy: value.Name + "@" + value.Version}, Response{OK: false, State: "refused", Message: err.Error()}, err)
 			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: err.Error()})
 			return
 		}
@@ -127,6 +128,7 @@ func (s Server) Handler() http.Handler {
 			return
 		}
 		if err := s.assignWorkspace(value); err != nil {
+			s.recordAudit(Request{Action: "workspace_assign", Workspace: value.Name, Policy: value.Policy}, Response{OK: false, State: "refused", Message: err.Error()}, err)
 			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: err.Error()})
 			return
 		}
