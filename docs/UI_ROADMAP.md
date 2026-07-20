@@ -333,11 +333,13 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
 The remaining connected work is trusted policy distribution. P4 now has a bounded
-history contract, signed policy
-provenance, a token-authenticated Unix-socket server, an optional loopback HTTP
-bridge, snapshot and follow-mode event endpoints, local policy/workspace config
-writes, a browser adapter, and a fixture-backed retention view. The socket,
-HTTP bridge, and bearer token are protected by explicit loopback/mode `0600`
+history contract, signed policy provenance, encrypted evidence hand-off,
+multi-key trust rotation, a token-authenticated Unix-socket server, an optional
+loopback HTTP bridge, snapshot and follow-mode event endpoints, local
+policy/workspace config writes, history pruning, expiring detachable session
+leases, credential lease metadata, a browser adapter, and a fixture-backed
+retention view. The socket,
+HTTP bridge, session leases, and bearer token are protected by explicit loopback/mode `0600`
 boundaries; authenticated status, rollback/recover, commit, policy creation,
 and workspace assignment route through supervisor code with redacted JSONL
 action audit. Local authentication/authorization beyond that token boundary is
@@ -371,7 +373,9 @@ Exit: an operator can create a package, simulate it, assign it to a workspace, a
 The current bridge exposes a mode-0600 Unix socket, an optional loopback HTTP
 bridge, bearer-authenticated history/events, lifecycle actions, policy/workspace
 config writes, follow-mode streams, and persistent redacted action audit. Add
-recovery/reconnect behavior and signed policy upload UX. Add local authentication
+recovery/reconnect behavior and signed policy upload UX. The connected UI also
+exposes credential-boundary status, retention pruning, and session
+acquire/takeover/release controls. Add local authentication
 beyond the socket/token boundary after the demo unless the connected deployment
 requires it earlier.
 

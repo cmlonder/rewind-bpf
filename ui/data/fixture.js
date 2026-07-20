@@ -49,7 +49,7 @@ export const fixture = {
   ],
   config: {
     revision: 42,
-    values: { overlay: "fuse-overlayfs", readMode: "enforce", writeMode: "rollback", network: "audit", eventCap: "unlimited", rotation: "512 KiB", retention: "7 days", truncation: "fail closed" },
+    values: { overlay: "fuse-overlayfs", readMode: "enforce", writeMode: "rollback", network: "audit", eventCap: "unlimited", rotation: "512 KiB", retention: "7 days", truncation: "fail closed", encryption: "AES-256-GCM", trustRotation: "2 pinned keys", remoteRetention: "signed HTTPS", session: "reconnectable" },
   },
   history: [
     { id: "d1b08d60", state: "rolled_back", workspace: "rewind-demo", updated: "2 min ago", size: "128 MiB upper" },

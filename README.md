@@ -191,6 +191,17 @@ secret bytes. The provider command receives `REWIND_CREDENTIAL_REF` and
 `REWIND_CREDENTIAL_SCOPES` as metadata and its output remains in the runtime-only
 broker.
 
+Evidence archives can be encrypted before hand-off with a raw 32-byte key:
+
+```bash
+rewind bundle encrypt --input evidence.tar.gz --output evidence.enc.json --key-file /secure/rewind.bundle.key
+rewind bundle publish --input evidence.enc.json --encrypted --endpoint https://review.example/upload --signature evidence.enc.sig --trusted-public-keys /etc/rewind/keys/current.pub,/etc/rewind/keys/previous.pub
+```
+
+Run metadata retention is explicit: `rewind history prune --path PATH --keep N`.
+The authenticated supervisor also exposes expiring session leases for browser
+reconnect and operator takeover; a lease never grants filesystem access by itself.
+
 For the browser Control Plane, expose an optional loopback-only HTTP bridge. It
 requires an exact CORS origin and bearer token; non-loopback bind addresses are
 refused:

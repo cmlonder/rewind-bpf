@@ -5,7 +5,7 @@ export async function connectSupervisor(baseUrl, token = "") {
   const root = baseUrl.replace(/\/$/, "");
   const headers = { Accept: "application/json" };
   if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-  const [health, capabilities, history, audit, policies, workspaces, policyBundles, credentialStatus] = await Promise.all([
+  const [health, capabilities, history, audit, policies, workspaces, policyBundles, credentialStatus, sessions] = await Promise.all([
     fetch(`${root}/health`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/capabilities`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/history`, { headers }).then(assertResponse).then((response) => response.json()),
@@ -14,6 +14,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     fetch(`${root}/v1/workspaces`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/policy-bundles`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/credential-leases`, { headers }).then(assertResponse).then((response) => response.json()),
+    fetch(`${root}/v1/sessions`, { headers }).then(assertResponse).then((response) => response.json()),
   ]);
   return {
     health,
@@ -24,6 +25,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     workspaces: Array.isArray(workspaces) ? workspaces : [],
     policyBundles: Array.isArray(policyBundles) ? policyBundles : [],
     credentialStatus: credentialStatus && typeof credentialStatus === "object" ? credentialStatus : { available: false, state: "unavailable" },
+    sessions: Array.isArray(sessions) ? sessions : [],
     token: token.trim(),
     baseUrl: root,
     action: (request) => executeAction(root, token.trim(), request),
@@ -31,12 +33,38 @@ export async function connectSupervisor(baseUrl, token = "") {
     assignWorkspace: (value) => createResource(root, token.trim(), "workspaces", value),
     uploadPolicyBundle: (value) => uploadPolicyBundle(root, token.trim(), value),
     issueCredentialLease: (value) => issueCredentialLease(root, token.trim(), value),
+    pruneHistory: (keep) => pruneHistory(root, token.trim(), keep),
+    session: (value) => sessionAction(root, token.trim(), value),
   };
 }
 
 export async function issueCredentialLease(baseUrl, token, value) {
   const root = baseUrl.replace(/\/$/, "");
   const response = await fetch(`${root}/v1/credential-leases`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify(value),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
+}
+
+export async function pruneHistory(baseUrl, token, keep) {
+  const root = baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}/v1/history/prune`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify({ keep }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
+}
+
+export async function sessionAction(baseUrl, token, value) {
+  const root = baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}/v1/sessions`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
     body: JSON.stringify(value),

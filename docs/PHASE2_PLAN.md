@@ -35,7 +35,7 @@ P0 scope excludes durable snapshot history, detachable sessions, registry featur
 The first product-core slice adds three explicit, portable contracts:
 
 - `internal/netpolicy` compiles allowlisted domains and provides a loopback HTTP/HTTPS proxy backend for proxy-aware clients. The explicit `deny` and Linux `namespace` backends fail closed for non-proxy-aware clients; allow-listed namespace egress remains a deployment track.
-- `internal/credentials` exposes capability references and a refusing broker. Raw values have no representation in policy, leases, argv, or workspace files.
+- `internal/credentials` exposes capability references, an opt-in command provider, and short-lived leases. Raw values have no representation in policy, lease JSON, argv, or workspace files; native keychains remain platform-specific.
 - `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before `rewind commit --confirm` applies regular-file and directory changes.
 
 The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This keeps the demo honest while preserving the API shape for native backends.
@@ -45,9 +45,10 @@ The Control Plane fixture exposes these states as operational UI: network mode i
 `internal/history` stores bounded, durable run summaries with atomic JSON
 replacement and keep-latest pruning. `internal/supervisor` now exposes a
 permissioned Unix-socket transport with bearer-token-authenticated lifecycle
-actions, snapshot/follow event streams, and redacted action audit. The browser
-adapter remains read-only; detachable process sessions and browser mutation
-bridging remain post-demo work.
+actions, snapshot/follow event streams, redacted action audit, history pruning,
+and expiring acquire/heartbeat/takeover/release session leases. The browser
+adapter can reconcile and manage those local leases; distributed session
+coordination remains deployment work.
 
 This is deliberately narrower than “protect the whole operating system” or “zero overhead.” OverlayFS protects filesystem changes inside the selected boundary. Landlock protects the selected read/write hierarchy. eBPF supplies low-cost telemetry and optional enforcement where the kernel supports it. Network, kernel state, devices, external services, and already-open descriptors remain explicit safety boundaries.
 
@@ -138,10 +139,10 @@ Nono is the closest product benchmark, so its publicly documented feature set be
 | Atomic undo and content-addressed snapshots | OverlayFS/FUSE upper-layer discard; SHA-256 start manifests | **P0:** diff index, rollback evidence, crash recovery; **P1:** deduplicated content store if storage measurements justify it | Multiple checkpoints and portable run bundles. |
 | Cryptographic audit trail/Merkle commitment | JSONL telemetry and run record; no final Merkle root | **P0:** sequence numbers, drop counters, hash-chained batches, final root, read-only verifier | Signed remote evidence and standalone packaging. |
 | Domain/network filtering | Policy field plus loopback proxy backend for proxy-aware HTTP/HTTPS clients; enforce mode denies raw/packet socket creation; explicit `deny` and Linux `namespace` backends refuse non-proxy-aware egress | **P1:** allow-listed network namespace/cgroup backend for non-proxy-aware clients and broader egress coverage | Credential-aware egress broker and per-agent network profiles. |
-| Credential injection without exposing raw keys | Refusing broker plus opt-in external command provider with short-lived one-shot leases | **P1:** provider MVP and no-secret serialization contract | Native keychain/secret-manager adapters and scoped injection protocol. |
+| Credential injection without exposing raw keys | Refusing broker plus opt-in external command provider with short-lived one-shot leases and authenticated metadata endpoint | **P1:** provider MVP and no-secret serialization contract shipped | Native keychain/secret-manager adapters and scoped injection protocol. |
 | Runtime supervisor and dynamic permission approval | Authenticated Unix-socket supervisor with lifecycle actions, snapshot/follow streams, redacted audit, and an optional loopback HTTP bridge for browser actions | **P1:** live SSE reconciliation, connected policy mutation, and approval protocol | Policy decision service with human/automation approval and time-bounded grants. |
 | Signed provenance/registry for profiles and agent packs | Local Ed25519 bundles and verification only | **P2:** document trust boundary and sign release artifacts | Sigstore-compatible profile/adapter registry. |
-| Detachable/ghost sessions | No persistent session owner; event follow is available for an existing run | **P2:** explicitly out of the six-day critical path | Persistent run handles with reconnect, retention, and operator takeover. |
+| Detachable/ghost sessions | Expiring authenticated local session leases with event follow and explicit takeover | **P2:** local lease shipped; distributed coordination remains | Persistent run handles with reconnect, retention, and operator takeover across supervisors. |
 
 The priority is intentional. Nono already demonstrates a broad product surface: kernel isolation, undo, audit, provenance, supervision, network filtering, credential injection, and detachable sessions ([feature overview](https://nono.sh/), [undo](https://nono.sh/undo), [audit trail](https://nono.sh/audit-trail), [profile learning](https://nono.sh/blog/nono-learn-policy-profile)). RewindBPF should first close the correctness and evidence gaps that would make our rollback claim unreliable, then add network/credential/supervisor features as separate policy planes. A six-day sprint that starts with a registry, durable history, or UI polish would create parity theatre without a stronger safety invariant. The complete product strategy, including native macOS and Windows tracks, lives in [`docs/PRODUCT_STRATEGY.md`](PRODUCT_STRATEGY.md).
 
@@ -338,9 +339,9 @@ flowchart LR
 
 ### 31–60 days: team and CI workflow
 
-- Expand the shipped supervisor with detachable sessions and authenticated run handles suitable for CI; action audit is now persisted locally as redacted JSONL.
+- Expand the shipped supervisor with distributed detachable sessions and authenticated run handles suitable for CI; local leases, history pruning, and action audit are already available.
 - Add CI mode: every agent task runs in a disposable workspace; output is a patch/artifact rather than an implicit host merge.
-- Add remote/object-store evidence bundles, retention policies, and public release trust distribution. Local checksum-indexed `rewind bundle create` archives, detached release signatures, and pinned-key verification are shipped; remote encryption, registry rotation, and revocation are not.
+- Add remote/object-store evidence bundles, KMS-backed retention policies, and public release trust distribution. Local AES-256-GCM envelopes, checksum-indexed archives, detached release signatures, multi-key trust rotation, and explicit HTTPS publish are shipped; provider-backed key lifecycle and restore automation remain.
 - Add network namespace/proxy policy as a separate plane; make credentials injectable without placing raw secrets in the agent filesystem.
 - Evaluate seccomp filters for syscall-surface reduction. Use seccomp user notification only for narrow, reviewable operations; the kernel documentation warns about notification TOCTOU and blocking semantics, so it is not a default file-write interceptor. See the [kernel seccomp documentation](https://docs.kernel.org/userspace-api/seccomp_filter.html).
 

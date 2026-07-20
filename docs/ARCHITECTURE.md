@@ -322,10 +322,14 @@ responsible for verifying `X-Rewind-Bundle-SHA256` and the detached signature.
 path safety, artifact hashes, `SHA256SUMS`, and the embedded record/run ID.
 `rewind bundle sign` and the optional signature flags on `bundle verify` add
 detached Ed25519 integrity and publisher-key pinning for a remote review
-hand-off. The command-provider credential broker uses short-lived one-shot
-leases and never serializes secret contents; native keychains, encrypted
-object storage, retention, rotation, and restore remain deployment-specific
-follow-ups.
+hand-off. `rewind bundle encrypt` wraps an archive in an AES-256-GCM envelope
+with plaintext/ciphertext digests; `bundle publish --encrypted` sends the
+envelope without exposing the archive contents, and `--trusted-public-keys`
+accepts a rotating signer set. `rewind history prune` and the supervisor
+history-prune endpoint apply explicit keep-latest retention. The command-provider
+credential broker uses short-lived one-shot leases and never serializes secret
+contents; KMS-backed keys, object-store durability, and restore automation remain
+deployment-specific follow-ups.
 
 ## 11. Implementation status
 
@@ -716,6 +720,9 @@ POST /v1/workspaces
 POST /v1/policy-bundles
 GET  /v1/policy-bundles
 POST /v1/credential-leases {ref, scopes[]} (metadata only; bearer required)
+GET  /v1/sessions
+POST /v1/sessions {acquire|heartbeat|takeover|release}
+POST /v1/history/prune {keep}
 GET  /v1/audit?limit=100
 GET  /v1/events?run_id=...           (snapshot)
 GET  /v1/events?run_id=...&follow=true (tail until terminal/timeout)
@@ -736,8 +743,9 @@ to send the same bearer-authenticated action intents; it never receives root
 privileges or raw credentials. The credential lease endpoint is an opt-in broker
 boundary: it returns only an opaque lease ID, scope metadata, expiry, and an
 explicit `secret_exposed: false` marker. Secret bytes remain inside the broker
-and are never serialized into the response, argv, policy, or workspace. The
-default Unix-socket path remains unchanged,
+and are never serialized into the response, argv, policy, or workspace. Session
+leases coordinate reconnect and explicit takeover with bounded TTLs; they do
+not bypass action authorization. The default Unix-socket path remains unchanged,
 and the HTTP listener rejects non-loopback bind addresses. Policy package and
 workspace assignment writes use a separate mode-`0600` local config store,
 validate names, versions, paths, and policy references, and are recorded in the

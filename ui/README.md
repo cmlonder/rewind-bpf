@@ -24,6 +24,8 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Show supervisor connection state and retry an interrupted authenticated event stream with bounded exponential backoff.
 - Add or edit workspace assignments and run a fixture boundary test before a future run.
 - Edit global runtime settings through revisioned controls; active runs remain unchanged.
+- Inspect broker status and request metadata-only credential leases when an opt-in provider is configured.
+- Apply keep-latest history pruning and manage expiring reconnect/takeover session leases through the authenticated supervisor.
 - Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
 
@@ -32,7 +34,8 @@ connected. When connected to the explicit loopback HTTP bridge, policy and
 workspace forms persist validated local config, signed bundle imports are
 verified by the supervisor, rollback/recovery/commit
 confirmations POST authenticated intents, and the run detail view follows its
-authenticated SSE evidence stream; the browser still never receives root access
+authenticated SSE evidence stream. Credential lease responses contain only an
+opaque ID/scope/expiry marker, and the browser still never receives root access
 or performs privileged work.
 
 ## Demo scope decision

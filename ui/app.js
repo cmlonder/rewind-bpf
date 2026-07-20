@@ -70,7 +70,8 @@ function handleAction(action, element) {
   if (action === "connect-supervisor") return openSupervisorConnector();
   if (action === "hold-review") { currentRun().state = "succeeded"; return setToast("Run held for review. Conflict-checked acceptance is now available.", "neutral"); }
   if (action === "simulate-credentials") return openCredentialLeaseCheck();
-  if (action === "retention") return setToast("Retention is fixture-backed in this demo; the P4 index prunes by keep-latest policy.", "neutral");
+  if (action === "retention") return openRetentionEditor();
+  if (action === "session") return openSessionEditor();
   if (action === "rollback") return openConfirm({ title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: () => runSupervisorAction("rollback", rollback) });
   if (action === "commit") return openConfirm({ title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: () => runSupervisorAction("commit", commitRun, "COMMIT") });
   if (action === "recover") return openConfirm({ title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success")) });
@@ -118,6 +119,34 @@ function openCredentialLeaseCheck() {
       setToast(`Lease ${String(lease.id || "issued").slice(0, 12)}… issued · secret_exposed=${lease.secret_exposed === false ? "false" : "unknown"}`, lease.secret_exposed === false ? "success" : "error");
       return true;
     } catch (error) { setToast(`Credential lease refused: ${error.message}`, "error"); }
+  } });
+}
+
+function openRetentionEditor() {
+  if (!state.supervisor?.pruneHistory) return setToast("Retention preview: keep-latest pruning is available through the authenticated supervisor.", "neutral");
+  openModal("Prune run history", `<form id="retention-form" class="modal-form"><label>Keep newest entries<input name="keep" type="number" min="0" value="30" required /></label><div class="form-note">Only bounded run metadata is pruned. Workspace layers and evidence archives are not silently deleted.</div></form>`, { confirm: "Prune history", onConfirm: async () => {
+    const form = document.querySelector("#retention-form");
+    if (!form?.reportValidity()) return false;
+    try {
+      const result = await state.supervisor.pruneHistory(Number(new FormData(form).get("keep")));
+      closeModal();
+      setToast(`History retention applied: ${result.message || "pruned"}`, "success");
+    } catch (error) { setToast(`Retention refused: ${error.message}`, "error"); }
+  } });
+}
+
+function openSessionEditor() {
+  if (!state.supervisor?.session) return setToast("Session leases are available after connecting the authenticated supervisor.", "neutral");
+  const run = currentRun();
+  openModal("Manage detachable run session", `<form id="session-form" class="modal-form"><label>Run ID<input name="run_id" value="${run.id}" required /></label><label>Owner<input name="owner" value="control-plane" required /></label><label>Action<select name="action"><option value="acquire">Acquire</option><option value="heartbeat">Heartbeat</option><option value="takeover">Take over</option><option value="release">Release</option></select></label><label>Lease seconds<input name="ttl_seconds" type="number" min="30" max="86400" value="600" required /></label><div class="form-note">A session lease coordinates reconnect and takeover; it does not bypass run authorization or expose credentials.</div></form>`, { confirm: "Apply session action", onConfirm: async () => {
+    const form = document.querySelector("#session-form");
+    if (!form?.reportValidity()) return false;
+    const data = new FormData(form);
+    try {
+      const lease = await state.supervisor.session({ action: data.get("action"), run_id: data.get("run_id"), owner: data.get("owner"), ttl_seconds: Number(data.get("ttl_seconds")) });
+      closeModal();
+      setToast(`Session ${data.get("action")}: ${String(lease.id || "updated").slice(0, 12)}…`, "success");
+    } catch (error) { setToast(`Session action refused: ${error.message}`, "error"); }
   } });
 }
 
@@ -370,7 +399,7 @@ function openWorkspaceEditor(name = "") {
 }
 
 function openConfigEditor(key) {
-  const labels = { overlay: ["Overlay backend", ["fuse-overlayfs", "kernel-overlayfs"]], readMode: ["Default read mode", ["off", "audit", "enforce"]], writeMode: ["Write behavior", ["rollback"]], network: ["Network mode", ["off", "audit", "enforce"]], eventCap: ["Total event cap", ["unlimited", "1 MiB", "16 MiB"]], rotation: ["Rotation size", ["256 KiB", "512 KiB", "1 MiB"]], retention: ["Retention", ["24 hours", "7 days", "30 days"]], truncation: ["On truncation", ["fail closed", "audit only"]] };
+  const labels = { overlay: ["Overlay backend", ["fuse-overlayfs", "kernel-overlayfs"]], readMode: ["Default read mode", ["off", "audit", "enforce"]], writeMode: ["Write behavior", ["rollback"]], network: ["Network mode", ["off", "audit", "enforce"]], eventCap: ["Total event cap", ["unlimited", "1 MiB", "16 MiB"]], rotation: ["Rotation size", ["256 KiB", "512 KiB", "1 MiB"]], retention: ["Retention", ["24 hours", "7 days", "30 days"]], truncation: ["On truncation", ["fail closed", "audit only"]], encryption: ["Bundle encryption", ["AES-256-GCM", "off"]], trustRotation: ["Trust rotation", ["2 pinned keys", "1 pinned key"]], remoteRetention: ["Remote hand-off", ["signed HTTPS", "local only"]], session: ["Session", ["reconnectable", "single-owner"]] };
   const [label, options] = labels[key] || [key, [fixture.config.values[key]]];
   openModal(`Edit ${label}`, `<form id="config-form" class="modal-form"><label>${label}<select name="value">${options.map((option) => `<option ${option === fixture.config.values[key] ? "selected" : ""}>${option}</option>`).join("")}</select></label><div class="form-note">This creates revision ${fixture.config.revision + 1}; active runs remain unchanged.</div></form>`, { confirm: "Save revision", onConfirm: () => { const value = new FormData(document.querySelector("#config-form")).get("value"); fixture.config.values[key] = value; fixture.config.revision += 1; closeModal(); render(); setToast(`${label} updated in revision ${fixture.config.revision}.`, "success"); } });
 }
