@@ -313,12 +313,19 @@ archive containing the run record, ordered JSONL event logs, `bundle.json`,
 and a names-only `SHA256SUMS`. The command refuses event or record paths
 outside the run runtime root and never includes the workspace, upper layer,
 credentials, or arbitrary absolute paths. This is a local hand-off primitive
-for later object-store integration. `rewind bundle verify --input PATH`
-validates the archive in memory, including path safety, artifact hashes,
-`SHA256SUMS`, and the embedded record/run ID. `rewind bundle sign` and the
-optional signature flags on `bundle verify` add detached Ed25519 integrity and
-publisher-key pinning for a remote review hand-off; encryption, remote
-retention, and restore are deliberately not claimed yet.
+for later object-store integration. `rewind bundle publish --input PATH
+--endpoint URL --signature PATH` adds an explicit operator-triggered HTTPS
+hand-off: it verifies the archive and detached signature before sending and
+accepts HTTP only for an explicit loopback test endpoint. The receiver is
+responsible for verifying `X-Rewind-Bundle-SHA256` and the detached signature.
+`rewind bundle verify --input PATH` validates the archive in memory, including
+path safety, artifact hashes, `SHA256SUMS`, and the embedded record/run ID.
+`rewind bundle sign` and the optional signature flags on `bundle verify` add
+detached Ed25519 integrity and publisher-key pinning for a remote review
+hand-off. The command-provider credential broker uses short-lived one-shot
+leases and never serializes secret contents; native keychains, encrypted
+object storage, retention, rotation, and restore remain deployment-specific
+follow-ups.
 
 ## 11. Implementation status
 

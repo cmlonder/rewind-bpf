@@ -112,3 +112,35 @@ func TestBuildAcceptsExplicitProxyForAuditMode(t *testing.T) {
 		t.Fatalf("plan=%+v, want raw socket defense disabled in audit mode", plan.Network)
 	}
 }
+
+func TestBuildAcceptsFailClosedDenyNetworkBackend(t *testing.T) {
+	workspace := t.TempDir()
+	plan, err := Build(Config{
+		Workspace:      workspace,
+		RuntimeRoot:    filepath.Join(t.TempDir(), "run"),
+		NetworkBackend: "deny",
+		Policy:         policy.Policy{Network: policy.NetworkPolicy{Mode: policy.ModeEnforce}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Network.RawSocketDeny || !plan.Network.NetworkDeny {
+		t.Fatalf("network plan=%+v, want strict deny flags", plan.Network)
+	}
+}
+
+func TestBuildRejectsAllowListWithDenyNetworkBackend(t *testing.T) {
+	workspace := t.TempDir()
+	_, err := Build(Config{
+		Workspace:      workspace,
+		RuntimeRoot:    filepath.Join(t.TempDir(), "run"),
+		NetworkBackend: "deny",
+		Policy: policy.Policy{Network: policy.NetworkPolicy{
+			Mode:         policy.ModeEnforce,
+			AllowDomains: []string{"example.com"},
+		}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "cannot provide allow_domains") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

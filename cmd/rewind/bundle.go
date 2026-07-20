@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/ed25519"
 	"encoding/json"
 	"flag"
@@ -26,8 +27,12 @@ func handleBundle(args []string) {
 		handleBundleSign(args[1:])
 		return
 	}
+	if args[0] == "publish" {
+		handleBundlePublish(args[1:])
+		return
+	}
 	if args[0] != "create" {
-		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle sign --input PATH --private-key PATH --output PATH | rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
+		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle sign --input PATH --private-key PATH --output PATH | rewind bundle publish --input PATH --endpoint URL --signature PATH | rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
 	}
 	flags := flag.NewFlagSet("bundle create", flag.ContinueOnError)
 	recordPath := flags.String("record", "", "run record JSON path")
@@ -54,6 +59,63 @@ func handleBundle(args []string) {
 		fatal(err.Error())
 	}
 	fmt.Printf("wrote evidence bundle: %s artifacts=%d run_id=%s\n", outputAbs, len(metadata.Artifacts), metadata.RunID)
+}
+
+func handleBundlePublish(args []string) {
+	flags := flag.NewFlagSet("bundle publish", flag.ContinueOnError)
+	inputPath := flags.String("input", "", "evidence .tar.gz path")
+	endpoint := flags.String("endpoint", "", "HTTPS review endpoint")
+	signaturePath := flags.String("signature", "", "detached signature JSON path")
+	publicPath := flags.String("public-key", "", "optional pinned public key path")
+	tokenPath := flags.String("token-file", "", "optional bearer token file")
+	allowInsecure := flags.Bool("allow-insecure-localhost", false, "allow HTTP only for localhost test endpoints")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" || strings.TrimSpace(*endpoint) == "" || strings.TrimSpace(*signaturePath) == "" {
+		fatal("usage: rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --token-file PATH --allow-insecure-localhost]")
+	}
+	if _, err := evidencebundle.Verify(*inputPath); err != nil {
+		fatal(fmt.Sprintf("evidence bundle verification failed: %v", err))
+	}
+	payload, err := os.ReadFile(filepath.Clean(*inputPath))
+	if err != nil {
+		fatal(fmt.Sprintf("read evidence bundle: %v", err))
+	}
+	signatureData, err := os.ReadFile(filepath.Clean(*signaturePath))
+	if err != nil {
+		fatal(fmt.Sprintf("read evidence bundle signature: %v", err))
+	}
+	var signed releasecrypto.Signature
+	if err := json.Unmarshal(signatureData, &signed); err != nil {
+		fatal(fmt.Sprintf("decode evidence bundle signature: %v", err))
+	}
+	var trusted ed25519.PublicKey
+	if strings.TrimSpace(*publicPath) != "" {
+		trustedData, err := os.ReadFile(filepath.Clean(*publicPath))
+		if err != nil {
+			fatal(fmt.Sprintf("read evidence bundle public key: %v", err))
+		}
+		trusted = ed25519.PublicKey(trustedData)
+	}
+	if len(trusted) > 0 {
+		err = releasecrypto.Verify(payload, signed, trusted)
+	} else {
+		err = releasecrypto.Verify(payload, signed)
+	}
+	if err != nil {
+		fatal(fmt.Sprintf("evidence bundle signature verification failed: %v", err))
+	}
+	var token string
+	if strings.TrimSpace(*tokenPath) != "" {
+		data, err := os.ReadFile(filepath.Clean(*tokenPath))
+		if err != nil {
+			fatal(fmt.Sprintf("read publish token: %v", err))
+		}
+		token = strings.TrimSpace(string(data))
+	}
+	receipt, err := evidencebundle.Publish(context.Background(), *inputPath, *endpoint, token, string(signatureData), *allowInsecure)
+	if err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("published signed evidence bundle: endpoint=%s key_id=%s receipt=%s\n", *endpoint, signed.KeyID, receipt)
 }
 
 func handleBundleVerify(args []string) {

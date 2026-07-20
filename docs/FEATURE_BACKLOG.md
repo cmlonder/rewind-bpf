@@ -15,8 +15,8 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Process and resource scope | **Shipped / Linux** | cgroup-v2 scope, descendant drain gate, PID/memory/CPU limits, fail-closed cleanup | Windows Job Object and macOS native process scope |
 | eBPF evidence | **Shipped / Linux** | CO-RE trace sensor, start gate, sequence numbers, hash chain, dropped-event accounting, bounded cap, ordered rotation, standalone verifier | Kernel-side backpressure policy and remote signed evidence storage |
 | Crash and stale-run recovery | **Shipped / Linux** | Parent death, open descriptors, stale FUSE mount, child drain, idempotent rollback/recover | Power-loss/startup matrix across filesystems |
-| Network policy | **Partial** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs also deny raw/packet socket creation with seccomp and record socket refusal events | Network namespace/cgroup egress enforcement, non-proxy-aware client coverage, and broader socket policy |
-| Credential safety | **Partial / refusing boundary** | Capability-only references and a broker that refuses raw secret exposure | One real keychain/secret-manager provider with leakage tests and short-lived leases |
+| Network policy | **Partial / fail-closed** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs also deny raw/packet socket creation with seccomp; the explicit `deny` backend refuses IPv4/IPv6/packet sockets and connect attempts for non-proxy-aware clients | Allow-listed network namespace/cgroup egress enforcement and broader non-proxy-aware allow coverage |
+| Credential safety | **Partial / broker MVP** | Capability-only references, default refusal, and an opt-in external command provider with short-lived one-shot leases, expiry, revoke, and no secret in lease JSON/argv/workspace | Native keychain/secret-manager adapters, scoped injection protocol, and leakage tests against real providers |
 | Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, full-fidelity Git patch export, manifest conflict checks, and clean-branch `rewind branch apply`; `rewind commit --confirm`; supervisor commit requires confirmation | Remote review workflow and richer provider adapters |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, and optional supervisor public-key allow-list enforcement | Remote registry, revocation, and organization trust distribution |
 | Local supervisor | **Shipped / Linux** | Permissioned Unix socket, token auth, health/capabilities/history, status/rollback/recover/commit, snapshot/follow events, redacted action audit | Detachable process sessions and operator takeover/reconnect |
@@ -26,7 +26,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | macOS native backend | **Prepared / manual gate** | Read-only APFS/Seatbelt/diskutil prerequisite plan, platform CLI, and fail-closed capability report; no destructive operation is enabled | Native Seatbelt/EndpointSecurity + APFS disposable-volume implementation and destructive tests on disposable storage |
 | Windows native backend | **Not implemented** | Cross-build and fail-closed unavailable backend only; WSL2 remains compatibility mode | Native process/filesystem policy + disposable workspace implementation and Windows VM tests |
 | Agent integrations | **Not implemented** | Generic `-- <agent-command>` wrapper | Tested adapters for Codex CLI/OpenHands/Claude Code or a stable adapter SDK |
-| Durable remote retention | **Partial / signed local hand-off** | Bounded local history and keep-latest pruning plus checksum-indexed `rewind bundle create`/`verify` archives and detached Ed25519 bundle signatures with optional pinned-key verification, restricted to the runtime root | Object-store/remote evidence bundles, retention policy, encryption, and restore |
+| Durable remote retention | **Partial / signed hand-off** | Bounded local history and keep-latest pruning plus checksum-indexed `rewind bundle create`/`verify` archives, detached Ed25519 signatures, and explicit HTTPS `rewind bundle publish` with optional pinned-key verification | Object-store durability, retention policy, encryption, key rotation, and restore |
 | Detachable/ghost sessions | **Not implemented** | Event follow and history are available after a run; no persistent session owner | Persistent run handles, reconnect, takeover, and session lease expiry |
 | Content-aware PII protection | **Not implemented** | Path-pattern protection only | Classifier/redactor with deterministic policy and leakage benchmarks |
 | Multi-agent/checkpoint graph | **Not implemented** | One transaction per run | Child transactions, dependency-aware merge, and multiple rewind points |
@@ -58,7 +58,9 @@ and eBPF object. The gate covered:
 The network case also persisted one `allow` and one `deny` `network_connect`
 event in the ordered hash-chained evidence stream. The same acceptance matrix
 verified that an enforce-mode agent receives `EPERM` when creating an IPv4 raw
-socket, while the ordinary proxy path remains usable.
+socket, while the ordinary proxy path remains usable. A second enforce-mode
+case verified the new `--network-backend deny` path: IPv4 socket creation was
+refused while Unix-domain socket creation remained available.
 
 The separate supervisor smoke also passed: the mode-`0600` Unix socket returned
 `401` without a bearer token, authenticated status and explicit commit succeeded,
@@ -75,7 +77,11 @@ Run unit, static, UI, and disposable-VM integration tests; verify rollback, read
 
 ### P1 — Linux productisation
 
-Finish broader network namespace enforcement for non-proxy-aware clients, one real credential provider, remote review workflow, public release trust distribution, and connected Control Plane mutation through a local action-token bridge.
+The local fail-closed network boundary, signed evidence hand-off, release signing,
+authenticated supervisor, and connected Control Plane mutation are shipped. The
+remaining P1 gates are an allow-listed network namespace/cgroup backend for
+non-proxy-aware clients, one real credential provider, and remote review/object
+storage with retention, encryption, and trust rotation.
 
 ### P2 — Native macOS
 

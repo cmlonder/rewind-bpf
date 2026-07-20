@@ -1,5 +1,7 @@
 // Package netpolicy compiles the network section into an auditable decision
-// plan. It deliberately does not open sockets or inject credentials.
+// plan. It deliberately does not open sockets or inject credentials. Runtime
+// backends are explicit: proxy allows policy-aware egress, while deny is a
+// fail-closed no-network boundary for clients that cannot use a proxy.
 package netpolicy
 
 import (
@@ -22,7 +24,13 @@ type Plan struct {
 	AllowDomains   []string
 	CredentialRefs []policy.CredentialRef
 	RawSocketDeny  bool `json:"raw_socket_deny,omitempty"`
+	NetworkDeny    bool `json:"network_deny,omitempty"`
 }
+
+const (
+	BackendProxy = "proxy"
+	BackendDeny  = "deny"
+)
 
 func Compile(value policy.NetworkPolicy) (Plan, error) {
 	if err := value.Validate(); err != nil {

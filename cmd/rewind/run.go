@@ -48,7 +48,7 @@ func handleRun(args []string) {
 	sensorObject := flags.String("sensor-object", "", "optional compiled telemetry object")
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
-	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy")
+	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy or deny")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	historyPath := flags.String("history", "", "optional durable run history JSON path")
 	if err := flags.Parse(args); err != nil {
@@ -144,11 +144,11 @@ func handleRun(args []string) {
 		stopNetworkProxy = nil
 		networkProxy = nil
 	}
-	starter := protectedrun.ExecStarter{HelperPath: helper, DenyRawNetwork: plan.Network.Mode == policy.ModeEnforce && *networkBackend == "proxy"}
+	starter := protectedrun.ExecStarter{HelperPath: helper, DenyRawNetwork: plan.Network.RawSocketDeny, DenyNetwork: plan.Network.NetworkDeny}
 	// An explicit proxy backend can observe audit mode as well as enforce mode.
 	// Audit stays zero-overhead when no backend is selected; enforce remains
 	// fail-closed in runplan.Build unless the proxy is explicitly requested.
-	if plan.Network.Mode != policy.ModeOff && *networkBackend == "proxy" {
+	if plan.Network.Mode != policy.ModeOff && *networkBackend == netpolicy.BackendProxy {
 		networkProxy, err = netpolicy.ListenProxy(plan.Network)
 		if err != nil {
 			fatal(fmt.Sprintf("start network policy proxy: %v", err))

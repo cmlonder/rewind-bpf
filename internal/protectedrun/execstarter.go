@@ -20,6 +20,7 @@ type ExecStarter struct {
 	HelperPath     string
 	Env            []string
 	DenyRawNetwork bool
+	DenyNetwork    bool
 }
 
 func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, plan *landlock.Plan) (Process, error) {
@@ -42,6 +43,9 @@ func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, pl
 	args := []string{"helper"}
 	if s.DenyRawNetwork {
 		args = append(args, "--deny-raw-network")
+	}
+	if s.DenyNetwork {
+		args = append(args, "--deny-network")
 	}
 	var planPath string
 	if plan != nil {

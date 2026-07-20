@@ -27,6 +27,7 @@ Usage:
   rewind export --record PATH --output PATH [--format json|patch|git-patch]
   rewind bundle create --record PATH --output PATH
   rewind bundle sign --input PATH --private-key PATH --output PATH
+  rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --token-file PATH --allow-insecure-localhost]
   rewind bundle verify --input PATH [--signature PATH --public-key PATH]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities

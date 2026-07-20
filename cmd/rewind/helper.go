@@ -18,6 +18,7 @@ func handleHelper(args []string) {
 	flags.SetOutput(os.Stderr)
 	planPath := flags.String("plan-file", "", "JSON Landlock plan written by the parent runtime")
 	denyRawNetwork := flags.Bool("deny-raw-network", false, "deny raw and packet socket creation before exec")
+	denyNetwork := flags.Bool("deny-network", false, "deny Internet and packet sockets before exec")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -53,6 +54,11 @@ func handleHelper(args []string) {
 	}
 	if *denyRawNetwork {
 		if err := seccomp.InstallDenyRawSockets(); err != nil {
+			fatal(err.Error())
+		}
+	}
+	if *denyNetwork {
+		if err := seccomp.InstallDenyNetwork(); err != nil {
 			fatal(err.Error())
 		}
 	}

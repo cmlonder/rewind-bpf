@@ -167,6 +167,18 @@ sudo jq -s -e 'any(.[]; .operation == "socket" and .decision == "allow")' "$ROOT
 sudo "$BIN" rollback --record "$ROOT/raw-network-audit/runtime/record.json"
 echo "raw socket audit semantics: PASS"
 
+# 4b. The fail-closed deny backend is for non-proxy-aware clients. It refuses
+# Internet socket creation while leaving local Unix-domain IPC available.
+mkdir -p "$ROOT/network-deny/workspace"
+make_policy "$ROOT/network-deny/policy.yaml" off enforce
+sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/network-deny/workspace" "$ROOT/network-deny/runtime" "$ROOT/network-deny/policy.yaml" "$ROOT/network-deny/runtime/record.json") --network-backend deny --on-success review -- \
+  /bin/sh -c '/usr/bin/python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)" && printf "internet-allowed\\n" > net.status || printf "internet-denied\\n" > net.status; /usr/bin/python3 -c "import socket; socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)" && printf "unix-allowed\\n" >> net.status'
+test "$(cat "$ROOT/network-deny/runtime/merged/net.status")" = $'internet-denied\nunix-allowed'
+sudo "$BIN" rollback --record "$ROOT/network-deny/runtime/record.json"
+# The strict deny backend is enforced by seccomp before the syscall reaches
+# the telemetry hook; the process outcome is the authoritative evidence here.
+echo "non-proxy deny backend: PASS"
+
 # 5. Bounded evidence must fail verification rather than look complete.
 mkdir -p "$ROOT/evidence/workspace"
 make_policy "$ROOT/evidence/policy.yaml" off audit
