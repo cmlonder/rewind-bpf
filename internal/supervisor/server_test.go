@@ -19,6 +19,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policybundle"
+	"github.com/rewindbpf/rewind/internal/registry"
 	"github.com/rewindbpf/rewind/internal/runstore"
 	"github.com/rewindbpf/rewind/internal/session"
 )
@@ -343,6 +344,49 @@ func TestMutatingActionRequiresOneTimeServerChallenge(t *testing.T) {
 	}
 	if response := request(challenge.Token); response.Code != http.StatusConflict {
 		t.Fatalf("replay status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestConnectedRegistryIsBearerBoundAndVerifiedBeforeUIResponse(t *testing.T) {
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := policybundle.Sign(policybundle.Bundle{Name: "strict-agent", Version: "1.0.0", Policy: policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeAudit}}}, privateKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/registry/policies":
+			_ = json.NewEncoder(w).Encode([]registry.Entry{{Name: "strict-agent", Version: "1.0.0"}})
+		case "/v1/registry/policies/strict-agent/1.0.0":
+			_ = json.NewEncoder(w).Encode(signed)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer remote.Close()
+	server := Server{AuthToken: "secret", Registry: &registry.Client{Endpoint: remote.URL, HTTP: remote.Client(), TrustedKeys: []ed25519.PublicKey{publicKey}}}
+	handler := server.Handler()
+	unauthorized := httptest.NewRecorder()
+	handler.ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/v1/registry/policies", nil))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized registry status=%d", unauthorized.Code)
+	}
+	authorized := httptest.NewRecorder()
+	list := httptest.NewRequest(http.MethodGet, "/v1/registry/policies", nil)
+	list.Header.Set("Authorization", "Bearer secret")
+	handler.ServeHTTP(authorized, list)
+	if authorized.Code != http.StatusOK || !strings.Contains(authorized.Body.String(), "strict-agent") {
+		t.Fatalf("registry list status=%d body=%s", authorized.Code, authorized.Body.String())
+	}
+	fetch := httptest.NewRecorder()
+	fetchRequest := httptest.NewRequest(http.MethodPost, "/v1/registry/policies/fetch", strings.NewReader(`{"name":"strict-agent","version":"1.0.0"}`))
+	fetchRequest.Header.Set("Authorization", "Bearer secret")
+	handler.ServeHTTP(fetch, fetchRequest)
+	if fetch.Code != http.StatusOK || !strings.Contains(fetch.Body.String(), `"name":"strict-agent"`) {
+		t.Fatalf("registry fetch status=%d body=%s", fetch.Code, fetch.Body.String())
 	}
 }
 

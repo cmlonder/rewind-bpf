@@ -735,6 +735,9 @@ GET  /v1/audit?limit=100
 GET  /v1/events?run_id=...           (snapshot)
 GET  /v1/events?run_id=...&follow=true (tail until terminal/timeout)
 POST /v1/action-challenges {action, run_id} (bearer required; one-time, 2 min)
+GET  /v1/registry/policies   (optional supervisor-proxied trusted registry)
+POST /v1/registry/policies/fetch {name, version}
+POST /v1/registry/policies/revoke {name, version}
 POST /v1/actions  {status|rollback|recover|commit}
 ```
 

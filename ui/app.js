@@ -478,12 +478,21 @@ function verifyTrustedRegistry() {
 
 function openRegistryImport() {
   const registry = fixture.registry;
-  openModal("Fetch trusted policy", `<form id="registry-import-form" class="modal-form"><label>Package name<input name="name" value="strict-agent" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" required /></label><label>Version<input name="version" value="1.3.0" pattern="[0-9]+\\.[0-9]+\\.[0-9]+" required /></label><label>Trust key<select name="key">${registry.keys.map((key) => `<option>${escapeUI(key.id)}</option>`).join("")}</select></label><div class="form-note">Fetch is simulated in fixture mode. A connected supervisor should perform the HTTPS request and verify the signed envelope before persistence.</div></form>`, { confirm: "Fetch & verify", onConfirm: () => {
+  const connectedEntry = state.supervisor?.registryEntries?.[0];
+  const defaultName = connectedEntry?.name || "strict-agent";
+  const defaultVersion = connectedEntry?.version || "1.3.0";
+  openModal("Fetch trusted policy", `<form id="registry-import-form" class="modal-form"><label>Package name<input name="name" value="${escapeUI(defaultName)}" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" required /></label><label>Version<input name="version" value="${escapeUI(defaultVersion)}" pattern="[0-9]+\\.[0-9]+\\.[0-9]+" required /></label><label>Trust key<select name="key">${registry.keys.map((key) => `<option>${escapeUI(key.id)}</option>`).join("")}</select></label><div class="form-note">${state.supervisor ? "The connected supervisor will fetch and verify the signed envelope before it reaches this page." : "Fetch is simulated in fixture mode. Connect a supervisor to perform the HTTPS request and verify the signed envelope."}</div></form>`, { confirm: "Fetch & verify", onConfirm: () => {
     const form = document.querySelector("#registry-import-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
-    fixture.policies.unshift({ name: data.get("name"), version: data.get("version"), state: "available", signed: true, signerKeyId: data.get("key"), description: "Imported from the trusted policy registry", reads: "enforce", writes: "rollback", network: "audit", assigned: 0, updated: "just now" });
-    closeModal(); render(); setToast(`Verified ${data.get("name")}@${data.get("version")} from the pinned registry.`, "success");
+    const value = { name: String(data.get("name")), version: String(data.get("version")) };
+    const fetch = state.supervisor ? state.supervisor.fetchRegistryPolicy(value) : Promise.resolve(null);
+    fetch.then((bundle) => {
+      const imported = bundle?.name ? { name: bundle.name, version: bundle.version, state: "available", signed: true, signerKeyId: data.get("key"), description: bundle.description || "Imported from the trusted policy registry", reads: bundle.policy?.read?.mode || "audit", writes: bundle.policy?.write?.mode || "rollback", network: bundle.policy?.network?.mode || "off", assigned: 0, updated: "just now" } : { name: value.name, version: value.version, state: "available", signed: true, signerKeyId: data.get("key"), description: "Imported from the trusted policy registry", reads: "enforce", writes: "rollback", network: "audit", assigned: 0, updated: "just now" };
+      fixture.policies.unshift(imported);
+      closeModal(); render(); setToast(`${state.supervisor ? "Verified and fetched" : "Verified"} ${value.name}@${value.version} from the pinned registry.`, "success");
+    }).catch((error) => setToast(`Registry fetch refused: ${error.message}`, "error"));
+    return fetch;
   } });
 }
 

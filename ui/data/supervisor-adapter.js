@@ -5,7 +5,7 @@ export async function connectSupervisor(baseUrl, token = "") {
   const root = baseUrl.replace(/\/$/, "");
   const headers = { Accept: "application/json" };
   if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-  const [health, capabilities, history, audit, policies, workspaces, policyBundles, credentialStatus, sessions] = await Promise.all([
+  const [health, capabilities, history, audit, policies, workspaces, policyBundles, credentialStatus, sessions, registryEntries] = await Promise.all([
     fetch(`${root}/health`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/capabilities`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/history`, { headers }).then(assertResponse).then((response) => response.json()),
@@ -15,6 +15,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     fetch(`${root}/v1/policy-bundles`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/credential-leases`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/sessions`, { headers }).then(assertResponse).then((response) => response.json()),
+    fetch(`${root}/v1/registry/policies`, { headers }).then((response) => response.ok ? response.json() : []),
   ]);
   return {
     health,
@@ -26,6 +27,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     policyBundles: Array.isArray(policyBundles) ? policyBundles : [],
     credentialStatus: credentialStatus && typeof credentialStatus === "object" ? credentialStatus : { available: false, state: "unavailable" },
     sessions: Array.isArray(sessions) ? sessions : [],
+    registryEntries: Array.isArray(registryEntries) ? registryEntries : [],
     token: token.trim(),
     baseUrl: root,
     challenge: (request) => issueActionChallenge(root, token.trim(), request),
@@ -36,7 +38,36 @@ export async function connectSupervisor(baseUrl, token = "") {
     issueCredentialLease: (value) => issueCredentialLease(root, token.trim(), value),
     pruneHistory: (keep) => pruneHistory(root, token.trim(), keep),
     session: (value) => sessionAction(root, token.trim(), value),
+    listRegistry: () => listRegistry(root, token.trim()),
+    fetchRegistryPolicy: (value) => fetchRegistryPolicy(root, token.trim(), value),
+    revokeRegistryPolicy: (value) => revokeRegistryPolicy(root, token.trim(), value),
   };
+}
+
+export async function listRegistry(baseUrl, token) {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/registry/policies`, { headers: { Accept: "application/json", Authorization: `Bearer ${token.trim()}` } });
+  const payload = await response.json().catch(() => []);
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return Array.isArray(payload) ? payload : [];
+}
+
+export async function fetchRegistryPolicy(baseUrl, token, value) {
+  return registryMutation(baseUrl, token, "fetch", value);
+}
+
+export async function revokeRegistryPolicy(baseUrl, token, value) {
+  return registryMutation(baseUrl, token, "revoke", value);
+}
+
+async function registryMutation(baseUrl, token, action, value) {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/registry/policies/${action}`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify(value),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
 }
 
 export async function issueActionChallenge(baseUrl, token, request) {

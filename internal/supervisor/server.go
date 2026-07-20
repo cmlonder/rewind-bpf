@@ -22,6 +22,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/platform"
 	"github.com/rewindbpf/rewind/internal/policybundle"
+	"github.com/rewindbpf/rewind/internal/registry"
 	"github.com/rewindbpf/rewind/internal/runstore"
 	"github.com/rewindbpf/rewind/internal/session"
 )
@@ -45,6 +46,7 @@ type Server struct {
 	Sessions          session.LeaseStore
 	SessionPath       string
 	ActionChallenges  *actionChallengeStore
+	Registry          *registry.Client
 }
 
 func (s Server) Handler() http.Handler {
@@ -327,6 +329,75 @@ func (s Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusCreated, challenge)
+	})
+	mux.HandleFunc("/v1/registry/policies", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if s.Registry == nil {
+			writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "unavailable", Message: "trusted registry client is not configured"})
+			return
+		}
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "registry listing requires GET"})
+			return
+		}
+		entries, err := s.Registry.List(r.Context())
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, Response{OK: false, State: "refused", Message: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, entries)
+	})
+	mux.HandleFunc("/v1/registry/policies/fetch", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if s.Registry == nil {
+			writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "unavailable", Message: "trusted registry client is not configured"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "registry fetch requires POST"})
+			return
+		}
+		var request RegistryFetchRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&request); err != nil || strings.TrimSpace(request.Name) == "" || strings.TrimSpace(request.Version) == "" {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "registry name and version are required"})
+			return
+		}
+		bundle, err := s.Registry.Fetch(r.Context(), request.Name, request.Version)
+		if err != nil {
+			writeJSON(w, http.StatusBadGateway, Response{OK: false, State: "refused", Message: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, bundle)
+	})
+	mux.HandleFunc("/v1/registry/policies/revoke", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if s.Registry == nil {
+			writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "unavailable", Message: "trusted registry client is not configured"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "registry revoke requires POST"})
+			return
+		}
+		var request RegistryFetchRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&request); err != nil || strings.TrimSpace(request.Name) == "" || strings.TrimSpace(request.Version) == "" {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "registry name and version are required"})
+			return
+		}
+		if err := s.Registry.Revoke(r.Context(), request.Name, request.Version); err != nil {
+			writeJSON(w, http.StatusBadGateway, Response{OK: false, State: "refused", Message: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, Response{OK: true, State: "revoked", Message: request.Name + "@" + request.Version})
 	})
 	mux.HandleFunc("/v1/actions", func(w http.ResponseWriter, r *http.Request) {
 		if !s.authorized(r) {

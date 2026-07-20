@@ -21,6 +21,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/credentials"
 	"github.com/rewindbpf/rewind/internal/history"
+	"github.com/rewindbpf/rewind/internal/registry"
 	"github.com/rewindbpf/rewind/internal/session"
 	"github.com/rewindbpf/rewind/internal/supervisor"
 )
@@ -38,12 +39,14 @@ func handleSupervisor(args []string) {
 	httpListen := flags.String("http-listen", "", "optional loopback HTTP bridge address, e.g. 127.0.0.1:8787")
 	corsOrigin := flags.String("cors-origin", "", "optional exact browser origin allowed for the HTTP bridge")
 	trustedPolicyKeys := flags.String("trusted-policy-keys", "", "optional comma-separated raw Ed25519 public-key files for signed policy imports")
+	registryEndpoint := flags.String("registry-endpoint", "", "optional HTTPS trusted-policy registry endpoint proxied by supervisor")
+	registryToken := flags.String("registry-token", "", "optional bearer token for the trusted-policy registry (never sent to browser)")
 	credentialProvider := flags.String("credential-provider-command", "", "optional command-provider executable for short-lived credential leases")
 	credentialTimeout := flags.Duration("credential-provider-timeout", 10*time.Second, "timeout for the credential provider command")
 	sessionBackend := flags.String("session-backend", "local", "session backend: local or sqlite")
 	sessionPath := flags.String("session-path", "", "optional session store path (defaults beside history)")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,... --credential-provider-command PATH]")
+		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,... --registry-endpoint URL --registry-token TOKEN --credential-provider-command PATH]")
 	}
 	if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
 		fatal(err.Error())
@@ -68,6 +71,10 @@ func handleSupervisor(args []string) {
 	trustedKeys, err := loadTrustedPolicyKeys(*trustedPolicyKeys)
 	if err != nil {
 		fatal(err.Error())
+	}
+	var registryClient *registry.Client
+	if strings.TrimSpace(*registryEndpoint) != "" {
+		registryClient = &registry.Client{Endpoint: strings.TrimSpace(*registryEndpoint), Bearer: *registryToken, TrustedKeys: trustedKeys}
 	}
 	var credentialBroker credentials.Broker
 	if strings.TrimSpace(*credentialProvider) != "" {
@@ -131,6 +138,7 @@ func handleSupervisor(args []string) {
 		SessionPath:       *sessionPath,
 		AuditPath:         *historyPath + ".actions.jsonl",
 		AuditMu:           &sync.Mutex{},
+		Registry:          registryClient,
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {
 			return supervisorAction(*historyPath, request)
 		},

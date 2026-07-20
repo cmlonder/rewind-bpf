@@ -45,6 +45,11 @@ type ActionChallengeResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
+type RegistryFetchRequest struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 type Response struct {
 	OK           bool     `json:"ok"`
 	State        string   `json:"state,omitempty"`
