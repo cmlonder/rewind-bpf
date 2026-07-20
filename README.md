@@ -55,7 +55,7 @@ nono is the stronger broad developer sandbox today. RewindBPF is intentionally n
 
 1. Did the agent write to the real project before I accepted the result? **No.**
 2. Could it read my configured sensitive paths? **The policy backend denies or hides them.**
-3. Can I accept the result without overwriting destination drift? **Only through a future conflict-checked apply.**
+3. Can I accept the result without overwriting destination drift? **Only through `rewind commit --confirm`, after the manifest conflict check passes.**
 4. Can the runtime prove the run was complete? **Evidence loss makes the run incomplete.**
 
 See [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md) for the adopted native-platform and post-demo roadmap.
@@ -117,7 +117,7 @@ sudo rewind recover --record ./runtime/record.json
 sudo rewind commit --record ./runtime/record.json --confirm
 ```
 
-Successful runs discard the temporary upper/work layer by default. Add `--on-success review` when you explicitly need to inspect the merged view before choosing export or discard. The agent always sees a merged workspace backed by an OverlayFS lower/upper pair; the protected lower layer is never modified before acceptance. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns. Network policy is compiled for audit/preview, while the default credential broker refuses raw secret exposure until a platform broker is configured. Candidate acceptance is conflict-checked against the immutable base before any future apply step.
+Successful runs discard the temporary upper/work layer by default. Add `--on-success review` when you explicitly need to inspect the merged view before choosing export or discard. The agent always sees a merged workspace backed by an OverlayFS lower/upper pair; the protected lower layer is never modified before acceptance. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns. Network policy supports an explicit loopback proxy backend for proxy-aware HTTP/HTTPS clients; raw sockets remain unsupported. The default credential broker refuses raw secret exposure until a platform broker is configured. Candidate acceptance is conflict-checked against the immutable base before `rewind commit --confirm` applies regular-file and directory changes.
 
 Signed policy provenance is available without putting secrets in the package:
 
@@ -267,11 +267,11 @@ The first full protected-run smoke was verified in the disposable Ubuntu VM on 2
 ```text
 cmd/rewind/       CLI entry point
 docs/             technical architecture and project plan
-ebpf/             planned C/libbpf kernel programs
+ebpf/             C/libbpf kernel sensor and optional enforcement programs
 internal/runplan/ pre-execution protected-run composition
 internal/protectedrun/ run lifecycle ordering and fail-closed cleanup
 policies/         safe example policies
-benchmarks/       benchmark design and future results
+benchmarks/       reproducible benchmark scripts, ledgers, and charts
 docs/PHASE2_PLAN.md Phase 2 hardening and productisation roadmap
 docs/PRODUCT_STRATEGY.md product wedge, competitive position, and native-platform roadmap
 tests/            integration-test safety notes

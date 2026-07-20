@@ -1,8 +1,8 @@
 # RewindBPF Phase 2 Plan
 
-**Status:** Proposed for the six-day post-MVP sprint
+**Status:** Linux implementation complete; disposable-VM verification gate next
 **Owner:** RewindBPF team
-**Last updated:** 2026-07-19
+**Last updated:** 2026-07-20
 **Decision horizon:** Hackathon demo in six days, followed by a 90-day productisation track
 
 ## 1. Executive decision
@@ -25,28 +25,29 @@ P0 is now organized by user outcome, with a runtime workstream and a matching Co
 |---|---|---|---|
 | Immutable project | Default-discard successful runs; explicit review/hold opt-in; no lower-layer writes before acceptance | Show `DISCARD BY DEFAULT`, upper-layer size, lower-layer integrity, and explicit `Review`/`Discard` actions | Destructive delete, rename, overwrite, and rollback fixture |
 | Invisible secrets | Enforce user-defined sensitive-read patterns; record deny decisions without secret contents | Policy simulator, secret-path decision timeline, capability/degraded state | `.env`, SSH, key, PII synthetic fixtures |
-| Explicit acceptance | Review export first; conflict-checked apply remains blocked until destination manifest checks exist | Make acceptance states visible; keep `Commit` disabled with a clear reason; expose export/discard as primary paths | Destination drift must refuse apply |
+| Explicit acceptance | Review export first; `rewind commit --confirm` applies only after destination manifest checks pass | Show the conflict gate, commit confirmation, and export/discard paths | Destination drift must refuse apply |
 | Fail-closed trust | Cleanup, process drain, mount state, event drops, truncation, and unsupported backends become explicit failure states | Evidence health, degraded backend banner, recovery progress, and actionable error states | Fault-injection matrix and incomplete-evidence verification |
 
-P0 scope excludes durable snapshot history, detachable sessions, registry features, and local authentication. Those are post-demo/productisation work unless required by a connected deployment boundary.
+P0 scope excludes durable snapshot history, detachable sessions, registry features, local authentication, native macOS/Windows enforcement, and real credential providers. Those are post-demo/productisation work unless required by a connected deployment boundary.
 
 ### P1 implementation boundary
 
 The first product-core slice adds three explicit, portable contracts:
 
-- `internal/netpolicy` compiles allowlisted domains into pure preview decisions. It does not claim kernel egress enforcement until a platform backend exists.
+- `internal/netpolicy` compiles allowlisted domains and provides a loopback HTTP/HTTPS proxy backend for proxy-aware clients. Raw-socket and non-proxy-aware clients remain unsupported.
 - `internal/credentials` exposes capability references and a refusing broker. Raw values have no representation in policy, leases, argv, or workspace files.
-- `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before any future apply operation.
+- `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before `rewind commit --confirm` applies regular-file and directory changes.
 
 The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This keeps the demo honest while preserving the API shape for native backends.
 
 ### P4 implementation boundary
 
-`internal/history` now stores bounded, durable run summaries with atomic JSON
-replacement and keep-latest pruning. `internal/supervisor` defines the future
-local control-plane request/response schema without pretending that transport
-or authentication is production-ready. The UI history page is fixture-backed
-until a local supervisor is added after the demo.
+`internal/history` stores bounded, durable run summaries with atomic JSON
+replacement and keep-latest pruning. `internal/supervisor` now exposes a
+permissioned Unix-socket transport with bearer-token-authenticated lifecycle
+actions, snapshot/follow event streams, and redacted action audit. The browser
+adapter remains read-only; detachable process sessions and browser mutation
+bridging remain post-demo work.
 
 This is deliberately narrower than “protect the whole operating system” or “zero overhead.” OverlayFS protects filesystem changes inside the selected boundary. Landlock protects the selected read/write hierarchy. eBPF supplies low-cost telemetry and optional enforcement where the kernel supports it. Network, kernel state, devices, external services, and already-open descriptors remain explicit safety boundaries.
 
@@ -85,7 +86,7 @@ The first P0 slice is now implemented and verified in the disposable VM:
 - Event count, byte count, SHA-256 digest, kernel-side dropped-event count, sequence numbers, a userspace hash chain, and complete/truncated JSONL evidence flag.
 - Read-only `diff --record` manifest comparison for a live merged view.
 
-The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. An open-descriptor crash smoke wrote through fd 9 in the merged layer, was forcibly terminated, and recovered with the lower marker unchanged. A VM-only small-ring stress test intentionally dropped 37 events from 50,000 writes; the run record remained `dropped=37`, `complete=false` after rollback, and `rewind verify` exited 2. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. The review-only `rewind export`, `policy learn`, optional cgroup resource-limit workflow, independent evidence verifier, and ordered JSONL rotation are now implemented; remaining P0 work is broader lifecycle fault coverage, while explicit backpressure remains P1.
+The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. An open-descriptor crash smoke wrote through fd 9 in the merged layer, was forcibly terminated, and recovered with the lower marker unchanged. A VM-only small-ring stress test intentionally dropped 37 events from 50,000 writes; the run record remained `dropped=37`, `complete=false` after rollback, and `rewind verify` exited 2. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. The review-only `rewind export`, `policy learn`, optional cgroup resource-limit workflow, independent evidence verifier, ordered JSONL rotation, network proxy path, conflict-checked commit, and authenticated supervisor actions are implemented. Remaining Linux work is verification and broader filesystem/power-loss coverage; explicit backpressure, native platform backends, and remote productisation remain staged work.
 
 ## 3. Research and competitive findings
 
@@ -136,11 +137,11 @@ Nono is the closest product benchmark, so its publicly documented feature set be
 | Profile-based policy and `learn` workflow | YAML policy, glob deny patterns, `off/audit/enforce` | **P0:** versioned policy schema, `policy learn`, explain/validate commands | Signed, composable profiles with toolchain/runtime groups. |
 | Atomic undo and content-addressed snapshots | OverlayFS/FUSE upper-layer discard; SHA-256 start manifests | **P0:** diff index, rollback evidence, crash recovery; **P1:** deduplicated content store if storage measurements justify it | Multiple checkpoints and portable run bundles. |
 | Cryptographic audit trail/Merkle commitment | JSONL telemetry and run record; no final Merkle root | **P0:** sequence numbers, drop counters, hash-chained batches, final root, read-only verifier | Signed remote evidence and standalone packaging. |
-| Domain/network filtering | Policy field exists, no equivalent enforcement | **P1:** network namespace/proxy adapter with audit/enforce semantics | Credential-aware egress broker and per-agent network profiles. |
+| Domain/network filtering | Policy field plus loopback proxy backend for proxy-aware HTTP/HTTPS clients | **P1:** network namespace/cgroup backend for raw sockets and non-proxy-aware clients | Credential-aware egress broker and per-agent network profiles. |
 | Credential injection without exposing raw keys | Not implemented | **P1:** design only during six-day sprint; never pass secrets through argv or agent workspace | Keychain/secret-manager adapters and short-lived scoped tokens. |
-| Runtime supervisor and dynamic permission approval | CLI owns one run; no long-lived supervisor | **P1:** Unix-socket supervisor design and approval protocol | Policy decision service with human/automation approval and time-bounded grants. |
-| Signed provenance/registry for profiles and agent packs | Local files only | **P2:** document trust boundary and sign release artifacts | Sigstore-compatible profile/adapter registry. |
-| Detachable/ghost sessions | Not implemented | **P2:** explicitly out of the six-day critical path | Persistent run handles with reconnect, retention, and operator takeover. |
+| Runtime supervisor and dynamic permission approval | Authenticated Unix-socket supervisor with lifecycle actions, snapshot/follow streams, and redacted audit | **P1:** connected browser mutation bridge and approval protocol | Policy decision service with human/automation approval and time-bounded grants. |
+| Signed provenance/registry for profiles and agent packs | Local Ed25519 bundles and verification only | **P2:** document trust boundary and sign release artifacts | Sigstore-compatible profile/adapter registry. |
+| Detachable/ghost sessions | No persistent session owner; event follow is available for an existing run | **P2:** explicitly out of the six-day critical path | Persistent run handles with reconnect, retention, and operator takeover. |
 
 The priority is intentional. Nono already demonstrates a broad product surface: kernel isolation, undo, audit, provenance, supervision, network filtering, credential injection, and detachable sessions ([feature overview](https://nono.sh/), [undo](https://nono.sh/undo), [audit trail](https://nono.sh/audit-trail), [profile learning](https://nono.sh/blog/nono-learn-policy-profile)). RewindBPF should first close the correctness and evidence gaps that would make our rollback claim unreliable, then add network/credential/supervisor features as separate policy planes. A six-day sprint that starts with a registry, durable history, or UI polish would create parity theatre without a stronger safety invariant. The complete product strategy, including native macOS and Windows tracks, lives in [`docs/PRODUCT_STRATEGY.md`](PRODUCT_STRATEGY.md).
 

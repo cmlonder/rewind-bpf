@@ -304,7 +304,7 @@ Live events use SSE first, with polling as a fallback. The supervisor owns Unix-
 - Use same-origin/CSP protections and an action token for state-changing requests.
 - Never render secret file contents, raw credentials, or environment values.
 - Treat path metadata as sensitive and redact where the policy requires it.
-- Require an impact summary for rollback/recover and a conflict report before any future commit.
+- Require an impact summary for rollback/recover and a conflict report before commit.
 - Keep UI failure independent from runtime safety; a crashed browser must not stop recovery.
 - Explain unsupported capabilities and unavailable actions in plain technical language.
 
@@ -332,10 +332,10 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining connected work is end-to-end reconnect/recovery behavior. P4 now
-has a bounded history contract, signed policy provenance, a token-authenticated
-Unix-socket server, snapshot and follow-mode event endpoints, a browser
-adapter, and a fixture-backed retention view. The socket
+The remaining connected work is browser-side mutation and end-to-end reconnect/
+recovery behavior. P4 now has a bounded history contract, signed policy
+provenance, a token-authenticated Unix-socket server, snapshot and follow-mode
+event endpoints, a browser adapter, and a fixture-backed retention view. The socket
 and bearer token are protected with mode `0600`; authenticated status,
 rollback/recover, and explicit commit actions now route through the same runtime
 lifecycle and conflict checks as the CLI, with redacted JSONL action audit. Local
@@ -368,10 +368,11 @@ Exit: an operator can create a package, simulate it, assign it to a workspace, a
 ### Phase 4 — Supervisor integration — read/action boundary delivered
 
 The current bridge exposes a mode-0600 Unix socket, bearer-authenticated
-history/events, and lifecycle actions. Continue with persistent action audit and
-recovery/reconnect behavior. Add local authentication beyond
-the socket/token boundary after the demo unless the connected deployment
-requires it earlier.
+history/events, lifecycle actions, follow-mode streams, and persistent redacted
+action audit. Continue with browser mutation through a local action-token bridge
+and recovery/reconnect behavior. Add local authentication beyond the
+socket/token boundary after the demo unless the connected deployment requires it
+earlier.
 
 Exit: UI state matches runtime state under refresh, reconnect, supervisor restart, and recovery scenarios.
 

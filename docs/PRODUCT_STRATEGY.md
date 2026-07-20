@@ -1,5 +1,7 @@
 # RewindBPF Product Strategy
 
+> **Delivery status:** the Linux transaction/product-core slice is implemented and entering disposable-VM verification. The complete multi-platform/productisation backlog is not finished; see [`FEATURE_BACKLOG.md`](FEATURE_BACKLOG.md) for the canonical shipped/partial/not-implemented matrix.
+
 **Status:** adopted after the nono comparison review  
 **Decision:** focus on destructive-change safety and sensitive-data safety before pursuing broad sandbox parity
 

@@ -2,9 +2,9 @@
 
 **Document status:** Living document
 
-**Current stage:** MVP complete — Phase 2 hardening planned
+**Current stage:** Linux feature implementation complete — disposable-VM verification gate
 
-**Last verified:** 2026-07-18
+**Last verified:** 2026-07-20
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
 
 ## 1. Product and business purpose
@@ -303,9 +303,9 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Stage 5 read policy | Complete for isolated MVP boundary; lifecycle integration next | Exact-path compiler, Landlock plan, and fixed-key ABI unit-tested; VM-only child-process test passed with allowed read and synthetic secret denied (`EACCES`); optional read-enforcer object remains available for kernels with active `bpf` |
 | Stage 6 protected-run integration | Complete | FUSE-backed end-to-end VM smoke passed: read denial, agent deletion isolation, generated-file creation, eBPF telemetry, successful record, rollback, and lower-layer preservation |
 | Stage 7 benchmarks | Complete for MVP evidence | Warm/cold B0/B2/B4 results, storage footprint, telemetry growth, and charts are recorded in `benchmarks/RESULTS.md`; broader B1–B5 coverage is Phase 2 work |
-| Phase 2 P0 transaction journal | VM smoke complete | Prepared record, `mounted` lifecycle state, idempotent rollback/recovery, invoker-owned metadata, cgroup path, capability report, and parent-`SIGKILL` recovery are implemented; broader fault coverage remains |
+| Phase 2 P0 transaction journal | Implemented; VM smoke complete | Prepared record, `mounted` lifecycle state, idempotent rollback/recovery, invoker-owned metadata, cgroup path, capability report, and parent-`SIGKILL` recovery are implemented; power-loss and filesystem matrix remain |
 | Phase 2 process scope | VM smoke complete | cgroup-v2 scope is created per run, optional `pids.max`/`memory.max`/`cpu.max` limits are written before release, helper PID is admitted before release, descendants inherit the scope, and stale scopes are cleaned during rollback |
-| Phase 2 telemetry evidence | VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, sequence/hash chain, complete flag, bounded total cap, and ordered `REWIND_EVENT_ROTATE_BYTES` files are persisted; explicit backpressure remains |
+| Phase 2 telemetry evidence | Implemented; VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, sequence/hash chain, complete flag, bounded total cap, and ordered `REWIND_EVENT_ROTATE_BYTES` files are persisted; explicit backpressure policy remains staged |
 | Phase 2 merged diff | Implemented | `rewind diff --record PATH` compares the start manifest with the live merged view without mutating either tree |
 
 ### Initial B0 baseline (disposable VM)

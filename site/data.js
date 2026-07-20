@@ -7,7 +7,7 @@ export const siteData = {
     ["Benchmarks", "#benchmarks"],
   ],
   status: {
-    label: "Phase 2 / P0 hardened",
+    label: "Linux feature-complete / verification gate",
     sublabel: "Disposable Ubuntu VM · ARM64 · kernel 6.8",
   },
   metrics: [
@@ -53,7 +53,7 @@ export const siteData = {
       title: "Review before merge",
       tag: "SHIPPED",
       body: "Inspect a merged-view diff and export a non-mutating JSON review bundle with before/after manifests and created, modified, deleted, or renamed paths.",
-      detail: "A live workspace is never overwritten by the export command. Conflict-checked commit remains deliberately separate.",
+      detail: "A live workspace is never overwritten by the export command. `rewind commit --confirm` applies only after the destination manifest passes the conflict gate.",
       tone: "lavender",
     },
     {
@@ -69,14 +69,14 @@ export const siteData = {
     { label: "01 / PREPARE", title: "Capture the lower layer", body: "Record a manifest and create the temporary upper/work directories before the agent starts.", icon: "↓" },
     { label: "02 / GATE", title: "Attach before exec", body: "Load the eBPF sensor, compile read rules, create the cgroup scope, then release the agent process.", icon: "⊙" },
     { label: "03 / RUN", title: "Observe the transaction", body: "The agent sees one merged workspace. Policies audit or deny sensitive reads; all writes stay copy-on-write.", icon: "↗" },
-    { label: "04 / DECIDE", title: "Keep, review, or rewind", body: "Status, events, verify, diff, and export make the outcome inspectable before a future commit path changes anything permanent.", icon: "↺" },
+    { label: "04 / DECIDE", title: "Keep, review, commit, or rewind", body: "Status, events, verify, diff, export, and conflict-checked commit make the outcome inspectable before anything permanent changes.", icon: "↺" },
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "P1", title: "P1: invisible secrets + explicit accept", status: "Contract shipped", body: "Scoped credential references refuse raw secret exposure, network policy has an auditable preview plan, and candidate acceptance rejects same-path destination drift." },
-    { phase: "P2", title: "P2: native macOS adapter", status: "Contract shipped", body: "Seatbelt / EndpointSecurity + APFS are represented as an explicit capability contract. The backend remains refused until it passes disposable-volume tests." },
-    { phase: "P3", title: "P3: native Windows adapter", status: "Contract shipped", body: "Windows cross-build and fail-closed process boundary are ready; native Job Object/filesystem enforcement remains disabled until tested on disposable Windows storage." },
-    { phase: "P4", title: "P4: durable history + supervisor", status: "Control plane shipped", body: "Atomic bounded run history, token-authenticated supervisor transport, lifecycle actions, snapshot/follow event streams, redacted action audit, and a fixture-backed retention view are now in place." },
+    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy backend, refusing credential boundary, conflict-checked commit, and authenticated supervisor are shipped. Raw-socket egress, a real credential provider, patch/branch adapters, and connected browser mutation remain." },
+    { phase: "P2", title: "P2: native macOS adapter", status: "Not implemented", body: "Seatbelt / EndpointSecurity + APFS are defined as a fail-closed capability contract. No macOS enforcement is claimed until disposable-volume tests pass." },
+    { phase: "P3", title: "P3: native Windows adapter", status: "Not implemented", body: "Cross-build and fail-closed refusal are ready; native process/filesystem enforcement remains disabled until tested on disposable Windows storage." },
+    { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams, and redacted audit are shipped. Detachable sessions, remote registry/retention, agent adapters, and multi-agent checkpoints remain." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],
