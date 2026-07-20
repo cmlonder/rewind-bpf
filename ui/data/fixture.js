@@ -100,6 +100,7 @@ export const fixture = {
       ["Endpoint transport", "HTTPS + bounded retry", "verified"],
       ["Signer trust", "2 pinned Ed25519 keys", "verified"],
       ["Envelope admission", "signature before persistence", "verified"],
+      ["Revocation", "marker-backed · 410 Gone", "verified"],
       ["Browser authority", "metadata only · no root", "ready"],
     ],
   },
