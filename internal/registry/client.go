@@ -26,6 +26,11 @@ type Client struct {
 	TrustedKeys []ed25519.PublicKey
 }
 
+type Entry struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 func (c Client) do(ctx context.Context, method, path string, body []byte) ([]byte, error) {
 	base, err := url.Parse(strings.TrimRight(c.Endpoint, "/"))
 	if err != nil || base.Scheme == "" || base.Host == "" {
@@ -105,6 +110,26 @@ func (c Client) Fetch(ctx context.Context, name, version string) (policybundle.B
 		return policybundle.Bundle{}, fmt.Errorf("verify registry policy: %w", err)
 	}
 	return bundle, nil
+}
+
+func (c Client) List(ctx context.Context) ([]Entry, error) {
+	data, err := c.do(ctx, http.MethodGet, "/v1/registry/policies", nil)
+	if err != nil {
+		return nil, err
+	}
+	var entries []Entry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, fmt.Errorf("decode registry listing: %w", err)
+	}
+	return entries, nil
+}
+
+func (c Client) Revoke(ctx context.Context, name, version string) error {
+	if strings.TrimSpace(name) == "" || strings.TrimSpace(version) == "" {
+		return fmt.Errorf("registry name and version are required")
+	}
+	_, err := c.do(ctx, http.MethodDelete, "/v1/registry/policies/"+url.PathEscape(name)+"/"+url.PathEscape(version), nil)
+	return err
 }
 
 func mustJSON(value any) []byte { data, _ := json.Marshal(value); return data }

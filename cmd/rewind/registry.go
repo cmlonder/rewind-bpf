@@ -17,11 +17,19 @@ import (
 )
 
 func handleRegistry(args []string) {
-	if len(args) == 0 || (args[0] != "fetch" && args[0] != "serve") {
-		fatal("usage: rewind registry fetch --endpoint URL --name NAME --version VERSION --output PATH [--trusted-public-keys PATH,...] | rewind registry serve --root PATH [--listen 127.0.0.1:8790 --bearer TOKEN]")
+	if len(args) == 0 || (args[0] != "fetch" && args[0] != "serve" && args[0] != "list" && args[0] != "revoke") {
+		fatal("usage: rewind registry fetch|list|revoke ... | rewind registry serve --root PATH [--listen 127.0.0.1:8790 --bearer TOKEN]")
 	}
 	if args[0] == "serve" {
 		handleRegistryServe(args[1:])
+		return
+	}
+	if args[0] == "list" {
+		handleRegistryList(args[1:])
+		return
+	}
+	if args[0] == "revoke" {
+		handleRegistryRevoke(args[1:])
 		return
 	}
 	flags := flag.NewFlagSet("registry fetch", flag.ContinueOnError)
@@ -44,6 +52,36 @@ func handleRegistry(args []string) {
 		fatal(fmt.Sprintf("write verified policy: %v", err))
 	}
 	fmt.Printf("fetched and verified policy: %s/%s -> %s\n", *name, *version, *output)
+}
+
+func handleRegistryList(args []string) {
+	flags := flag.NewFlagSet("registry list", flag.ContinueOnError)
+	endpoint := flags.String("endpoint", "", "HTTPS registry endpoint")
+	token := flags.String("token", "", "optional bearer token")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *endpoint == "" {
+		fatal("usage: rewind registry list --endpoint URL [--token TOKEN]")
+	}
+	entries, err := (registry.Client{Endpoint: *endpoint, Bearer: *token}).List(context.Background())
+	if err != nil {
+		fatal(err.Error())
+	}
+	data, _ := json.MarshalIndent(entries, "", "  ")
+	fmt.Println(string(data))
+}
+
+func handleRegistryRevoke(args []string) {
+	flags := flag.NewFlagSet("registry revoke", flag.ContinueOnError)
+	endpoint := flags.String("endpoint", "", "HTTPS registry endpoint")
+	name := flags.String("name", "", "policy name")
+	version := flags.String("version", "", "policy version")
+	token := flags.String("token", "", "bearer token")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *endpoint == "" || *name == "" || *version == "" {
+		fatal("usage: rewind registry revoke --endpoint URL --name NAME --version VERSION --token TOKEN")
+	}
+	if err := (registry.Client{Endpoint: *endpoint, Bearer: *token}).Revoke(context.Background(), *name, *version); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("revoked policy: %s/%s\n", *name, *version)
 }
 
 func handleRegistryServe(args []string) {

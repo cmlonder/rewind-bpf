@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/policy"
@@ -61,5 +62,19 @@ func TestFileRegistryPublishAndFetch(t *testing.T) {
 	}
 	if bundle.Version != "1" {
 		t.Fatal(bundle)
+	}
+	entries, err := client.List(context.Background())
+	if err != nil || len(entries) != 1 || entries[0].Name != "safe" {
+		t.Fatalf("entries=%+v err=%v", entries, err)
+	}
+	if err := client.Revoke(context.Background(), "safe", "1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := client.Fetch(context.Background(), "safe", "1"); err == nil || !strings.Contains(err.Error(), "410") {
+		t.Fatalf("expected revoked policy, err=%v", err)
+	}
+	entries, err = client.List(context.Background())
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("revoked entry still listed: %+v err=%v", entries, err)
 	}
 }

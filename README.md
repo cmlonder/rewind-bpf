@@ -235,8 +235,11 @@ rewind registry fetch --endpoint https://registry.example \
   --trusted-public-keys /etc/rewind/keys/current.pub,/etc/rewind/keys/previous.pub
 ```
 
-The registry client has a bounded response size and retry budget. It never
-turns an unverified remote payload into an active run policy.
+The registry service also supports `rewind registry list` and
+`rewind registry revoke --name NAME --version VERSION`; revocation is a
+durable marker, so a revoked package returns `410 Gone` instead of being
+silently deleted. The registry client has a bounded response size and retry
+budget. It never turns an unverified remote payload into an active run policy.
 
 ### Local supervisor control plane
 
