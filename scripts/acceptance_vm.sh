@@ -78,6 +78,8 @@ sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/core/workspace" "$ROOT/core/r
 test -f "$ROOT/core/workspace/src/marker.txt"
 test ! -e "$ROOT/core/workspace/generated.txt"
 sudo "$BIN" verify --record "$ROOT/core/runtime/record.json"
+sudo "$BIN" bundle create --record "$ROOT/core/runtime/record.json" --output "$ROOT/core/evidence.tar.gz"
+sudo "$BIN" bundle verify --input "$ROOT/core/evidence.tar.gz"
 echo "core rollback/read denial: PASS"
 
 # 2. Explicit review and conflict-checked commit.
@@ -89,6 +91,24 @@ sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/commit/workspace" "$ROOT/comm
 sudo "$BIN" commit --record "$ROOT/commit/runtime/record.json" --confirm
 test "$(cat "$ROOT/commit/workspace/accepted.txt")" = accepted
 echo "review/commit: PASS"
+
+# 2b. Explicit clean-branch Git acceptance. The repository and candidate are
+# disposable; the adapter must refuse a dirty or wrong checkout before apply.
+mkdir -p "$ROOT/branch/workspace"
+git -C "$ROOT/branch/workspace" init -b main >/dev/null
+git -C "$ROOT/branch/workspace" config user.email test@example.invalid
+git -C "$ROOT/branch/workspace" config user.name "Rewind Acceptance"
+printf 'before\n' > "$ROOT/branch/workspace/accepted.txt"
+git -C "$ROOT/branch/workspace" add --all
+git -C "$ROOT/branch/workspace" commit -m initial >/dev/null
+make_policy "$ROOT/branch/policy.yaml" off audit
+sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/branch/workspace" "$ROOT/branch/runtime" "$ROOT/branch/policy.yaml" "$ROOT/branch/runtime/record.json") --on-success review -- \
+  /bin/sh -c 'printf "accepted\n" > accepted.txt; printf "generated\n" > generated.txt'
+sudo "$BIN" branch apply --record "$ROOT/branch/runtime/record.json" --repo "$ROOT/branch/workspace" --branch main --confirm --commit --message "accept reviewed result" >/dev/null
+test "$(cat "$ROOT/branch/workspace/accepted.txt")" = accepted
+test "$(cat "$ROOT/branch/workspace/generated.txt")" = generated
+test "$(git -C "$ROOT/branch/workspace" log -1 --pretty=%s)" = "accept reviewed result"
+echo "clean-branch acceptance: PASS"
 
 mkdir -p "$ROOT/conflict/workspace"
 printf 'base\n' > "$ROOT/conflict/workspace/conflict.txt"
