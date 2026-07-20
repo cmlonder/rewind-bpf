@@ -84,6 +84,57 @@ func TestBrokerMovesPeerAndConfiguresChildNamespace(t *testing.T) {
 	}
 }
 
+func TestBrokerRefreshAtomicallySwapsResolvedSet(t *testing.T) {
+	plan, err := BuildAllowlistPlanWithIPsAndResolvers([]string{"api.example.com"}, map[string][]net.IP{"api.example.com": {net.ParseIP("203.0.113.10")}}, []net.IP{net.ParseIP("192.0.2.53")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	broker := &Broker{
+		Plan:   plan,
+		Runner: runner,
+		ResolveDomains: func(context.Context, []string) (map[string][]net.IP, error) {
+			return map[string][]net.IP{"api.example.com": {net.ParseIP("203.0.113.20"), net.ParseIP("203.0.113.20")}}, nil
+		},
+		ResolveNameservers: func() ([]net.IP, error) { return []net.IP{net.ParseIP("192.0.2.54")}, nil },
+	}
+	if err := broker.Refresh(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(runner.calls, "\n")
+	for _, expected := range []string{
+		"ipset create REWIND_ALLOWLIST4_NEXT hash:ip family inet -exist",
+		"ipset add REWIND_ALLOWLIST4_NEXT 192.0.2.54 -exist",
+		"ipset add REWIND_ALLOWLIST4_NEXT 203.0.113.20 -exist",
+		"ipset swap REWIND_ALLOWLIST4 REWIND_ALLOWLIST4_NEXT",
+		"ipset destroy REWIND_ALLOWLIST4_NEXT",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("missing %q in calls:\n%s", expected, joined)
+		}
+	}
+	if len(broker.Plan.ResolvedIPs) != 1 || broker.Plan.ResolvedIPs[0] != "203.0.113.20" || broker.Plan.ResolverIPs[0] != "192.0.2.54" {
+		t.Fatalf("plan not refreshed: %+v", broker.Plan)
+	}
+}
+
+func TestBrokerRefreshLeavesPlanUntouchedWhenResolutionFails(t *testing.T) {
+	plan, err := BuildAllowlistPlanWithIPsAndResolvers([]string{"api.example.com"}, map[string][]net.IP{"api.example.com": {net.ParseIP("203.0.113.10")}}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{}
+	broker := &Broker{Plan: plan, Runner: runner, ResolveDomains: func(context.Context, []string) (map[string][]net.IP, error) {
+		return nil, fmt.Errorf("resolver offline")
+	}}
+	if err := broker.Refresh(context.Background()); err == nil || !strings.Contains(err.Error(), "resolver offline") {
+		t.Fatalf("err=%v", err)
+	}
+	if len(runner.calls) != 0 || broker.Plan.ResolvedIPs[0] != "203.0.113.10" {
+		t.Fatalf("refresh mutated state after resolution failure: calls=%v plan=%+v", runner.calls, broker.Plan)
+	}
+}
+
 func TestAllowlistInstallPropagatesCommandFailure(t *testing.T) {
 	runner := &failingRunner{at: 5}
 	plan, _ := BuildAllowlistPlan([]string{"api.example.com"})

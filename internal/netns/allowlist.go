@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 )
 
@@ -26,6 +27,8 @@ type Broker struct {
 	Plan               AllowlistPlan
 	Runner             CommandRunner
 	RequireRoot        bool
+	ResolveDomains     func(context.Context, []string) (map[string][]net.IP, error)
+	ResolveNameservers func() ([]net.IP, error)
 	previousForwarding string
 }
 
@@ -83,6 +86,63 @@ func (b *Broker) Cleanup(ctx context.Context) error {
 		b.previousForwarding = ""
 	}
 	return err
+}
+
+// Refresh re-resolves the configured domains and atomically replaces the
+// destination IP set. Resolution happens before any firewall mutation; a DNS
+// outage therefore leaves the last-known-good set active. The ipset swap is
+// atomic from the packet filter's perspective, so an agent never observes a
+// partially populated allowlist.
+func (b *Broker) Refresh(ctx context.Context) error {
+	if b == nil {
+		return fmt.Errorf("namespace broker is nil")
+	}
+	if b.requireRoot() && os.Geteuid() != 0 {
+		return fmt.Errorf("namespace broker refresh requires root")
+	}
+	if b.Runner == nil {
+		b.Runner = OSCommandRunner{}
+	}
+	if len(b.Plan.Domains) == 0 {
+		return fmt.Errorf("namespace broker has no domains to refresh")
+	}
+	resolveDomains := b.ResolveDomains
+	if resolveDomains == nil {
+		resolveDomains = ResolveDomains
+	}
+	resolved, err := resolveDomains(ctx, append([]string(nil), b.Plan.Domains...))
+	if err != nil {
+		return fmt.Errorf("refresh namespace allowlist: resolve domains: %w", err)
+	}
+	resolveNameservers := b.ResolveNameservers
+	if resolveNameservers == nil {
+		resolveNameservers = ResolveNameservers
+	}
+	resolvers, err := resolveNameservers()
+	if err != nil {
+		return fmt.Errorf("refresh namespace allowlist: resolve nameservers: %w", err)
+	}
+	resolvedIPs := flattenIPs(resolved)
+	resolverIPs := normalizeIPs(resolvers)
+	if len(resolvedIPs) == 0 {
+		return fmt.Errorf("refresh namespace allowlist: no IPv4 addresses")
+	}
+	commands := [][]string{{"ipset", "create", "REWIND_ALLOWLIST4_NEXT", "hash:ip", "family", "inet", "-exist"}, {"ipset", "flush", "REWIND_ALLOWLIST4_NEXT"}}
+	for _, ip := range append(append([]string(nil), resolvedIPs...), resolverIPs...) {
+		commands = append(commands, []string{"ipset", "add", "REWIND_ALLOWLIST4_NEXT", ip, "-exist"})
+	}
+	commands = append(commands,
+		[]string{"ipset", "swap", "REWIND_ALLOWLIST4", "REWIND_ALLOWLIST4_NEXT"},
+		[]string{"ipset", "destroy", "REWIND_ALLOWLIST4_NEXT"},
+	)
+	for _, command := range commands {
+		if err := b.Runner.Run(ctx, command[0], command[1:]...); err != nil {
+			return fmt.Errorf("refresh namespace allowlist command %s: %w", strings.Join(command, " "), err)
+		}
+	}
+	b.Plan.ResolvedIPs = resolvedIPs
+	b.Plan.ResolverIPs = resolverIPs
+	return nil
 }
 
 func (b *Broker) requireRoot() bool {
@@ -325,4 +385,30 @@ func BuildAllowlistPlanWithIPsAndResolvers(domains []string, resolved map[string
 		plan.Commands = append(plan.Commands, "ipset add REWIND_ALLOWLIST4 "+ip+" -exist")
 	}
 	return plan, nil
+}
+
+func flattenIPs(resolved map[string][]net.IP) []string {
+	var ips []net.IP
+	for _, values := range resolved {
+		ips = append(ips, values...)
+	}
+	return normalizeIPs(ips)
+}
+
+func normalizeIPs(values []net.IP) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == nil || value.To4() == nil {
+			continue
+		}
+		text := value.To4().String()
+		if _, ok := seen[text]; ok {
+			continue
+		}
+		seen[text] = struct{}{}
+		result = append(result, text)
+	}
+	sort.Strings(result)
+	return result
 }

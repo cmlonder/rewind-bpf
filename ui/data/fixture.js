@@ -80,7 +80,7 @@ export const fixture = {
     { name: "Claude", kind: "claude", stage: "validated", status: "command contract" },
   ],
   hardening: {
-    namespace: { state: "verified", title: "veth / NAT egress broker", detail: "UTM acceptance passed · allowlist and cleanup verified" },
+    namespace: { state: "verified", title: "veth / NAT egress broker", detail: "UTM acceptance passed · atomic DNS refresh and cleanup verified" },
     registry: { state: "verified", title: "Signed policy registry", detail: "HTTPS + pinned Ed25519 keys + retry bound" },
     sessions: { state: "ready", title: "SQLite lease store", detail: "WAL · expiry · takeover semantics" },
     native: [
