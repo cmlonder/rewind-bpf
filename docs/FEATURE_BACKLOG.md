@@ -66,6 +66,12 @@ The separate supervisor smoke also passed: the mode-`0600` Unix socket returned
 `401` without a bearer token, authenticated status and explicit commit succeeded,
 and the redacted action audit contained the commit record.
 
+The new content-aware gate also passed in the disposable Ubuntu 24.04 ARM64 VM
+on 2026-07-20. A synthetic file containing `alice@example.com` was denied by
+`read.pii.mode: enforce` before the agent could read it, while an ordinary
+generated file remained writable in the merged layer; rollback preserved the
+original lower file.
+
 Host-side `go test ./...`, `go vet ./...`, UI syntax checks, and shell syntax
 checks also pass. Privileged OverlayFS/eBPF tests remain VM-only by design.
 

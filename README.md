@@ -121,6 +121,9 @@ refusal, proxy/raw-socket semantics, and incomplete-evidence refusal. Run
 `make benchmark-verify` to validate the checked-in B0/B2/B4 ledger and chart.
 The supervisor boundary can be checked separately with
 `REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm`.
+The same VM-only gate now includes `read.pii.mode: enforce`: a synthetic email
+file is denied before agent start, and the lower workspace remains intact after
+rollback. Do not run this against a real project or on the personal Mac.
 
 ## User workflow
 
