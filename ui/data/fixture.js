@@ -16,6 +16,7 @@ export const fixture = {
         { time: "00:01.204", type: "write", operation: "DELETE", path: "src/auth/legacy.go", decision: "allow", risk: "high", detail: "Upper layer only · lower remains intact" },
         { time: "00:01.511", type: "write", operation: "WRITE", path: "src/auth/session.go", decision: "allow", risk: "high", detail: "Copy-on-write: 24 KiB" },
         { time: "00:01.722", type: "process", operation: "SPAWN", path: "go test ./...", decision: "allow", risk: "medium", detail: "Descendant PID 14831" },
+        { time: "00:02.008", type: "network", operation: "RAW SOCKET", path: "AF_INET / SOCK_RAW", decision: "deny", risk: "critical", detail: "Seccomp refusal recorded by eBPF socket tracepoint" },
       ],
       diff: [
         { path: "src/auth/legacy.go", kind: "deleted", bytes: "8.2 KiB", note: "upper-layer tombstone" },
