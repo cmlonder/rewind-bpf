@@ -1,5 +1,5 @@
 // The browser adapter is intentionally unprivileged. It talks to a local
-// read-only supervisor HTTP endpoint; privileged actions remain supervisor
+// authenticated supervisor HTTP endpoint; privileged actions remain supervisor
 // decisions and never run in browser code.
 export async function connectSupervisor(baseUrl, token = "") {
   const root = baseUrl.replace(/\/$/, "");
@@ -17,6 +17,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     history: Array.isArray(history) ? history : [],
     audit: Array.isArray(audit) ? audit : [],
     token: token.trim(),
+    baseUrl: root,
     action: (request) => executeAction(root, token.trim(), request),
   };
 }
@@ -35,6 +36,34 @@ export async function executeAction(baseUrl, token, request) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
   return payload;
+}
+
+// Follow the authenticated SSE stream without EventSource because browser
+// EventSource cannot attach the supervisor bearer header. The caller owns the
+// AbortSignal and can reconnect after a supervisor restart.
+export async function followEvents(baseUrl, token, runId, onEvent, signal) {
+  const root = baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}/v1/events?run_id=${encodeURIComponent(runId)}&follow=true`, {
+    headers: { Accept: "text/event-stream", Authorization: `Bearer ${token.trim()}` },
+    signal,
+  });
+  if (!response.ok) throw new Error(`supervisor returned HTTP ${response.status}`);
+  if (!response.body) throw new Error("supervisor event stream is unavailable");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const blocks = buffer.split("\n\n");
+    buffer = blocks.pop() || "";
+    for (const block of blocks) {
+      const line = block.split("\n").find((item) => item.startsWith("data: "));
+      if (!line) continue;
+      try { onEvent(JSON.parse(line.slice(6))); } catch (_) { /* ignore malformed server frames */ }
+    }
+    if (done) break;
+  }
 }
 
 async function assertResponse(response) {

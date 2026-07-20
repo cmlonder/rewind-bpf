@@ -27,7 +27,8 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 These actions deliberately stop at the fixture adapter until a supervisor is
 connected. When connected to the explicit loopback HTTP bridge, rollback,
 recovery, and commit confirmations POST authenticated intents to the supervisor;
-the browser still never receives root access or performs privileged work.
+the browser still never receives root access or performs privileged work, and
+the run detail view follows its authenticated SSE evidence stream.
 
 ## Demo scope decision
 

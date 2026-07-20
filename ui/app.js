@@ -1,9 +1,9 @@
 import { fixture, getRun } from "./data/fixture.js";
-import { connectSupervisor } from "./data/supervisor-adapter.js";
+import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null, supervisor: null };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null, supervisor: null, eventAbort: null };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
@@ -93,9 +93,34 @@ function openSupervisorConnector() {
         state.selectedRun = fixture.runs[0].id;
       }
       if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
-      closeModal(); render(); setToast("Supervisor connected in read-only mode.", "success");
+      followConnectedEvents();
+      closeModal(); render(); setToast("Supervisor connected: live evidence and authenticated actions enabled.", "success");
     } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
   } });
+}
+
+function followConnectedEvents() {
+  if (!state.supervisor || !state.supervisor.token || !currentRun()) return;
+  state.eventAbort?.abort();
+  const controller = new AbortController();
+  state.eventAbort = controller;
+  const run = currentRun();
+  followEvents(state.supervisor.baseUrl, state.supervisor.token, run.id, (event) => {
+    if (currentRun()?.id !== run.id) return;
+    run.events.push({
+      time: "live",
+      type: event.operation === "network_connect" ? "network" : "write",
+      operation: event.operation.replaceAll("_", " ").toUpperCase(),
+      path: event.path || "—",
+      decision: event.decision || "allow",
+      risk: event.risk || "medium",
+      detail: `sequence ${event.sequence || "—"} · hash ${String(event.hash || "").slice(0, 10)}…`,
+    });
+    run.evidence.count += 1;
+    render();
+  }, controller.signal).catch((error) => {
+    if (error.name !== "AbortError") setToast(`Event stream disconnected: ${error.message}`, "error");
+  });
 }
 
 function remoteRun(item) {
