@@ -275,7 +275,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Produce one deterministic three-act demo: destructive delete → secret-read denial → rollback proof.
 - Add a failure-act: kill the agent midway and show automatic recovery/status.
 - Freeze benchmark CSV/SVG, capability report, threat model, limitations, and competitor matrix.
-- Add a minimal release artifact: versioned binary, eBPF object, example policy, VM quickstart, checksum, and a “do not run on your host” warning.
+- Add a minimal release artifact: versioned binary, eBPF object, example policy, VM quickstart, checksum, and a “do not run on your host” warning. `make release-manifest` now emits SHA256SUMS plus metadata that explicitly records the artifact as unsigned.
 - Rehearse the exact command sequence in a clean disposable VM snapshot.
 
 **Exit criterion:** a fresh VM operator can reproduce the demo from README without touching the host filesystem, and every claim on the slide deck maps to a checked-in artifact or cited external source.

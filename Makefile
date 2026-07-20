@@ -2,7 +2,7 @@ BIN_DIR := bin
 BIN := $(BIN_DIR)/rewind
 EVIDENCE_BIN := $(BIN_DIR)/rewind-evidence
 
-.PHONY: build test fmt clean release bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm
+.PHONY: build test fmt clean release release-manifest bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -23,6 +23,9 @@ release:
 	GOOS=linux GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o $(BIN_DIR)/rewind-linux-arm64 ./cmd/rewind
 	GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags='-s -w' -o $(BIN_DIR)/rewind-darwin-arm64 ./cmd/rewind
 	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags='-s -w' -o $(BIN_DIR)/rewind-windows-amd64.exe ./cmd/rewind
+
+release-manifest: release
+	./scripts/release_manifest.sh $(BIN_DIR)
 
 bootstrap:
 	./scripts/bootstrap_vm.sh

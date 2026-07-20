@@ -14,6 +14,8 @@ Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITE
 
 The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
 
+Release builds are cross-compiled with `make release`; `make release-manifest` adds `bin/SHA256SUMS` and `bin/release-metadata.txt`. The checksum is tamper-evident metadata, not a cryptographic publisher signature; public distribution still requires an external signing workflow.
+
 ## Competitive landscape
 
 RewindBPF is not the first project to use a kernel primitive, a sandbox, or a filesystem snapshot for agent safety. The credible distinction is the combination and the boundary: a Linux-first, agent-agnostic transaction that is prepared before the agent starts, keeps the original lower layer untouched, emits kernel telemetry, supports user-defined sensitive-read policies, and can discard the whole write layer in one rollback operation.
