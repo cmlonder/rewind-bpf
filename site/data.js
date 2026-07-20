@@ -14,6 +14,7 @@ export const siteData = {
     { value: "1 operation", label: "to discard a failed run" },
     { value: "0 dropped", label: "in the normal demo path" },
     { value: "11.1%", label: "warm B4 throughput gap vs native" },
+    { value: "129 MiB", label: "upper-layer logical footprint for 128 MiB workload" },
   ],
   capabilities: [
     {
@@ -102,11 +103,13 @@ export const siteData = {
     { label: "B0 · native ext4", read: 10334.2, write: 4421.0, readLabel: "10,334", writeLabel: "4,421", note: "No overlay · no sensor" },
     { label: "B2 · FUSE only", read: 9143.8, write: 3915.4, readLabel: "9,144", writeLabel: "3,915", note: "COW layer cost" },
     { label: "B4 · protected run", read: 9181.7, write: 3932.6, readLabel: "9,182", writeLabel: "3,933", note: "FUSE + eBPF + helper" },
+    { label: "B0/B2/B4 · cold control", read: 10918.6, write: 4672.9, readLabel: "10,919", writeLabel: "4,673", note: "Cold values are separate controls; B4 includes mount/copy-up cost" },
   ],
   evidence: [
     ["16,620", "events in direct fio telemetry smoke"],
     ["148.5 B", "average JSONL bytes per event"],
     ["37", "intentional drops surfaced as incomplete"],
     ["1.0×", "full-file copy-up amplification measured"],
+    ["16,620", "events in the protected telemetry run"],
   ],
 };

@@ -1,6 +1,6 @@
 // Package checkpoint stores a small, deterministic dependency graph for
-// future multi-agent transactions. It is deliberately separate from the
-// single-run lifecycle until merge semantics are proven.
+// multi-agent transactions. Filesystem work remains owned by the run
+// coordinator; this package owns dependency ordering and state safety.
 package checkpoint
 
 import (
@@ -118,6 +118,35 @@ func (s *Store) Transition(id string, state State) error {
 	return s.writeLocked(graph)
 }
 
+// Rollback rolls a node and all of its descendants back in deterministic
+// descendant-first order. A parent can therefore never be discarded while a
+// dependent checkpoint still advertises a live state.
+func (s *Store) Rollback(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	graph, err := s.readLocked()
+	if err != nil {
+		return err
+	}
+	if _, ok := findNode(graph, id); !ok {
+		return fmt.Errorf("checkpoint node %s does not exist", id)
+	}
+	order := descendantOrder(graph, id)
+	now := time.Now().UTC()
+	for _, nodeID := range order {
+		index := indexOf(graph, nodeID)
+		if index < 0 || graph.Nodes[index].State == RolledBack {
+			continue
+		}
+		if !allowedTransition(graph.Nodes[index].State, RolledBack) {
+			return fmt.Errorf("checkpoint transition %s -> %s is not allowed", graph.Nodes[index].State, RolledBack)
+		}
+		graph.Nodes[index].State = RolledBack
+		graph.Nodes[index].UpdatedAt = now
+	}
+	return s.writeLocked(graph)
+}
+
 func (s *Store) readLocked() (Graph, error) {
 	if s.path == "" {
 		return Graph{Version: 1, Nodes: []Node{}}, nil
@@ -189,6 +218,38 @@ func contains(values []string, value string) bool {
 		}
 	}
 	return false
+}
+func indexOf(graph Graph, id string) int {
+	for i := range graph.Nodes {
+		if graph.Nodes[i].ID == id {
+			return i
+		}
+	}
+	return -1
+}
+func descendantOrder(graph Graph, root string) []string {
+	seen := map[string]bool{}
+	order := []string{}
+	var visit func(string)
+	visit = func(id string) {
+		if seen[id] {
+			return
+		}
+		seen[id] = true
+		children := []string{}
+		for _, node := range graph.Nodes {
+			if contains(node.Parents, id) {
+				children = append(children, node.ID)
+			}
+		}
+		sort.Strings(children)
+		for _, child := range children {
+			visit(child)
+		}
+		order = append(order, id)
+	}
+	visit(root)
+	return order
 }
 func validState(value State) bool {
 	return value == Pending || value == Running || value == Succeeded || value == RolledBack || value == Blocked

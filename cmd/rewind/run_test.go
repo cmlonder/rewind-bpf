@@ -4,10 +4,13 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/netpolicy"
 	"github.com/rewindbpf/rewind/internal/overlay"
+	"github.com/rewindbpf/rewind/internal/policy"
+	"github.com/rewindbpf/rewind/internal/runplan"
 	"github.com/rewindbpf/rewind/internal/telemetry"
 )
 
@@ -74,5 +77,20 @@ func TestRecordNetworkAppendsHashChainedEvent(t *testing.T) {
 	}
 	if journal.Sequence != 1 || journal.Hash == "" {
 		t.Fatalf("journal sequence/hash = %d/%q", journal.Sequence, journal.Hash)
+	}
+}
+
+func TestScanPIIAfterRunFindsCreatedFileWithoutRawValue(t *testing.T) {
+	merged := t.TempDir()
+	path := filepath.Join(merged, "generated.txt")
+	if err := os.WriteFile(path, []byte("token=ghp_1234567890abcdef\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	plan := &runplan.Plan{Layout: overlay.Layout{Merged: merged}, PIIMode: policy.ModeAudit}
+	if err := scanPIIAfterRun(plan); err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.PIIFindings) != 1 || plan.PIIFindings[0].ValueHash == "" {
+		t.Fatalf("findings=%+v", plan.PIIFindings)
 	}
 }

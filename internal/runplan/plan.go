@@ -21,29 +21,36 @@ import (
 )
 
 type Config struct {
-	Workspace      string
-	RuntimeRoot    string
-	Policy         policy.Policy
-	RuntimeRoots   []string
-	OverlayBackend overlay.Backend
-	NetworkBackend string
-	AgentAdapter   string
+	Workspace         string
+	RuntimeRoot       string
+	Policy            policy.Policy
+	RuntimeRoots      []string
+	OverlayBackend    overlay.Backend
+	NetworkBackend    string
+	AgentAdapter      string
+	CheckpointGraph   string
+	CheckpointID      string
+	CheckpointParents []string
 }
 
 type Plan struct {
-	Run            lifecycle.Run           `json:"run"`
-	Layout         overlay.Layout          `json:"layout"`
-	Manifest       manifest.Manifest       `json:"manifest"`
-	ReadRules      policycompile.ReadRules `json:"read_rules"`
-	Landlock       *landlock.Plan          `json:"landlock,omitempty"`
-	Resources      policy.ResourcePolicy   `json:"resources,omitempty"`
-	OverlayBackend overlay.Backend         `json:"overlay_backend"`
-	CgroupPath     string                  `json:"cgroup_path,omitempty"`
-	Capabilities   capabilities.Report     `json:"capabilities,omitempty"`
-	HistoryPath    string                  `json:"history_path,omitempty"`
-	Network        netpolicy.Plan          `json:"network"`
-	AgentAdapter   agent.Kind              `json:"agent_adapter"`
-	PIIFindings    []pii.Finding           `json:"pii_findings,omitempty"`
+	Run               lifecycle.Run           `json:"run"`
+	Layout            overlay.Layout          `json:"layout"`
+	Manifest          manifest.Manifest       `json:"manifest"`
+	ReadRules         policycompile.ReadRules `json:"read_rules"`
+	Landlock          *landlock.Plan          `json:"landlock,omitempty"`
+	Resources         policy.ResourcePolicy   `json:"resources,omitempty"`
+	OverlayBackend    overlay.Backend         `json:"overlay_backend"`
+	CgroupPath        string                  `json:"cgroup_path,omitempty"`
+	Capabilities      capabilities.Report     `json:"capabilities,omitempty"`
+	HistoryPath       string                  `json:"history_path,omitempty"`
+	Network           netpolicy.Plan          `json:"network"`
+	AgentAdapter      agent.Kind              `json:"agent_adapter"`
+	PIIFindings       []pii.Finding           `json:"pii_findings,omitempty"`
+	PIIMode           policy.Mode             `json:"pii_mode,omitempty"`
+	CheckpointGraph   string                  `json:"checkpoint_graph,omitempty"`
+	CheckpointID      string                  `json:"checkpoint_id,omitempty"`
+	CheckpointParents []string                `json:"checkpoint_parents,omitempty"`
 }
 
 // Build validates and composes all pre-execution state. The workspace is used
@@ -132,7 +139,11 @@ func Build(config Config) (Plan, error) {
 	if backend != overlay.BackendFuse && backend != overlay.BackendKernel {
 		return Plan{}, fmt.Errorf("build run plan: unsupported overlay backend %q", backend)
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind, PIIFindings: piiFindings}, nil
+	checkpointID := strings.TrimSpace(config.CheckpointID)
+	if checkpointID == "" && strings.TrimSpace(config.CheckpointGraph) != "" {
+		checkpointID = run.ID
+	}
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind, PIIFindings: piiFindings, PIIMode: config.Policy.Read.PII.Mode, CheckpointGraph: config.CheckpointGraph, CheckpointID: checkpointID, CheckpointParents: append([]string(nil), config.CheckpointParents...)}, nil
 }
 
 func piiFindingsForPlan(config policy.PIIPolicy, workspace string) ([]pii.Finding, error) {

@@ -19,6 +19,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/agent"
 	"github.com/rewindbpf/rewind/internal/capabilities"
 	"github.com/rewindbpf/rewind/internal/cgroup"
+	"github.com/rewindbpf/rewind/internal/checkpoint"
 	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/ebpfload"
 	"github.com/rewindbpf/rewind/internal/event"
@@ -29,6 +30,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/netpolicy"
 	"github.com/rewindbpf/rewind/internal/overlay"
+	"github.com/rewindbpf/rewind/internal/pii"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/protectedrun"
 	"github.com/rewindbpf/rewind/internal/runplan"
@@ -53,6 +55,9 @@ func handleRun(args []string) {
 	agentAdapter := flags.String("agent-adapter", "generic", "agent adapter: generic, codex, openhands, or claude-code")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	historyPath := flags.String("history", "", "optional durable run history JSON path")
+	checkpointGraph := flags.String("checkpoint-graph", "", "optional checkpoint dependency graph JSON path")
+	checkpointID := flags.String("checkpoint-id", "", "optional checkpoint node id")
+	checkpointParents := flags.String("checkpoint-parents", "", "comma-separated parent checkpoint ids")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -82,13 +87,16 @@ func handleRun(args []string) {
 		fatal(err.Error())
 	}
 	plan, err := runplan.Build(runplan.Config{
-		Workspace:      *workspace,
-		RuntimeRoot:    *runtimeRoot,
-		Policy:         value,
-		RuntimeRoots:   splitCSV(*runtimeRoots),
-		OverlayBackend: overlay.Backend(*overlayBackend),
-		NetworkBackend: *networkBackend,
-		AgentAdapter:   string(agentSpec.Kind),
+		Workspace:         *workspace,
+		RuntimeRoot:       *runtimeRoot,
+		Policy:            value,
+		RuntimeRoots:      splitCSV(*runtimeRoots),
+		OverlayBackend:    overlay.Backend(*overlayBackend),
+		NetworkBackend:    *networkBackend,
+		AgentAdapter:      string(agentSpec.Kind),
+		CheckpointGraph:   *checkpointGraph,
+		CheckpointID:      *checkpointID,
+		CheckpointParents: splitCSV(*checkpointParents),
 	})
 	if err != nil {
 		fatal(err.Error())
@@ -116,6 +124,11 @@ func handleRun(args []string) {
 	}
 	plan.Capabilities = capabilityReport
 	plan.HistoryPath = *historyPath
+	if plan.CheckpointGraph != "" {
+		if err := checkpoint.Open(plan.CheckpointGraph).Add(checkpoint.Node{ID: plan.CheckpointID, RunID: plan.Run.ID, Parents: plan.CheckpointParents}); err != nil {
+			fatal(fmt.Sprintf("prepare checkpoint node: %v", err))
+		}
+	}
 	// Prepare the dedicated runtime tree before the first journal write. The
 	// agent must be able to traverse the eventual merged mount; creating the
 	// parent through runstore alone would leave it mode 0700 when invoked via
@@ -193,6 +206,10 @@ func handleRun(args []string) {
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		fatal(err.Error())
 	}
+	if err := transitionCheckpoint(plan, checkpoint.Running); err != nil {
+		_ = handle.Rollback(context.Background())
+		fatal(err.Error())
+	}
 	if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 		_ = handle.Rollback(context.Background())
 		closeNetworkProxy()
@@ -210,10 +227,15 @@ func handleRun(args []string) {
 		return nil
 	})
 	if waitErr != nil {
+		_ = rollbackCheckpoint(plan)
 		rollbackErr := handle.Rollback(context.Background())
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		_ = persistHistory(*historyPath, plan, *recordPath)
 		fatal(errors.Join(waitErr, rollbackErr).Error())
+	}
+	if err := scanPIIAfterRun(&plan); err != nil {
+		_ = handle.Rollback(context.Background())
+		fatal(err.Error())
 	}
 	if *onSuccess == "discard" {
 		if err := handle.Rollback(context.Background()); err != nil {
@@ -222,6 +244,9 @@ func handleRun(args []string) {
 		}
 		if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 			fatal(fmt.Sprintf("persist discarded run: %v", err))
+		}
+		if err := rollbackCheckpoint(plan); err != nil {
+			fatal(err.Error())
 		}
 		if err := persistHistory(*historyPath, plan, *recordPath); err != nil {
 			fatal(fmt.Sprintf("persist discarded history: %v", err))
@@ -237,6 +262,9 @@ func handleRun(args []string) {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist review history: %v", err))
 	}
+	if err := transitionCheckpoint(plan, checkpoint.Succeeded); err != nil {
+		fatal(err.Error())
+	}
 	fmt.Printf("run ready for review: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
 	fmt.Printf("discard with: rewind rollback --record %s\n", *recordPath)
 }
@@ -246,6 +274,45 @@ func persistHistory(path string, plan runplan.Plan, recordPath string) error {
 		return nil
 	}
 	return history.Open(path).Upsert(history.Entry{RunID: plan.Run.ID, State: string(plan.Run.State), Workspace: plan.Layout.Lower, RecordPath: recordPath, UpdatedAt: plan.Run.UpdatedAt, CreatedAt: plan.Run.CreatedAt})
+}
+
+func transitionCheckpoint(plan runplan.Plan, state checkpoint.State) error {
+	if strings.TrimSpace(plan.CheckpointGraph) == "" {
+		return nil
+	}
+	return checkpoint.Open(plan.CheckpointGraph).Transition(plan.CheckpointID, state)
+}
+
+func rollbackCheckpoint(plan runplan.Plan) error {
+	if strings.TrimSpace(plan.CheckpointGraph) == "" {
+		return nil
+	}
+	return checkpoint.Open(plan.CheckpointGraph).Rollback(plan.CheckpointID)
+}
+
+func scanPIIAfterRun(plan *runplan.Plan) error {
+	if plan == nil || plan.PIIMode == "" || plan.PIIMode == policy.ModeOff {
+		return nil
+	}
+	findings, err := pii.ScanPath(plan.Layout.Merged)
+	if err != nil {
+		return fmt.Errorf("post-run PII scan: %w", err)
+	}
+	seen := make(map[string]struct{}, len(plan.PIIFindings))
+	for _, finding := range plan.PIIFindings {
+		seen[piiFindingKey(finding)] = struct{}{}
+	}
+	for _, finding := range findings {
+		if _, ok := seen[piiFindingKey(finding)]; ok {
+			continue
+		}
+		plan.PIIFindings = append(plan.PIIFindings, finding)
+	}
+	return nil
+}
+
+func piiFindingKey(finding pii.Finding) string {
+	return fmt.Sprintf("%s|%s|%d|%d|%s", finding.Path, finding.Kind, finding.Line, finding.Column, finding.ValueHash)
 }
 
 func validateOnSuccess(value string) error {
@@ -291,6 +358,9 @@ func handleRollback(args []string) {
 	if err := coordinator.RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(err.Error())
 	}
+	if err := rollbackCheckpoint(record.Plan); err != nil {
+		fatal(err.Error())
+	}
 	if err := persistRecordState(*recordPath, record.Plan, record.EventsPath, evidenceState{dropped: record.Events.Dropped, truncated: record.Events.Truncated}); err != nil {
 		fatal(err.Error())
 	}
@@ -319,6 +389,9 @@ func handleRecover(args []string) {
 	}
 	if err := (protectedrun.Coordinator{Overlay: overlay.Manager{Backend: record.Plan.OverlayBackend}, Scope: persistedScope(record.Plan.CgroupPath)}).RollbackPlan(context.Background(), &record.Plan); err != nil {
 		fatal(fmt.Sprintf("recover protected run: %v", err))
+	}
+	if err := rollbackCheckpoint(record.Plan); err != nil {
+		fatal(err.Error())
 	}
 	if err := persistRecordState(*recordPath, record.Plan, record.EventsPath, evidenceState{dropped: record.Events.Dropped, truncated: record.Events.Truncated}); err != nil {
 		fatal(err.Error())

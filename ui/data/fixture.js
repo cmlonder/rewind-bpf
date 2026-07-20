@@ -57,6 +57,18 @@ export const fixture = {
   ],
   effectivePolicy: [["read.mode", "enforce", "strict-agent@1.3.0"], ["read.deny", "**/*.env · **/*.pem · /home/*/.ssh/**", "package"], ["read.pii.mode", "audit", "global default"], ["write.mode", "rollback", "global default"], ["write.scope", "workspace", "workspace override"], ["network.mode", "audit", "package"], ["resources", "256 PIDs · 512 MiB · 50% CPU", "global default"]],
   audit: [["10:42:18", "Run started", "strict-agent@1.3.0", "system"], ["10:41:52", "Policy assigned", "payments-api", "cemal"], ["10:39:10", "Evidence exported", "run_d1b08d60", "cemal"]],
+  checkpoints: { nodes: [
+    { id: "root", runId: "08e0ef80", state: "succeeded", parents: [] },
+    { id: "review-08e0", runId: "08e0ef80", state: "running", parents: ["root"] },
+    { id: "rollback-demo", runId: "d1b08d60", state: "rolled_back", parents: ["root"] },
+  ] },
+  piiFindings: [{ path: "config/generated.env", kind: "github_token", hash: "sha256:2f9a…", replacement: "[REDACTED:github_token]", source: "post-run scan" }],
+  remoteRetention: { state: "ready", endpoint: "s3-compatible gateway", digest: "sha256:9d7e…c41", lastRestore: "never · ready to verify" },
+  adapterLifecycle: [
+    { name: "Codex", kind: "codex", stage: "prepared", status: "identity exported" },
+    { name: "OpenHands", kind: "openhands", stage: "hooked", status: "lifecycle callbacks" },
+    { name: "Claude", kind: "claude", stage: "validated", status: "command contract" },
+  ],
 };
 
 export function getRun(id) { return fixture.runs.find((run) => run.id === id) || fixture.runs[0]; }

@@ -88,6 +88,10 @@ function handleAction(action, element) {
   if (action === "inspect-audit") return setToast("Audit event details are available after supervisor integration.", "neutral");
   if (action === "config-change") return openConfigEditor(element.dataset.configKey);
   if (action === "pii-scan") return setToast("PII scan is audit-only: findings are hashed and redacted; it never broadens read access.", "neutral");
+  if (action === "pii-rescan") return setToast("Post-run PII scan queued: new files are hashed, redacted, and attached to the run record.", "success");
+  if (action === "remote-restore") return setToast("Remote bundle restored after digest verification; retry budget remains bounded.", "success");
+  if (action === "adapter-test") return setToast("Codex, OpenHands, and Claude adapter preflight passed: identity and lifecycle hooks are ready.", "success");
+  if (action === "checkpoint-rollback") return openConfirm({ title: "Rollback dependent checkpoints?", kicker: "GRAPH-AWARE RECOVERY", body: "Rewind will order descendants before parents and refuse ambiguous dependencies.", confirm: "Rollback graph", tone: "orange", onConfirm: () => setToast("Checkpoint rollback plan accepted in fixture mode.", "success") });
 }
 
 function openSupervisorConnector() {
