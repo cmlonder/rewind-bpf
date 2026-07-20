@@ -861,3 +861,9 @@ passed (`CHECKPOINT_PII_VM_PASS`) and the namespace backend refused an
 allow-domain policy before launch (`NAMESPACE_ALLOWLIST_FAIL_CLOSED_PASS`). No
 host network namespace was mutated; the installer remains uncalled by the
 smoke script.
+
+The same VM then started the supervisor with `--session-backend sqlite`,
+performed authenticated lease list and acquire requests over its Unix socket,
+and stopped with a non-empty SQLite database (`SQLITE_SESSION_VM_PASS`). This
+validated the wiring without exposing the supervisor over TCP or touching the
+host filesystem.
