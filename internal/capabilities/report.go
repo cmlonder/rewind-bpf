@@ -37,9 +37,11 @@ func Probe() Report {
 	if _, err := exec.LookPath("fuse-overlayfs"); err == nil {
 		report.FuseOverlayFS = true
 	}
-	if status := readTrimmed("/proc/self/status"); status != "" {
-		report.Seccomp = contains(status, "Seccomp:")
-	}
+	// The Seccomp field in /proc/self/status only reports this process' current
+	// mode (usually 0); it is not a capability probe. The actions_avail kernel
+	// interface is the read-only capability signal we need before installing a
+	// filter in the agent helper.
+	report.Seccomp = exists("/proc/sys/kernel/seccomp/actions_avail")
 	if !report.OverlayFS && !report.FuseOverlayFS {
 		report.Warnings = append(report.Warnings, "no OverlayFS or fuse-overlayfs backend detected")
 	}
@@ -52,7 +54,7 @@ func Probe() Report {
 	return report
 }
 
-func (r Report) ValidateForProtectedRun(backend string, enforceRead bool) error {
+func (r Report) ValidateForProtectedRun(backend string, enforceRead, denyRawNetwork bool) error {
 	if backend == "kernel" && !r.OverlayFS {
 		return fmt.Errorf("kernel OverlayFS backend is unavailable")
 	}
@@ -61,6 +63,9 @@ func (r Report) ValidateForProtectedRun(backend string, enforceRead bool) error 
 	}
 	if enforceRead && !r.Landlock && !r.BPFLSM {
 		return fmt.Errorf("read enforcement requested but Landlock and BPF-LSM are unavailable")
+	}
+	if denyRawNetwork && !r.Seccomp {
+		return fmt.Errorf("raw-socket network enforcement requested but seccomp is unavailable")
 	}
 	if !r.CgroupV2 {
 		return fmt.Errorf("protected run requires cgroup-v2 process scope")

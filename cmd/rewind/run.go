@@ -94,7 +94,7 @@ func handleRun(args []string) {
 	}
 	telemetry := &telemetryAdapter{path: eventsPath, owner: owner, maxBytes: maxEventBytes, rotateBytes: rotateEventBytes}
 	capabilityReport := capabilities.Probe()
-	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil); err != nil {
+	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil, plan.Network.RawSocketDeny); err != nil {
 		fatal(fmt.Sprintf("protected-run capability check: %v", err))
 	}
 	plan.Capabilities = capabilityReport

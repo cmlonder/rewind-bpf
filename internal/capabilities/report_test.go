@@ -21,3 +21,17 @@ func TestReportJSONIsStableEnoughForInspection(t *testing.T) {
 		t.Fatal("expected JSON report")
 	}
 }
+
+func TestValidateRejectsRawNetworkEnforcementWithoutSeccomp(t *testing.T) {
+	report := Report{FuseOverlayFS: true, CgroupV2: true, Seccomp: false}
+	if err := report.ValidateForProtectedRun("fuse", false, true); err == nil {
+		t.Fatal("expected raw-network enforcement to fail without seccomp")
+	}
+}
+
+func TestValidateAcceptsRawNetworkEnforcementWithSeccomp(t *testing.T) {
+	report := Report{FuseOverlayFS: true, CgroupV2: true, Seccomp: true}
+	if err := report.ValidateForProtectedRun("fuse", false, true); err != nil {
+		t.Fatal(err)
+	}
+}
