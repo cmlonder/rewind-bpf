@@ -3,6 +3,7 @@ package credentials
 import (
 	"context"
 	"io"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -60,5 +61,28 @@ func TestCommandProviderContextIsHonored(t *testing.T) {
 	_, err := (CommandProvider{Path: "/bin/sh", Args: []string{"-c", "printf token"}}).Fetch(ctx, Request{Ref: "x"})
 	if err == nil {
 		t.Fatal("expected canceled provider")
+	}
+}
+
+func TestNativeProviderUsesArgvAndBoundsOutput(t *testing.T) {
+	provider := NativeProvider{Path: "/bin/sh", Service: "rewind-test"}
+	lease, err := (&ManagedBroker{Provider: provider, TTL: time.Minute}).Issue(Request{Ref: "github"})
+	if err == nil {
+		// /bin/sh is intentionally only a command-shape probe on the host; it
+		// must not accidentally be treated as a working secret manager.
+		t.Fatalf("unexpected native provider lease: %+v", lease)
+	}
+	if strings.Contains(err.Error(), "github") {
+		t.Fatalf("provider error exposed credential reference: %v", err)
+	}
+}
+
+func TestNativeProviderRefusesUnsupportedPlatformWithoutPath(t *testing.T) {
+	if runtime.GOOS == "darwin" || runtime.GOOS == "linux" {
+		t.Skip("host has a supported native provider contract")
+	}
+	_, err := (NativeProvider{}).Fetch(context.Background(), Request{Ref: "secret"})
+	if err == nil || !strings.Contains(err.Error(), "unsupported") {
+		t.Fatalf("err=%v", err)
 	}
 }
