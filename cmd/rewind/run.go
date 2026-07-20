@@ -487,7 +487,7 @@ func handleExport(args []string) {
 	flags.SetOutput(os.Stderr)
 	recordPath := flags.String("record", "", "run record JSON path")
 	outputPath := flags.String("output", "", "review bundle JSON output path")
-	format := flags.String("format", "json", "output format: json or patch (text files only)")
+	format := flags.String("format", "json", "output format: json, patch (text), or git-patch (full fidelity)")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -531,6 +531,15 @@ func handleExport(args []string) {
 			fatal(err.Error())
 		}
 		fmt.Printf("wrote review patch with %d changes to %s\n", len(bundle.Changes), *outputPath)
+	case "git-patch":
+		patch, err := export.GitPatch(record.Plan.Layout.Lower, record.Plan.Layout.Merged)
+		if err != nil {
+			fatal(err.Error())
+		}
+		if err := export.WritePatch(*outputPath, patch); err != nil {
+			fatal(err.Error())
+		}
+		fmt.Printf("wrote full-fidelity review patch with %d changes to %s\n", len(bundle.Changes), *outputPath)
 	default:
 		fatal(fmt.Sprintf("unsupported export format %q", *format))
 	}

@@ -24,7 +24,7 @@ Usage:
   rewind verify --record PATH
   rewind evidence verify --record PATH
   rewind diff --record PATH
-  rewind export --record PATH --output PATH [--format json|patch]
+  rewind export --record PATH --output PATH [--format json|patch|git-patch]
   rewind capabilities
   rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN]
   rewind rollback --record PATH
