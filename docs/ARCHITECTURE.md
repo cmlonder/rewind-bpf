@@ -313,8 +313,10 @@ archive containing the run record, ordered JSONL event logs, `bundle.json`,
 and a names-only `SHA256SUMS`. The command refuses event or record paths
 outside the run runtime root and never includes the workspace, upper layer,
 credentials, or arbitrary absolute paths. This is a local hand-off primitive
-for later object-store integration; encryption, remote retention, and restore
-are deliberately not claimed yet.
+for later object-store integration. `rewind bundle verify --input PATH`
+validates the archive in memory, including path safety, artifact hashes,
+`SHA256SUMS`, and the embedded record/run ID; encryption, remote retention,
+and restore are deliberately not claimed yet.
 
 ## 11. Implementation status
 

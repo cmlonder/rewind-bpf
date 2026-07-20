@@ -11,8 +11,15 @@ import (
 )
 
 func handleBundle(args []string) {
-	if len(args) == 0 || args[0] != "create" {
-		fatal("usage: rewind bundle create --record PATH --output PATH")
+	if len(args) == 0 {
+		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle verify --input PATH")
+	}
+	if args[0] == "verify" {
+		handleBundleVerify(args[1:])
+		return
+	}
+	if args[0] != "create" {
+		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle verify --input PATH")
 	}
 	flags := flag.NewFlagSet("bundle create", flag.ContinueOnError)
 	recordPath := flags.String("record", "", "run record JSON path")
@@ -39,4 +46,17 @@ func handleBundle(args []string) {
 		fatal(err.Error())
 	}
 	fmt.Printf("wrote evidence bundle: %s artifacts=%d run_id=%s\n", outputAbs, len(metadata.Artifacts), metadata.RunID)
+}
+
+func handleBundleVerify(args []string) {
+	flags := flag.NewFlagSet("bundle verify", flag.ContinueOnError)
+	inputPath := flags.String("input", "", "evidence .tar.gz path")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" {
+		fatal("usage: rewind bundle verify --input PATH")
+	}
+	metadata, err := evidencebundle.Verify(*inputPath)
+	if err != nil {
+		fatal(fmt.Sprintf("evidence bundle verification failed: %v", err))
+	}
+	fmt.Printf("evidence bundle verified: run_id=%s artifacts=%d state=%s\n", metadata.RunID, len(metadata.Artifacts), metadata.State)
 }

@@ -87,7 +87,7 @@ export const siteData = {
     ["06", "Review surface", "inspect, diff, export, policy explain, policy learn, and standalone evidence verification."],
     ["07", "Acceptance safety", "Explicit conflict-checked commit, incomplete-evidence refusal, and signed Ed25519 policy envelopes."],
     ["08", "Control plane contract", "Durable history, an authenticated Unix-socket/HTTP supervisor with lifecycle actions, signed policy imports, reconnecting event follow, and a browser adapter that never receives root access."],
-    ["09", "Evidence hand-off", "Checksum-indexed tar.gz bundles carry the run record and ordered event logs without copying workspace contents or arbitrary host paths."],
+    ["09", "Evidence hand-off", "Checksum-indexed tar.gz bundles carry the run record and ordered event logs without copying workspace contents or arbitrary host paths; the bundle verifier checks them without extraction."],
     ["10", "Release integrity", "Cross-platform artifacts, SHA256SUMS, release metadata, and detached Ed25519 signing with optional pinned-key verification."],
   ],
   competitors: [

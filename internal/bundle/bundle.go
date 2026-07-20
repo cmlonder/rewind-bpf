@@ -216,3 +216,136 @@ func SortedArtifacts(value Metadata) []Artifact {
 	sort.Slice(artifacts, func(i, j int) bool { return artifacts[i].Name < artifacts[j].Name })
 	return artifacts
 }
+
+// Verify checks archive structure, metadata, checksums, and the run ID in the
+// embedded record without extracting or writing any artifact to disk.
+func Verify(path string) (Metadata, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("open evidence bundle: %w", err)
+	}
+	defer file.Close()
+	gz, err := gzip.NewReader(file)
+	if err != nil {
+		return Metadata{}, fmt.Errorf("open evidence gzip: %w", err)
+	}
+	defer gz.Close()
+	reader := tar.NewReader(gz)
+	type observedArtifact struct {
+		bytes int64
+		hash  string
+	}
+	observed := make(map[string]observedArtifact)
+	var metadataData, checksumsData, recordData []byte
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return Metadata{}, fmt.Errorf("read evidence tar: %w", err)
+		}
+		if !safeArchiveName(header.Name) {
+			return Metadata{}, fmt.Errorf("unsafe evidence archive path %q", header.Name)
+		}
+		if header.Typeflag != tar.TypeReg && header.Typeflag != tar.TypeRegA {
+			return Metadata{}, fmt.Errorf("unsupported evidence archive entry %q", header.Name)
+		}
+		if _, exists := observed[header.Name]; exists {
+			return Metadata{}, fmt.Errorf("duplicate evidence archive entry %q", header.Name)
+		}
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			return Metadata{}, fmt.Errorf("read evidence archive entry %s: %w", header.Name, err)
+		}
+		switch header.Name {
+		case "bundle.json":
+			metadataData = data
+		case "SHA256SUMS":
+			checksumsData = data
+		default:
+			if header.Name == "record.json" {
+				recordData = data
+			}
+			digest := sha256.Sum256(data)
+			observed[header.Name] = observedArtifact{bytes: int64(len(data)), hash: hex.EncodeToString(digest[:])}
+		}
+	}
+	if len(metadataData) == 0 || len(checksumsData) == 0 {
+		return Metadata{}, fmt.Errorf("evidence bundle is missing bundle.json or SHA256SUMS")
+	}
+	var metadata Metadata
+	if err := json.Unmarshal(metadataData, &metadata); err != nil {
+		return Metadata{}, fmt.Errorf("decode evidence metadata: %w", err)
+	}
+	if metadata.Version != 1 || metadata.RunID == "" {
+		return Metadata{}, fmt.Errorf("invalid evidence metadata")
+	}
+	var record runstore.Record
+	if err := json.Unmarshal(recordData, &record); err != nil {
+		return Metadata{}, fmt.Errorf("decode evidence record: %w", err)
+	}
+	if record.Plan.Run.ID != metadata.RunID {
+		return Metadata{}, fmt.Errorf("evidence run id mismatch: metadata=%s record=%s", metadata.RunID, record.Plan.Run.ID)
+	}
+	checksums, err := parseChecksums(string(checksumsData))
+	if err != nil {
+		return Metadata{}, err
+	}
+	if len(metadata.Artifacts) != len(observed) {
+		return Metadata{}, fmt.Errorf("evidence artifact count mismatch: metadata=%d archive=%d", len(metadata.Artifacts), len(observed))
+	}
+	if len(checksums) != len(metadata.Artifacts) {
+		return Metadata{}, fmt.Errorf("SHA256SUMS artifact count mismatch: checksums=%d metadata=%d", len(checksums), len(metadata.Artifacts))
+	}
+	seenArtifacts := make(map[string]struct{}, len(metadata.Artifacts))
+	for _, artifact := range metadata.Artifacts {
+		if !safeArchiveName(artifact.Name) {
+			return Metadata{}, fmt.Errorf("unsafe evidence metadata path %q", artifact.Name)
+		}
+		if _, exists := seenArtifacts[artifact.Name]; exists {
+			return Metadata{}, fmt.Errorf("duplicate evidence metadata artifact %q", artifact.Name)
+		}
+		seenArtifacts[artifact.Name] = struct{}{}
+		actual, ok := observed[artifact.Name]
+		if !ok {
+			return Metadata{}, fmt.Errorf("missing evidence artifact %q", artifact.Name)
+		}
+		if actual.bytes != artifact.Bytes || actual.hash != artifact.SHA256 {
+			return Metadata{}, fmt.Errorf("evidence artifact checksum mismatch: %s", artifact.Name)
+		}
+		if checksums[artifact.Name] != artifact.SHA256 {
+			return Metadata{}, fmt.Errorf("SHA256SUMS mismatch: %s", artifact.Name)
+		}
+	}
+	if _, ok := seenArtifacts["record.json"]; !ok {
+		return Metadata{}, fmt.Errorf("evidence metadata omits record.json")
+	}
+	return metadata, nil
+}
+
+func parseChecksums(value string) (map[string]string, error) {
+	result := make(map[string]string)
+	for _, line := range strings.Split(strings.TrimSpace(value), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 || len(fields[0]) != sha256.Size*2 {
+			return nil, fmt.Errorf("invalid SHA256SUMS line %q", line)
+		}
+		if !safeArchiveName(fields[1]) {
+			return nil, fmt.Errorf("unsafe SHA256SUMS path %q", fields[1])
+		}
+		if _, err := hex.DecodeString(fields[0]); err != nil {
+			return nil, fmt.Errorf("invalid SHA256SUMS digest for %s", fields[1])
+		}
+		if _, exists := result[fields[1]]; exists {
+			return nil, fmt.Errorf("duplicate SHA256SUMS entry %q", fields[1])
+		}
+		result[fields[1]] = fields[0]
+	}
+	return result, nil
+}
+
+func safeArchiveName(name string) bool {
+	clean := filepath.ToSlash(filepath.Clean(name))
+	return clean == name && clean != "." && !filepath.IsAbs(clean) && !strings.HasPrefix(clean, "../") && !strings.Contains(clean, "/../")
+}
