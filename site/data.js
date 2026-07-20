@@ -76,7 +76,7 @@ export const siteData = {
     { phase: "P1", title: "P1: invisible secrets + explicit accept", status: "Contract shipped", body: "Scoped credential references refuse raw secret exposure, network policy has an auditable preview plan, and candidate acceptance rejects same-path destination drift." },
     { phase: "P2", title: "P2: native macOS adapter", status: "Contract shipped", body: "Seatbelt / EndpointSecurity + APFS are represented as an explicit capability contract. The backend remains refused until it passes disposable-volume tests." },
     { phase: "P3", title: "P3: native Windows adapter", status: "Contract shipped", body: "Windows cross-build and fail-closed process boundary are ready; native Job Object/filesystem enforcement remains disabled until tested on disposable Windows storage." },
-    { phase: "P4", title: "P4: durable history + supervisor", status: "Control plane shipped", body: "Atomic bounded run history, token-authenticated supervisor transport, lifecycle actions, snapshot/follow event streams, and a fixture-backed retention view are now in place." },
+    { phase: "P4", title: "P4: durable history + supervisor", status: "Control plane shipped", body: "Atomic bounded run history, token-authenticated supervisor transport, lifecycle actions, snapshot/follow event streams, redacted action audit, and a fixture-backed retention view are now in place." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],
