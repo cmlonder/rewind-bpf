@@ -23,6 +23,8 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$ROOT/workspace"
+printf '%s\n' '#!/bin/sh' 'test "$REWIND_CREDENTIAL_REF" = github' 'printf "vm-secret-token\n"' > "$ROOT/credential-provider.sh"
+chmod 700 "$ROOT/credential-provider.sh"
 printf 'original\n' > "$ROOT/workspace/marker.txt"
 printf '%s\n' \
   'read:' \
@@ -56,7 +58,7 @@ test -n "$RUN_ID"
 
 SOCKET="$ROOT/supervisor.sock"
 TOKEN_FILE="$ROOT/supervisor.token"
-sudo "$BIN" supervisor --socket "$SOCKET" --history "$ROOT/history.json" --token-file "$TOKEN_FILE" > "$ROOT/supervisor.log" 2>&1 &
+sudo "$BIN" supervisor --socket "$SOCKET" --history "$ROOT/history.json" --token-file "$TOKEN_FILE" --credential-provider-command "$ROOT/credential-provider.sh" > "$ROOT/supervisor.log" 2>&1 &
 SUPERVISOR_PID=$!
 for _ in $(seq 1 50); do
   [[ -S "$SOCKET" ]] && break
@@ -69,9 +71,16 @@ TOKEN="$(sudo cat "$TOKEN_FILE")"
 test "$(sudo curl --unix-socket "$SOCKET" -sS -o /dev/null -w '%{http_code}' http://localhost/v1/actions -X POST -H 'Content-Type: application/json' -d '{"action":"status","run_id":"'"$RUN_ID"'"}')" = 401
 STATUS="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/actions -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"action":"status","run_id":"'"$RUN_ID"'"}')"
 echo "$STATUS" | grep -q '"ok":true'
+LEASE="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/credential-leases -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"ref":"github","scopes":["read:org"]}')"
+echo "$LEASE" | jq -e '.id != null and .ref == "github" and .secret_exposed == false' >/dev/null
+if echo "$LEASE" | grep -q 'vm-secret-token'; then
+  echo "credential lease unexpectedly exposed provider output" >&2
+  exit 1
+fi
 COMMIT="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/actions -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"action":"commit","run_id":"'"$RUN_ID"'","confirmation":"COMMIT"}')"
 echo "$COMMIT" | grep -q '"ok":true'
 test "$(cat "$ROOT/workspace/marker.txt")" = accepted-by-supervisor
-sudo curl --unix-socket "$SOCKET" -sS -H "Authorization: Bearer $TOKEN" 'http://localhost/v1/audit?limit=10' | grep -q '"action":"commit"'
+sudo curl --unix-socket "$SOCKET" -sS -H "Authorization: Bearer $TOKEN" 'http://localhost/v1/audit?limit=20' | grep -q '"action":"credential_lease"'
+sudo curl --unix-socket "$SOCKET" -sS -H "Authorization: Bearer $TOKEN" 'http://localhost/v1/audit?limit=20' | grep -q '"action":"commit"'
 
 echo "SUPERVISOR_SMOKE=PASS"
