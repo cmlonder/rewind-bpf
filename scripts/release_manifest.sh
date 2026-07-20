@@ -40,7 +40,7 @@ metadata_path="$OUT_DIR/release-metadata.txt"
   printf 'artifacts=%s\n' "${#artifacts[@]}"
   printf 'checksum_file=SHA256SUMS\n'
   printf 'signing_status=unsigned-checksum-only\n'
-  printf 'signing_note=SHA-256 detects accidental or post-build changes; use an external signing workflow before public distribution.\n'
+  printf 'signing_note=SHA-256 detects accidental or post-build changes; use release-sign with a protected Ed25519 key before public distribution.\n'
 } > "$metadata_path"
 
 printf 'wrote %s and %s\n' "$checksum_path" "$metadata_path"

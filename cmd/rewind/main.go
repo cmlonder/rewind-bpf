@@ -26,6 +26,9 @@ Usage:
   rewind diff --record PATH
   rewind export --record PATH --output PATH [--format json|patch|git-patch]
   rewind capabilities
+  rewind release keygen --private PATH --public PATH
+  rewind release sign --input PATH --private-key PATH --output PATH
+  rewind release verify --input PATH --signature PATH [--public-key PATH]
   rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN]
   rewind rollback --record PATH
   rewind recover --record PATH
@@ -85,6 +88,8 @@ func main() {
 		handleExport(os.Args[2:])
 	case "capabilities":
 		handleCapabilities(os.Args[2:])
+	case "release":
+		handleRelease(os.Args[2:])
 	case "supervisor":
 		handleSupervisor(os.Args[2:])
 	case "commit":

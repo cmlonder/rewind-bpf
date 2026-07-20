@@ -275,7 +275,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Produce one deterministic three-act demo: destructive delete → secret-read denial → rollback proof.
 - Add a failure-act: kill the agent midway and show automatic recovery/status.
 - Freeze benchmark CSV/SVG, capability report, threat model, limitations, and competitor matrix.
-- Add a minimal release artifact: versioned binary, eBPF object, example policy, VM quickstart, checksum, and a “do not run on your host” warning. `make release-manifest` now emits SHA256SUMS plus metadata that explicitly records the artifact as unsigned.
+- Add a minimal release artifact: versioned binary, eBPF object, example policy, VM quickstart, checksum, and a “do not run on your host” warning. `make release-manifest` emits SHA256SUMS plus metadata; `make release-sign REWIND_RELEASE_PRIVATE_KEY=/secure/path/release.key` adds a detached Ed25519 signature without putting the private key in the repository.
 - Rehearse the exact command sequence in a clean disposable VM snapshot.
 
 **Exit criterion:** a fresh VM operator can reproduce the demo from README without touching the host filesystem, and every claim on the slide deck maps to a checked-in artifact or cited external source.
@@ -340,7 +340,7 @@ flowchart LR
 
 - Expand the shipped supervisor with detachable sessions and authenticated run handles suitable for CI; action audit is now persisted locally as redacted JSONL.
 - Add CI mode: every agent task runs in a disposable workspace; output is a patch/artifact rather than an implicit host merge.
-- Add remote/object-store evidence bundles, retention policies, and signed release metadata.
+- Add remote/object-store evidence bundles, retention policies, and public release trust distribution. Local detached release signatures and pinned-key verification are shipped; registry rotation/revocation is not.
 - Add network namespace/proxy policy as a separate plane; make credentials injectable without placing raw secrets in the agent filesystem.
 - Evaluate seccomp filters for syscall-surface reduction. Use seccomp user notification only for narrow, reviewable operations; the kernel documentation warns about notification TOCTOU and blocking semantics, so it is not a default file-write interceptor. See the [kernel seccomp documentation](https://docs.kernel.org/userspace-api/seccomp_filter.html).
 

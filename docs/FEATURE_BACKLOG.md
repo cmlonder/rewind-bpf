@@ -22,7 +22,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Local supervisor | **Shipped / Linux** | Permissioned Unix socket, token auth, health/capabilities/history, status/rollback/recover/commit, snapshot/follow events, redacted action audit | Detachable process sessions and operator takeover/reconnect |
 | Control Plane UI | **Shipped / fixture + authenticated bridge** | Responsive operational views, local policy/workspace config store, loopback HTTP supervisor bridge, bearer-authenticated rollback/recover/commit and policy/workspace writes, authenticated SSE evidence follow with reconnect backoff, signed policy bundle import with verification and audit | Trusted remote registry, local action-token UX |
 | Public jury site | **Shipped** | Static modular single-page narrative, honest competitor matrix, roadmap, and measured benchmark ledger | Publish/deploy automation and post-hackathon content updates |
-| Linux release/bootstrap | **Shipped / checksummed** | VM bootstrap, release Make targets, cross-build checks, SHA256SUMS and release metadata with explicit unsigned status | External signing workflow and package repository |
+| Linux release/bootstrap | **Shipped / signed locally** | VM bootstrap, release Make targets, cross-build checks, SHA256SUMS, release metadata, and detached Ed25519 signature/verification with optional pinned public key | Public registry trust, key rotation/revocation, and package repository |
 | macOS native backend | **Not implemented** | Capability probe and fail-closed unavailable backend only | Seatbelt/EndpointSecurity + APFS disposable-volume implementation and destructive tests on disposable storage |
 | Windows native backend | **Not implemented** | Cross-build and fail-closed unavailable backend only; WSL2 remains compatibility mode | Native process/filesystem policy + disposable workspace implementation and Windows VM tests |
 | Agent integrations | **Not implemented** | Generic `-- <agent-command>` wrapper | Tested adapters for Codex CLI/OpenHands/Claude Code or a stable adapter SDK |
@@ -75,7 +75,7 @@ Run unit, static, UI, and disposable-VM integration tests; verify rollback, read
 
 ### P1 — Linux productisation
 
-Finish broader network namespace enforcement for non-proxy-aware clients, one real credential provider, patch/branch acceptance adapters, signed release artifacts, and connected Control Plane mutation through a local action-token bridge.
+Finish broader network namespace enforcement for non-proxy-aware clients, one real credential provider, patch/branch acceptance adapters, public release trust distribution, and connected Control Plane mutation through a local action-token bridge.
 
 ### P2 — Native macOS
 

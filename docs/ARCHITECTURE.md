@@ -289,6 +289,23 @@ Benchmark groups:
 
 Correctness tests use synthetic fixtures and compare manifests before/after rollback. Destructive tests are allowed only in a disposable VM or an explicitly created test image after a safety review.
 
+### Release integrity
+
+`make release` cross-compiles the supported artifact set. `make
+release-manifest` writes a names-only `bin/SHA256SUMS` file and
+`bin/release-metadata.txt`; ordinary `sha256sum -c` verification therefore
+works without the Rewind binary. The optional `make release-sign
+REWIND_RELEASE_PRIVATE_KEY=/secure/path/release.key` target signs the exact
+checksum file with Ed25519 and writes `bin/SHA256SUMS.sig`. The detached
+envelope contains a key ID, the raw public key, the payload digest, and the
+signature, but never the private key.
+
+`rewind release verify` always verifies the embedded key and payload digest.
+Passing `--public-key` adds an organization trust pin and refuses a valid
+signature from an unexpected signer. This is an integrity and local
+provenance mechanism, not a public registry: key distribution, rotation,
+revocation, and package repository policy remain outside the current runtime.
+
 ## 11. Implementation status
 
 | Stage | Status | Evidence |
@@ -307,6 +324,7 @@ Correctness tests use synthetic fixtures and compare manifests before/after roll
 | Phase 2 process scope | VM smoke complete | cgroup-v2 scope is created per run, optional `pids.max`/`memory.max`/`cpu.max` limits are written before release, helper PID is admitted before release, descendants inherit the scope, and stale scopes are cleaned during rollback |
 | Phase 2 telemetry evidence | Implemented; VM smoke complete | Start gate closes short-run attach race; event count/bytes/SHA-256, kernel-side dropped count, sequence/hash chain, complete flag, bounded total cap, and ordered `REWIND_EVENT_ROTATE_BYTES` files are persisted; explicit backpressure policy remains staged |
 | Phase 2 merged diff | Implemented | `rewind diff --record PATH` compares the start manifest with the live merged view without mutating either tree |
+| Phase 2 release integrity | Implemented | `release-manifest` emits SHA256SUMS/metadata; `release-sign` and `rewind release verify` provide detached Ed25519 signatures with optional trust pinning |
 
 ### Initial B0 baseline (disposable VM)
 

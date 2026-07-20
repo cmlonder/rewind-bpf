@@ -14,7 +14,7 @@ Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITE
 
 The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
 
-Release builds are cross-compiled with `make release`; `make release-manifest` adds `bin/SHA256SUMS` and `bin/release-metadata.txt`. The checksum is tamper-evident metadata, not a cryptographic publisher signature; public distribution still requires an external signing workflow.
+Release builds are cross-compiled with `make release`; `make release-manifest` adds `bin/SHA256SUMS` and `bin/release-metadata.txt`. For a detached Ed25519 signature, generate a key outside the repository and run `REWIND_RELEASE_PRIVATE_KEY=/secure/path/release.key make release-sign`; this writes `bin/SHA256SUMS.sig` and records the signing status without copying the private key. Verify with `rewind release verify --input bin/SHA256SUMS --signature bin/SHA256SUMS.sig --public-key /secure/path/release.pub`. An embedded public key proves integrity, while a pinned key proves publisher identity; public registry trust, rotation, and revocation remain deployment responsibilities.
 
 ## Competitive landscape
 
