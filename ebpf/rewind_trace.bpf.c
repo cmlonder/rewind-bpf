@@ -35,6 +35,14 @@ struct {
 	__type(value, __u8);
 } tracked_pids SEC(".maps");
 
+/* Keep these values local to the CO-RE program so the BPF build does not
+ * include architecture-specific userspace socket headers. */
+#define REWIND_AF_INET 2
+#define REWIND_AF_INET6 10
+#define REWIND_AF_PACKET 17
+#define REWIND_SOCK_RAW 3
+#define REWIND_SOCK_TYPE_MASK 0xf
+
 static __always_inline bool target_matches(void)
 {
 	__u32 pid = (__u32)(bpf_get_current_pid_tgid() >> 32);
@@ -62,8 +70,10 @@ static __always_inline bool target_matches(void)
 	return false;
 }
 
-static __always_inline int emit_event(__u32 operation, __u32 risk,
-					      const char *user_path)
+static __always_inline int emit_event_with_decision(__u32 operation,
+							    __u32 risk,
+							    __u32 decision,
+							    const char *user_path)
 {
 	struct rewind_event *event;
 
@@ -82,7 +92,7 @@ static __always_inline int emit_event(__u32 operation, __u32 risk,
 	event->pid = (__u32)(bpf_get_current_pid_tgid() >> 32);
 	event->operation = operation;
 	event->timestamp_ns = bpf_ktime_get_ns();
-	event->decision = REWIND_DECISION_ALLOW;
+	event->decision = decision;
 	event->risk = risk;
 	event->path[0] = '\0';
 	if (user_path)
@@ -90,6 +100,13 @@ static __always_inline int emit_event(__u32 operation, __u32 risk,
 
 	bpf_ringbuf_submit(event, 0);
 	return 0;
+}
+
+static __always_inline int emit_event(__u32 operation, __u32 risk,
+					      const char *user_path)
+{
+	return emit_event_with_decision(operation, risk, REWIND_DECISION_ALLOW,
+					       user_path);
 }
 
 SEC("tracepoint/syscalls/sys_enter_execve")
@@ -146,4 +163,20 @@ int trace_truncate(struct trace_event_raw_sys_enter *ctx)
 {
 	return emit_event(REWIND_OP_TRUNCATE, REWIND_RISK_HIGH,
 			  (const char *)ctx->args[0]);
+}
+
+SEC("tracepoint/syscalls/sys_enter_socket")
+int trace_socket(struct trace_event_raw_sys_enter *ctx)
+{
+	__u32 family = (__u32)ctx->args[0];
+	__u32 type = (__u32)ctx->args[1];
+	bool raw = family == REWIND_AF_PACKET ||
+		(family == REWIND_AF_INET &&
+		 ((type & REWIND_SOCK_TYPE_MASK) == REWIND_SOCK_RAW)) ||
+		(family == REWIND_AF_INET6 &&
+		 ((type & REWIND_SOCK_TYPE_MASK) == REWIND_SOCK_RAW));
+
+	return emit_event_with_decision(REWIND_OP_SOCKET, REWIND_RISK_HIGH,
+					       raw ? REWIND_DECISION_DENY : REWIND_DECISION_ALLOW,
+					       0);
 }

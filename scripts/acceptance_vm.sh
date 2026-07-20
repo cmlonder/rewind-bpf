@@ -132,6 +132,7 @@ sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/raw-network/workspace" "$ROOT
   /bin/sh -c '/usr/bin/python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)" && printf "raw-allowed\\n" > raw.status || printf "raw-denied\\n" > raw.status'
 test "$(cat "$ROOT/raw-network/runtime/merged/raw.status")" = raw-denied
 sudo "$BIN" rollback --record "$ROOT/raw-network/runtime/record.json"
+sudo jq -s -e 'any(.[]; .operation == "socket" and .decision == "deny")' "$ROOT/raw-network/runtime/events.jsonl" >/dev/null
 echo "raw socket refusal: PASS"
 
 # 5. Bounded evidence must fail verification rather than look complete.

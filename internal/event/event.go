@@ -15,6 +15,7 @@ const (
 	RenameAt2      Operation = "renameat2"
 	Truncate       Operation = "truncate"
 	NetworkConnect Operation = "network_connect"
+	Socket         Operation = "socket"
 )
 
 // Numeric operation codes are the stable wire values used by the eBPF ring
@@ -29,6 +30,7 @@ const (
 	OperationCodeRenameAt2
 	OperationCodeTruncate
 	OperationCodeNetworkConnect
+	OperationCodeSocket = 9
 )
 
 type Decision string
@@ -77,6 +79,8 @@ func OperationCode(value Operation) (uint32, bool) {
 		return OperationCodeTruncate, true
 	case NetworkConnect:
 		return OperationCodeNetworkConnect, true
+	case Socket:
+		return OperationCodeSocket, true
 	default:
 		return 0, false
 	}
@@ -100,6 +104,8 @@ func OperationFromCode(code uint32) (Operation, bool) {
 		return Truncate, true
 	case OperationCodeNetworkConnect:
 		return NetworkConnect, true
+	case OperationCodeSocket:
+		return Socket, true
 	default:
 		return "", false
 	}
@@ -195,7 +201,7 @@ func (e Event) Validate() error {
 
 func validOperation(value Operation) bool {
 	switch value {
-	case Execve, OpenAt, Read, Write, UnlinkAt, RenameAt2, Truncate, NetworkConnect:
+	case Execve, OpenAt, Read, Write, UnlinkAt, RenameAt2, Truncate, NetworkConnect, Socket:
 		return true
 	default:
 		return false

@@ -138,7 +138,7 @@ The daemon is expected to run with narrowly scoped Linux capabilities inside the
 
 The kernel data plane observes target process/cgroup activity and emits compact events through a ring buffer. It does not create snapshots after the fact. Candidate observation points include `execve`, `openat/openat2`, `unlinkat`, `renameat2`, `write`, `pwrite`, `truncate`, and `ftruncate`.
 
-For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; `network.mode: audit` can use the same explicit backend to persist observed decisions without denying. Each proxy decision is appended to the run evidence chain. Enforce runs additionally install a narrow seccomp filter that denies AF_PACKET and AF_INET/AF_INET6 `SOCK_RAW` creation while leaving normal TCP/UDP sockets available to the proxy. Network namespaces, non-proxy-aware egress, and broader socket policy remain outside this guarantee.
+For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; `network.mode: audit` can use the same explicit backend to persist observed decisions without denying. Each proxy decision is appended to the run evidence chain. Enforce runs additionally install a narrow seccomp filter that denies AF_PACKET and AF_INET/AF_INET6 `SOCK_RAW` creation while leaving normal TCP/UDP sockets available to the proxy. The eBPF `socket` tracepoint records the attempted family class as an allow/deny evidence event, so the operator can correlate refusal with the process timeline. Network namespaces, non-proxy-aware egress, and broader socket policy remain outside this guarantee.
 
 #### OverlayFS transaction
 
@@ -535,7 +535,7 @@ Therefore RewindBPF’s defensible MVP claim is composition and focus: a Linux O
 The first kernel source is intentionally telemetry-only:
 
 - `ebpf/event.h` defines the stable numeric ring-buffer record layout.
-- `ebpf/rewind_trace.bpf.c` observes `execve`, `openat`, `write`, `pwrite64`, `unlinkat`, `renameat2`, and `truncate` tracepoints.
+- `ebpf/rewind_trace.bpf.c` observes `execve`, `openat`, `write`, `pwrite64`, `unlinkat`, `renameat2`, `truncate`, and `socket` tracepoints.
 - A read-only `target_pid` filter scopes events to the agent process; the future daemon must set it before a production run.
 - Events default to `allow` because this program does not enforce policy. BPF-LSM enforcement is a separate module and stage.
 - The compact kernel record intentionally omits the string `run_id`; the userspace ring-buffer reader adds the active run context before validation and persistence.

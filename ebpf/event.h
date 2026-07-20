@@ -15,6 +15,8 @@ enum rewind_operation {
 	REWIND_OP_UNLINKAT,
 	REWIND_OP_RENAMEAT2,
 	REWIND_OP_TRUNCATE,
+	/* Userspace reserves code 8 for proxy-generated network events. */
+	REWIND_OP_SOCKET = 9,
 };
 
 enum rewind_decision {
