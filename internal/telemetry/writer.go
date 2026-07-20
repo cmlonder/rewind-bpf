@@ -20,8 +20,12 @@ type JournalWriter struct {
 	Bytes       uint64
 	FileBytes   uint64
 	Truncated   bool
-	Rotate      func() (io.Writer, error)
-	chain       Chain
+	Dropped     uint64
+	// OnDrop is optional observability for a bounded stream. A dropped event
+	// is never reported as durable evidence.
+	OnDrop func(event.Event)
+	Rotate func() (io.Writer, error)
+	chain  Chain
 }
 
 func (w *JournalWriter) Append(value event.Event) error {
@@ -39,6 +43,10 @@ func (w *JournalWriter) Append(value event.Event) error {
 	data = append(data, '\n')
 	if w.MaxBytes > 0 && w.Bytes+uint64(len(data)) > w.MaxBytes {
 		w.Truncated = true
+		w.Dropped++
+		if w.OnDrop != nil {
+			w.OnDrop(value)
+		}
 		return nil
 	}
 	if w.RotateBytes > 0 && w.FileBytes > 0 && w.FileBytes+uint64(len(data)) > w.RotateBytes {

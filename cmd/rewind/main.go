@@ -33,16 +33,19 @@ Usage:
   rewind bundle fetch --endpoint URL --output PATH [--token TOKEN --sha256 HEX]
   rewind retention put|get --endpoint URL --key KEY --input|--output PATH
   rewind bundle verify --input PATH [--signature PATH --public-key PATH]
+  rewind registry fetch --endpoint URL --name NAME --version VERSION --output PATH [--trusted-public-keys PATH,...]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
   rewind platform plan --workspace PATH
+  rewind platform contract --platform darwin|windows --workspace PATH
+  rewind network plan --domains HOST[,HOST...]
   rewind release keygen --private PATH --public PATH
   rewind release sign --input PATH --private-key PATH --output PATH
   rewind release verify --input PATH --signature PATH [--public-key PATH]
   rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
   rewind history prune --path PATH --keep N
   rewind pii scan --path PATH [--output PATH --redact-output PATH]
-  rewind agent list
+  rewind agent list|contract KIND
   rewind checkpoint graph inspect|add|transition
   rewind rollback --record PATH
   rewind recover --record PATH
@@ -108,6 +111,8 @@ func main() {
 		handleCapabilities(os.Args[2:])
 	case "platform":
 		handlePlatform(os.Args[2:])
+	case "network":
+		handleNetwork(os.Args[2:])
 	case "release":
 		handleRelease(os.Args[2:])
 	case "supervisor":
@@ -122,6 +127,8 @@ func main() {
 		handleCheckpoint(os.Args[2:])
 	case "retention":
 		handleRetention(os.Args[2:])
+	case "registry":
+		handleRegistry(os.Args[2:])
 	case "commit":
 		handleCommit(os.Args[2:])
 	default:

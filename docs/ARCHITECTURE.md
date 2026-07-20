@@ -818,3 +818,42 @@ bpftool feature probe kernel | grep -A3 -B2 'program types' | grep -i lsm
 ```
 
 `bpf` must appear in the active LSM list. A `bpf` program type reported by `bpftool` alone only proves kernel support; it does not prove that BPF-LSM enforcement is active. The current VM fails this optional gate, so no BPF-LSM program has been loaded. Landlock is the validated VM enforcement path.
+
+### Hardening contracts added after the Linux MVP
+
+The runtime now exposes six bounded productisation seams without silently
+claiming unsupported enforcement:
+
+- `internal/netns` emits and tests a veth/IP/iptables allowlist plan. The
+  privileged `Install` method is injectable and root-gated; it is not called
+  by ordinary runs until a disposable namespace broker owns the lifecycle.
+- `internal/platform` emits portable macOS Seatbelt/EndpointSecurity/APFS and
+  Windows minifilter/Job Object/VHDX contracts. `rewind platform contract` is
+  a read-only report and both native contracts remain `ready: false` until
+  signed helper and disposable-volume tests exist.
+- `internal/agent` records executable aliases plus a `rewind/v1` lifecycle
+  environment (`prepare,start,exit,run_id`). Commands are preserved exactly;
+  provider SDK callbacks remain adapter-owned acceptance work.
+- `internal/session` adds a WAL-backed SQLite lease store with the same
+  acquire/heartbeat/takeover/release ownership and expiry semantics as the
+  local JSON store. The supervisor still defaults to local storage until a
+  deployment explicitly selects the SQLite/distributed backend.
+- `internal/registry` fetches signed policy envelopes over bounded HTTPS with
+  retries and pinned-key verification. Verification occurs before a bundle
+  can become a runtime policy; no remote registry is trusted by default.
+- `internal/pii` supports custom redacted regex rules and bounded streaming
+  scans. Findings contain hashes only, and tests assert that raw values do not
+  appear in JSON or redacted output. `JournalWriter` counts capped/dropped
+  events and exposes an optional drop callback for backpressure telemetry.
+
+These seams are intentionally modular: network installation, native helpers,
+agent SDKs, session stores, registries, and content classifiers can evolve
+without coupling the Linux transaction core to one provider.
+
+The UTM Ubuntu 24.04 ARM64 smoke was rerun on 2026-07-20 after this pass. The
+new ARM binary emitted the namespace command plan, Codex lifecycle contract,
+and macOS fail-closed native contract. The privileged checkpoint/PII run
+passed (`CHECKPOINT_PII_VM_PASS`) and the namespace backend refused an
+allow-domain policy before launch (`NAMESPACE_ALLOWLIST_FAIL_CLOSED_PASS`). No
+host network namespace was mutated; the installer remains uncalled by the
+smoke script.

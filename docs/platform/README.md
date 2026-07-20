@@ -19,11 +19,21 @@ The implementation boundary is deliberately separate from the Linux
 OverlayFS/Landlock/eBPF path. A native helper may share policy and evidence
 schemas, but it must provide its own capability proof and rollback tests.
 
+`rewind platform contract --platform darwin --workspace PATH` emits the shared
+contract used by the UI and release checklist. It remains `ready: false` until
+signed EndpointSecurity entitlements and an APFS disposable-volume acceptance
+test exist. `platform.SeatbeltProfile` is a reviewable profile generator, not a
+launcher.
+
 ## Windows (P3 preview)
 
 Windows will use a native process/filesystem policy adapter and a disposable
 workspace. WSL2 is a compatibility path for Linux development only; it must
 never be presented as protection for the Windows host filesystem.
+
+`rewind platform contract --platform windows --workspace PATH` emits the
+Job Object/restricted-token/VHDX boundary and its manual gates. The portable
+contract does not pretend to enforce a Windows host from Linux or WSL2.
 
 ## Test rule
 

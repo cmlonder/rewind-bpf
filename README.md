@@ -10,7 +10,7 @@ The product strategy is documented in [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_ST
 
 The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, narrow raw/packet-socket denial in enforce mode, fail-closed `deny` and isolated `namespace` network backends for non-proxy-aware clients, an opt-in short-lived external credential-provider broker, conflict-checked `commit --confirm`, durable history, signed evidence hand-off, an authenticated supervisor transport with lifecycle actions and follow-mode events, release/bootstrap scripts, checkpoint lifecycle wiring, bounded post-run PII scanning, an S3-compatible HTTPS retention adapter with digest/retry, a remote session lease protocol, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining deployment work is privileged allow-listed namespace egress, native keychain adapters, provider-specific SDK hooks, SQLite/distributed session deployment, and native macOS/Windows enforcement; unsupported capabilities remain fail-closed.
 
-Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
+Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage. The six hardening boundaries now have portable contracts and safe tests, but a contract is not production enforcement.
 
 The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
 
@@ -137,6 +137,9 @@ rewind pii scan --path ./project --output ./runtime/pii-findings.json
 # Optional single-file redaction:
 rewind pii scan --path ./project/config.env --redact-output ./runtime/config.env.redacted
 rewind agent list
+rewind agent contract codex
+rewind network plan --domains api.example.com,registry.example.com
+rewind platform contract --platform darwin --workspace /path/to/disposable-apfs-fixture
 sudo rewind status --record ./runtime/record.json
 rewind inspect --record ./runtime/record.json
 sudo rewind events --record ./runtime/record.json
@@ -187,6 +190,19 @@ rewind policy verify strict-agent.bundle.json --public-key /path/to/policy-publi
 ```
 
 Signatures authenticate package contents; they do not bypass runtime capability checks or operator confirmation.
+
+For a remote policy registry, the client verifies the embedded Ed25519
+envelope before writing a local policy file. Public endpoints must use HTTPS
+(loopback HTTP is reserved for disposable tests):
+
+```bash
+rewind registry fetch --endpoint https://registry.example \
+  --name strict-agent --version 1.3.0 --output strict-agent.policy.json \
+  --trusted-public-keys /etc/rewind/keys/current.pub,/etc/rewind/keys/previous.pub
+```
+
+The registry client has a bounded response size and retry budget. It never
+turns an unverified remote payload into an active run policy.
 
 ### Local supervisor control plane
 

@@ -366,6 +366,17 @@ flowchart LR
 
 ## 10. Definition of done for Phase 2
 
+### Latest hardening pass (2026-07-20)
+
+The six requested post-MVP workstreams now have code-level contracts and unit
+tests: reviewable namespace egress commands, native macOS/Windows boundaries,
+agent lifecycle identities, SQLite leases, signed remote policy fetch, and
+configurable/streaming PII plus telemetry drop accounting. This is deliberately
+not the same as claiming all six are production-ready. The remaining gates are
+privileged VM egress, signed native helpers and disposable platform volumes,
+provider SDK callback tests, distributed deployment, a registry service/KMS,
+and measured VM leakage benchmarks.
+
 Phase 2 is complete when all of the following are true:
 
 - A killed or crashed agent cannot mutate the lower workspace, and startup recovery is deterministic.

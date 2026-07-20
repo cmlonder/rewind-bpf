@@ -101,6 +101,7 @@ func handleRun(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
+	launch.Environment = append(launch.Environment, "REWIND_AGENT_RUN_ID="+plan.Run.ID)
 	eventsPath := filepath.Join(plan.Layout.Root, "events.jsonl")
 	owner, err := agentOwner()
 	if err != nil {

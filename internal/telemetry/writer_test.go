@@ -16,12 +16,16 @@ func testEvent() event.Event {
 
 func TestJournalWriterCapsWithoutBreakingTheReader(t *testing.T) {
 	var output bytes.Buffer
-	writer := &JournalWriter{Destination: &output, MaxBytes: 1}
+	var dropped uint64
+	writer := &JournalWriter{Destination: &output, MaxBytes: 1, OnDrop: func(event.Event) { dropped++ }}
 	if err := writer.Append(testEvent()); err != nil {
 		t.Fatal(err)
 	}
 	if !writer.Truncated || output.Len() != 0 {
 		t.Fatalf("writer = truncated=%v bytes=%d, want truncated and no partial line", writer.Truncated, output.Len())
+	}
+	if writer.Dropped != 1 || dropped != 1 {
+		t.Fatalf("drop counters=%d/%d", writer.Dropped, dropped)
 	}
 	if err := writer.Append(testEvent()); err != nil {
 		t.Fatal(err)

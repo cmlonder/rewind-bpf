@@ -4,6 +4,7 @@ package agent
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 )
 
@@ -17,9 +18,11 @@ const (
 )
 
 type Spec struct {
-	Kind        Kind   `json:"kind"`
-	DisplayName string `json:"display_name"`
-	Description string `json:"description"`
+	Kind         Kind     `json:"kind"`
+	DisplayName  string   `json:"display_name"`
+	Description  string   `json:"description"`
+	Executables  []string `json:"executables,omitempty"`
+	HookProtocol string   `json:"hook_protocol"`
 }
 
 type Launch struct {
@@ -29,10 +32,10 @@ type Launch struct {
 }
 
 var specs = []Spec{
-	{Kind: Generic, DisplayName: "Generic command", Description: "Any executable launched under the protected runtime."},
-	{Kind: Codex, DisplayName: "Codex", Description: "Codex-compatible command; the operator command remains unchanged."},
-	{Kind: OpenHands, DisplayName: "OpenHands", Description: "OpenHands-compatible command; the operator command remains unchanged."},
-	{Kind: ClaudeCode, DisplayName: "Claude Code", Description: "Claude Code-compatible command; the operator command remains unchanged."},
+	{Kind: Generic, DisplayName: "Generic command", Description: "Any executable launched under the protected runtime.", HookProtocol: "rewind/v1"},
+	{Kind: Codex, DisplayName: "Codex", Description: "Codex-compatible command; the operator command remains unchanged.", Executables: []string{"codex", "codex-cli"}, HookProtocol: "rewind/v1"},
+	{Kind: OpenHands, DisplayName: "OpenHands", Description: "OpenHands-compatible command; the operator command remains unchanged.", Executables: []string{"openhands"}, HookProtocol: "rewind/v1"},
+	{Kind: ClaudeCode, DisplayName: "Claude Code", Description: "Claude Code-compatible command; the operator command remains unchanged.", Executables: []string{"claude", "claude-code"}, HookProtocol: "rewind/v1"},
 }
 
 func List() []Spec { result := make([]Spec, len(specs)); copy(result, specs); return result }
@@ -65,5 +68,19 @@ func Prepare(spec Spec, command []string) (Launch, error) {
 		return Launch{}, err
 	}
 	copyCommand := append([]string(nil), command...)
-	return Launch{Spec: spec, Command: copyCommand, Environment: []string{"REWIND_AGENT_ADAPTER=" + string(spec.Kind)}}, nil
+	return Launch{Spec: spec, Command: copyCommand, Environment: []string{
+		"REWIND_AGENT_ADAPTER=" + string(spec.Kind),
+		"REWIND_AGENT_HOOK_PROTOCOL=" + spec.HookProtocol,
+		"REWIND_AGENT_LIFECYCLE=prepare,start,exit",
+	}}, nil
+}
+
+func (s Spec) Recognizes(command string) bool {
+	base := strings.ToLower(filepath.Base(strings.TrimSpace(command)))
+	for _, executable := range s.Executables {
+		if base == executable {
+			return true
+		}
+	}
+	return s.Kind == Generic
 }

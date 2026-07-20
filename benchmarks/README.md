@@ -22,6 +22,12 @@ python3 benchmarks/plot_results.py
 
 This writes `benchmarks/results_chart.svg`. The script uses only the Python standard library; no plotting package is required.
 
+The PII protocol is intentionally separate from the I/O chart. Create a
+synthetic corpus, run `python3 benchmarks/pii_benchmark.py --input corpus.txt`,
+then record the Go scanner's findings count, raw-value leakage check, bounded
+stream limit, and scan throughput in the experiment notes. No PII benchmark
+number is checked in until it has a VM or host provenance line.
+
 ## Competitor comparison policy
 
 The feature matrix in [`docs/PHASE2_PLAN.md`](../docs/PHASE2_PLAN.md) separates direct product competitors from adjacent kernel systems and research references. Benchmark claims must preserve that distinction:

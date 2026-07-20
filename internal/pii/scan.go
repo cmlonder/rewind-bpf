@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -29,6 +30,32 @@ type rule struct {
 	kind        string
 	pattern     *regexp.Regexp
 	replacement string
+}
+
+// RuleConfig lets operators add deterministic, redacted project-specific
+// patterns without changing the built-in scanner. Pattern values are regular
+// expressions and must never be used to return matched content.
+type RuleConfig struct {
+	Kind        string `json:"kind" yaml:"kind"`
+	Pattern     string `json:"pattern" yaml:"pattern"`
+	Replacement string `json:"replacement" yaml:"replacement"`
+}
+
+type Scanner struct{ rules []rule }
+
+func NewScanner(custom []RuleConfig) (Scanner, error) {
+	compiled := append([]rule(nil), rules...)
+	for _, config := range custom {
+		if strings.TrimSpace(config.Kind) == "" || strings.TrimSpace(config.Pattern) == "" || strings.TrimSpace(config.Replacement) == "" {
+			return Scanner{}, fmt.Errorf("PII custom rule requires kind, pattern, and replacement")
+		}
+		pattern, err := regexp.Compile(config.Pattern)
+		if err != nil {
+			return Scanner{}, fmt.Errorf("PII custom rule %s: %w", config.Kind, err)
+		}
+		compiled = append(compiled, rule{kind: config.Kind, pattern: pattern, replacement: config.Replacement})
+	}
+	return Scanner{rules: compiled}, nil
 }
 
 var rules = []rule{
@@ -61,12 +88,24 @@ func ScanPath(path string) ([]Finding, error) {
 }
 
 func ScanBytes(path string, data []byte) []Finding {
+	return scanBytes(path, data, rules)
+}
+
+func (s Scanner) ScanBytes(path string, data []byte) []Finding {
+	active := s.rules
+	if len(active) == 0 {
+		active = rules
+	}
+	return scanBytes(path, data, active)
+}
+
+func scanBytes(path string, data []byte, active []rule) []Finding {
 	if strings.IndexByte(string(data), 0) >= 0 {
 		return nil
 	}
 	var findings []Finding
 	for lineNumber, line := range strings.Split(string(data), "\n") {
-		for _, current := range rules {
+		for _, current := range active {
 			for _, match := range current.pattern.FindAllStringIndex(line, -1) {
 				value := line[match[0]:match[1]]
 				digest := sha256.Sum256([]byte(value))
@@ -86,9 +125,37 @@ func ScanBytes(path string, data []byte) []Finding {
 	return findings
 }
 
+// ScanReader consumes at most maxBytes and avoids loading an unbounded stream
+// into memory. It is intended for event payloads and remote restore previews.
+func (s Scanner) ScanReader(path string, reader io.Reader, maxBytes int64) ([]Finding, error) {
+	if maxBytes <= 0 || maxBytes > MaxFileBytes {
+		maxBytes = MaxFileBytes
+	}
+	data, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, fmt.Errorf("scan PII: stream exceeds %d-byte limit", maxBytes)
+	}
+	return s.ScanBytes(path, data), nil
+}
+
 func RedactBytes(data []byte) []byte {
+	return redactBytes(data, rules)
+}
+
+func (s Scanner) RedactBytes(data []byte) []byte {
+	active := s.rules
+	if len(active) == 0 {
+		active = rules
+	}
+	return redactBytes(data, active)
+}
+
+func redactBytes(data []byte, active []rule) []byte {
 	value := string(data)
-	for _, current := range rules {
+	for _, current := range active {
 		value = current.pattern.ReplaceAllString(value, current.replacement)
 	}
 	return []byte(value)

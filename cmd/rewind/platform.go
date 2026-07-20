@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"strings"
@@ -13,8 +14,25 @@ import (
 )
 
 func handlePlatform(args []string) {
-	if len(args) == 0 || args[0] != "plan" {
-		fatal("usage: rewind platform plan --workspace PATH")
+	if len(args) == 0 || (args[0] != "plan" && args[0] != "contract") {
+		fatal("usage: rewind platform plan --workspace PATH | rewind platform contract --platform darwin|windows --workspace PATH")
+	}
+	if args[0] == "contract" {
+		flags := flag.NewFlagSet("platform contract", flag.ContinueOnError)
+		flags.SetOutput(io.Discard)
+		platformName := flags.String("platform", "", "target platform: darwin or windows")
+		workspace := flags.String("workspace", "", "workspace directory")
+		if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 || strings.TrimSpace(*platformName) == "" || strings.TrimSpace(*workspace) == "" {
+			fatal("usage: rewind platform contract --platform darwin|windows --workspace PATH")
+		}
+		contract, err := platform.BuildNativeContract(*platformName, *workspace)
+		if err != nil {
+			fatal(err.Error())
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(contract); err != nil {
+			fatal(err.Error())
+		}
+		return
 	}
 	flags := flag.NewFlagSet("platform plan", flag.ContinueOnError)
 	workspace := flags.String("workspace", "", "workspace directory to probe")

@@ -69,6 +69,15 @@ export const fixture = {
     { name: "OpenHands", kind: "openhands", stage: "hooked", status: "lifecycle callbacks" },
     { name: "Claude", kind: "claude", stage: "validated", status: "command contract" },
   ],
+  hardening: {
+    namespace: { state: "review-only", title: "veth / NAT egress plan", detail: "VM broker required · fail-closed by default" },
+    registry: { state: "verified", title: "Signed policy registry", detail: "HTTPS + pinned Ed25519 keys + retry bound" },
+    sessions: { state: "ready", title: "SQLite lease store", detail: "WAL · expiry · takeover semantics" },
+    native: [
+      { platform: "macOS", state: "manual gate", detail: "Seatbelt + EndpointSecurity + APFS" },
+      { platform: "Windows", state: "manual gate", detail: "Job Object + minifilter + VHDX" },
+    ],
+  },
 };
 
 export function getRun(id) { return fixture.runs.find((run) => run.id === id) || fixture.runs[0]; }
