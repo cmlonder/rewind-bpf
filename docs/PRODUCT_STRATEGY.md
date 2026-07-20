@@ -95,7 +95,7 @@ Complete the current Linux transaction: automatic discard semantics, sensitive-r
 
 ### Track B — Confidentiality plane
 
-Add network enforcement and a credential broker. The current product slice has a loopback HTTP/CONNECT proxy backend for proxy-aware clients and a refusal-safe credential broker contract. The broker must never pass raw credentials through argv, the agent workspace, or an unrestricted environment variable. Start with one provider and short-lived, scoped tokens; expand only after leakage tests pass. Raw sockets and non-proxy-aware clients remain unsupported until a namespace/eBPF backend is available.
+Add network enforcement and a credential broker. The current product slice has a loopback HTTP/CONNECT proxy backend for proxy-aware clients, narrow seccomp denial for raw/packet sockets in enforce mode, and a refusal-safe credential broker contract. The broker must never pass raw credentials through argv, the agent workspace, or an unrestricted environment variable. Start with one provider and short-lived, scoped tokens; expand only after leakage tests pass. Non-proxy-aware clients and broader egress remain unsupported until a namespace/eBPF backend is available.
 
 ### Track C — Explicit acceptance
 

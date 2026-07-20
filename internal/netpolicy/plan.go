@@ -21,6 +21,7 @@ type Plan struct {
 	Mode           policy.Mode
 	AllowDomains   []string
 	CredentialRefs []policy.CredentialRef
+	RawSocketDeny  bool `json:"raw_socket_deny,omitempty"`
 }
 
 func Compile(value policy.NetworkPolicy) (Plan, error) {

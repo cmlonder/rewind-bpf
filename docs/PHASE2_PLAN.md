@@ -71,7 +71,7 @@ This is deliberately narrower than “protect the whole operating system” or �
 4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
 5. Conflict-aware `commit --confirm` is now implemented for regular files/directories. It refuses incomplete evidence, destination drift, unsafe paths, and symlink/other entries; branch/patch integration remains a separate product adapter.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
-7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients. It is not equivalent to namespace-level or raw-socket isolation; unsupported clients must remain refused or visibly degraded.
+7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients. Enforced runs also deny AF_PACKET and raw AF_INET/AF_INET6 socket creation through seccomp, but this is not equivalent to namespace-level or full egress isolation; unsupported clients must remain refused or visibly degraded.
 
 ### Phase 2 implementation progress
 
@@ -137,7 +137,7 @@ Nono is the closest product benchmark, so its publicly documented feature set be
 | Profile-based policy and `learn` workflow | YAML policy, glob deny patterns, `off/audit/enforce` | **P0:** versioned policy schema, `policy learn`, explain/validate commands | Signed, composable profiles with toolchain/runtime groups. |
 | Atomic undo and content-addressed snapshots | OverlayFS/FUSE upper-layer discard; SHA-256 start manifests | **P0:** diff index, rollback evidence, crash recovery; **P1:** deduplicated content store if storage measurements justify it | Multiple checkpoints and portable run bundles. |
 | Cryptographic audit trail/Merkle commitment | JSONL telemetry and run record; no final Merkle root | **P0:** sequence numbers, drop counters, hash-chained batches, final root, read-only verifier | Signed remote evidence and standalone packaging. |
-| Domain/network filtering | Policy field plus loopback proxy backend for proxy-aware HTTP/HTTPS clients | **P1:** network namespace/cgroup backend for raw sockets and non-proxy-aware clients | Credential-aware egress broker and per-agent network profiles. |
+| Domain/network filtering | Policy field plus loopback proxy backend for proxy-aware HTTP/HTTPS clients; enforce mode also denies raw/packet socket creation through seccomp | **P1:** network namespace/cgroup backend for non-proxy-aware clients and broader egress coverage | Credential-aware egress broker and per-agent network profiles. |
 | Credential injection without exposing raw keys | Not implemented | **P1:** design only during six-day sprint; never pass secrets through argv or agent workspace | Keychain/secret-manager adapters and short-lived scoped tokens. |
 | Runtime supervisor and dynamic permission approval | Authenticated Unix-socket supervisor with lifecycle actions, snapshot/follow streams, redacted audit, and an optional loopback HTTP bridge for browser actions | **P1:** live SSE reconciliation, connected policy mutation, and approval protocol | Policy decision service with human/automation approval and time-bounded grants. |
 | Signed provenance/registry for profiles and agent packs | Local Ed25519 bundles and verification only | **P2:** document trust boundary and sign release artifacts | Sigstore-compatible profile/adapter registry. |

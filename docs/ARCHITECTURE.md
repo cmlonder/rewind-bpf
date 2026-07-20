@@ -511,6 +511,8 @@ A module is ready when it has:
 
 The package does not start processes, mount filesystems, parse policies, or load eBPF. Those operations remain separate integration boundaries for the daemon. Its tests run on the development host and require no kernel or privileged filesystem state.
 
+The serialized `runplan.Plan.Network` section is persisted before process release. In enforced proxy runs it records `raw_socket_deny=true`, making the seccomp defense part of the auditable pre-execution posture rather than an implicit coordinator-side mutation.
+
 ## 20. Stage 4 event contract foundation
 
 `internal/event` defines the narrow data contract between eBPF telemetry and userspace. It contains only primitive, serializable fields: run ID, PID, operation, optional path, kernel timestamp, decision, and risk level.

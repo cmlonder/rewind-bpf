@@ -75,7 +75,7 @@ Run unit, static, UI, and disposable-VM integration tests; verify rollback, read
 
 ### P1 — Linux productisation
 
-Finish raw-socket/network namespace enforcement, one real credential provider, patch/branch acceptance adapters, signed release artifacts, and connected Control Plane mutation through a local action-token bridge.
+Finish broader network namespace enforcement for non-proxy-aware clients, one real credential provider, patch/branch acceptance adapters, signed release artifacts, and connected Control Plane mutation through a local action-token bridge.
 
 ### P2 — Native macOS
 

@@ -1,8 +1,10 @@
 package runplan
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/policy"
@@ -77,6 +79,16 @@ func TestBuildAcceptsExplicitProxyNetworkBackend(t *testing.T) {
 	if plan.Network.Mode != policy.ModeEnforce || len(plan.Network.AllowDomains) != 1 {
 		t.Fatalf("network plan=%+v", plan.Network)
 	}
+	if !plan.Network.RawSocketDeny {
+		t.Fatalf("network plan=%+v, want raw socket defense enabled", plan.Network)
+	}
+	encoded, err := json.Marshal(plan.Network)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"raw_socket_deny":true`) {
+		t.Fatalf("serialized network plan=%s, want raw_socket_deny=true", encoded)
+	}
 }
 
 func TestBuildAcceptsExplicitProxyForAuditMode(t *testing.T) {
@@ -95,5 +107,8 @@ func TestBuildAcceptsExplicitProxyForAuditMode(t *testing.T) {
 	}
 	if plan.Network.Mode != policy.ModeAudit || len(plan.Network.AllowDomains) != 1 {
 		t.Fatalf("plan=%+v", plan.Network)
+	}
+	if plan.Network.RawSocketDeny {
+		t.Fatalf("plan=%+v, want raw socket defense disabled in audit mode", plan.Network)
 	}
 }

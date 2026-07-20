@@ -60,6 +60,10 @@ func Build(config Config) (Plan, error) {
 	if networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend != "proxy" {
 		return Plan{}, fmt.Errorf("build run plan: network enforce requires --network-backend proxy")
 	}
+	// Keep the defense decision in the inert plan that is persisted before
+	// process start. This makes the run record auditable and prevents the
+	// coordinator from silently changing the security posture after planning.
+	networkPlan.RawSocketDeny = networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend == "proxy"
 	runtimeRoot, err := resolveRuntimeRoot(config.RuntimeRoot)
 	if err != nil {
 		return Plan{}, err
