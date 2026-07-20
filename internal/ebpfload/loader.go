@@ -44,7 +44,7 @@ type Session struct {
 // Load parses and loads a telemetry object, scopes it to targetPID, and
 // attaches the declared tracepoints. This is a privileged Linux operation and
 // must only be called inside the disposable VM.
-func Load(objectPath, runID string, targetPID uint32) (*Session, error) {
+func Load(objectPath, runID string, targetPID uint32, denyRawNetwork ...bool) (*Session, error) {
 	if err := validateObjectPath(objectPath); err != nil {
 		return nil, err
 	}
@@ -59,7 +59,11 @@ func Load(objectPath, runID string, targetPID uint32) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load eBPF sensors: parse object: %w", err)
 	}
-	if err := spec.RewriteConstants(map[string]interface{}{"target_pid": targetPID}); err != nil {
+	denyRaw := uint32(0)
+	if len(denyRawNetwork) > 0 && denyRawNetwork[0] {
+		denyRaw = 1
+	}
+	if err := spec.RewriteConstants(map[string]interface{}{"target_pid": targetPID, "deny_raw_sockets": denyRaw}); err != nil {
 		return nil, fmt.Errorf("load eBPF sensors: set target pid: %w", err)
 	}
 	if err := rlimit.RemoveMemlock(); err != nil {

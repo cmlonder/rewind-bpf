@@ -135,6 +135,17 @@ sudo "$BIN" rollback --record "$ROOT/raw-network/runtime/record.json"
 sudo jq -s -e 'any(.[]; .operation == "socket" and .decision == "deny")' "$ROOT/raw-network/runtime/events.jsonl" >/dev/null
 echo "raw socket refusal: PASS"
 
+# Audit mode must preserve the real syscall outcome and must not label a raw
+# socket as denied when no seccomp defense was requested.
+mkdir -p "$ROOT/raw-network-audit/workspace"
+make_policy "$ROOT/raw-network-audit/policy.yaml" off audit
+sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/raw-network-audit/workspace" "$ROOT/raw-network-audit/runtime" "$ROOT/raw-network-audit/policy.yaml" "$ROOT/raw-network-audit/runtime/record.json") --network-backend proxy --on-success review -- \
+  /bin/sh -c '/usr/bin/python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)" && printf "raw-allowed\\n" > raw.status || printf "raw-denied\\n" > raw.status'
+test -s "$ROOT/raw-network-audit/runtime/merged/raw.status"
+sudo jq -s -e 'any(.[]; .operation == "socket" and .decision == "allow")' "$ROOT/raw-network-audit/runtime/events.jsonl" >/dev/null
+sudo "$BIN" rollback --record "$ROOT/raw-network-audit/runtime/record.json"
+echo "raw socket audit semantics: PASS"
+
 # 5. Bounded evidence must fail verification rather than look complete.
 mkdir -p "$ROOT/evidence/workspace"
 make_policy "$ROOT/evidence/policy.yaml" off audit

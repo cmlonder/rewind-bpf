@@ -27,6 +27,7 @@ struct {
 // zero is useful for a controlled telemetry smoke test, but production runs
 // should always scope events to the agent PID or cgroup.
 const volatile __u32 target_pid;
+const volatile __u32 deny_raw_sockets;
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -177,6 +178,6 @@ int trace_socket(struct trace_event_raw_sys_enter *ctx)
 		 ((type & REWIND_SOCK_TYPE_MASK) == REWIND_SOCK_RAW));
 
 	return emit_event_with_decision(REWIND_OP_SOCKET, REWIND_RISK_HIGH,
-					       raw ? REWIND_DECISION_DENY : REWIND_DECISION_ALLOW,
+					       raw && deny_raw_sockets ? REWIND_DECISION_DENY : REWIND_DECISION_ALLOW,
 					       0);
 }

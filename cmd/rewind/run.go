@@ -92,7 +92,7 @@ func handleRun(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	telemetry := &telemetryAdapter{path: eventsPath, owner: owner, maxBytes: maxEventBytes, rotateBytes: rotateEventBytes}
+	telemetry := &telemetryAdapter{path: eventsPath, owner: owner, maxBytes: maxEventBytes, rotateBytes: rotateEventBytes, denyRawNetwork: plan.Network.RawSocketDeny}
 	capabilityReport := capabilities.Probe()
 	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil, plan.Network.RawSocketDeny); err != nil {
 		fatal(fmt.Sprintf("protected-run capability check: %v", err))
@@ -576,10 +576,11 @@ func configuredTelemetryRotateBytes() (uint64, error) {
 }
 
 type telemetryAdapter struct {
-	path        string
-	owner       overlay.Owner
-	maxBytes    uint64
-	rotateBytes uint64
+	path           string
+	owner          overlay.Owner
+	maxBytes       uint64
+	rotateBytes    uint64
+	denyRawNetwork bool
 
 	mu        sync.Mutex
 	writerMu  sync.Mutex
@@ -599,7 +600,7 @@ type telemetryAdapter struct {
 }
 
 func (a *telemetryAdapter) Attach(_ context.Context, objectPath, runID string, pid uint32) (io.Closer, error) {
-	session, err := ebpfload.Load(objectPath, runID, pid)
+	session, err := ebpfload.Load(objectPath, runID, pid, a.denyRawNetwork)
 	if err != nil {
 		return nil, err
 	}
