@@ -60,6 +60,9 @@ func TestBuildPersistsAgentAdapterIdentity(t *testing.T) {
 	if plan.AgentAdapter != "codex" {
 		t.Fatalf("agent adapter=%q, want codex", plan.AgentAdapter)
 	}
+	if plan.AgentHookProtocol != "rewind/v1" || len(plan.AgentExecutables) == 0 {
+		t.Fatalf("agent lifecycle contract=%+v", plan)
+	}
 }
 
 func TestBuildRejectsUnknownAgentAdapter(t *testing.T) {

@@ -34,6 +34,7 @@ Usage:
   rewind retention put|get --endpoint URL --key KEY --input|--output PATH
   rewind bundle verify --input PATH [--signature PATH --public-key PATH]
   rewind registry fetch --endpoint URL --name NAME --version VERSION --output PATH [--trusted-public-keys PATH,...]
+  rewind registry serve --root PATH [--listen 127.0.0.1:8790 --bearer TOKEN]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
   rewind platform plan --workspace PATH

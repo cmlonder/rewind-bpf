@@ -42,3 +42,24 @@ func TestRejectsNonHTTPSPublicEndpoint(t *testing.T) {
 		t.Fatal("expected HTTPS refusal")
 	}
 }
+
+func TestFileRegistryPublishAndFetch(t *testing.T) {
+	public, private, _ := ed25519.GenerateKey(rand.Reader)
+	signed, err := policybundle.Sign(policybundle.Bundle{Name: "safe", Version: "1", Policy: policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeOff}, Write: policy.WritePolicy{Mode: "rollback", Scope: "workspace"}, Network: policy.NetworkPolicy{Mode: policy.ModeAudit}}}, private)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer((Server{Store: FileStore{Root: t.TempDir()}, Bearer: "token"}).Handler())
+	defer server.Close()
+	client := Client{Endpoint: server.URL, Bearer: "token", TrustedKeys: []ed25519.PublicKey{public}}
+	if err := client.Publish(context.Background(), signed); err != nil {
+		t.Fatal(err)
+	}
+	bundle, err := client.Fetch(context.Background(), "safe", "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bundle.Version != "1" {
+		t.Fatal(bundle)
+	}
+}

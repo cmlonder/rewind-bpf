@@ -46,6 +46,8 @@ type Plan struct {
 	HistoryPath       string                  `json:"history_path,omitempty"`
 	Network           netpolicy.Plan          `json:"network"`
 	AgentAdapter      agent.Kind              `json:"agent_adapter"`
+	AgentHookProtocol string                  `json:"agent_hook_protocol,omitempty"`
+	AgentExecutables  []string                `json:"agent_executables,omitempty"`
 	PIIFindings       []pii.Finding           `json:"pii_findings,omitempty"`
 	PIIMode           policy.Mode             `json:"pii_mode,omitempty"`
 	CheckpointGraph   string                  `json:"checkpoint_graph,omitempty"`
@@ -143,7 +145,7 @@ func Build(config Config) (Plan, error) {
 	if checkpointID == "" && strings.TrimSpace(config.CheckpointGraph) != "" {
 		checkpointID = run.ID
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind, PIIFindings: piiFindings, PIIMode: config.Policy.Read.PII.Mode, CheckpointGraph: config.CheckpointGraph, CheckpointID: checkpointID, CheckpointParents: append([]string(nil), config.CheckpointParents...)}, nil
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind, AgentHookProtocol: agentSpec.HookProtocol, AgentExecutables: append([]string(nil), agentSpec.Executables...), PIIFindings: piiFindings, PIIMode: config.Policy.Read.PII.Mode, CheckpointGraph: config.CheckpointGraph, CheckpointID: checkpointID, CheckpointParents: append([]string(nil), config.CheckpointParents...)}, nil
 }
 
 func piiFindingsForPlan(config policy.PIIPolicy, workspace string) ([]pii.Finding, error) {

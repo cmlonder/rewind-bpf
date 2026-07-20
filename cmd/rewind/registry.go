@@ -6,16 +6,23 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/rewindbpf/rewind/internal/registry"
 )
 
 func handleRegistry(args []string) {
-	if len(args) == 0 || args[0] != "fetch" {
-		fatal("usage: rewind registry fetch --endpoint URL --name NAME --version VERSION --output PATH [--trusted-public-keys PATH,...]")
+	if len(args) == 0 || (args[0] != "fetch" && args[0] != "serve") {
+		fatal("usage: rewind registry fetch --endpoint URL --name NAME --version VERSION --output PATH [--trusted-public-keys PATH,...] | rewind registry serve --root PATH [--listen 127.0.0.1:8790 --bearer TOKEN]")
+	}
+	if args[0] == "serve" {
+		handleRegistryServe(args[1:])
+		return
 	}
 	flags := flag.NewFlagSet("registry fetch", flag.ContinueOnError)
 	endpoint := flags.String("endpoint", "", "HTTPS registry endpoint")
@@ -37,6 +44,26 @@ func handleRegistry(args []string) {
 		fatal(fmt.Sprintf("write verified policy: %v", err))
 	}
 	fmt.Printf("fetched and verified policy: %s/%s -> %s\n", *name, *version, *output)
+}
+
+func handleRegistryServe(args []string) {
+	flags := flag.NewFlagSet("registry serve", flag.ContinueOnError)
+	root := flags.String("root", "", "directory for signed policy envelopes")
+	listen := flags.String("listen", "127.0.0.1:8790", "loopback listen address")
+	bearer := flags.String("bearer", "", "optional bearer token")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || *root == "" || !strings.HasPrefix(*listen, "127.0.0.1:") && !strings.HasPrefix(*listen, "localhost:") {
+		fatal("usage: rewind registry serve --root PATH [--listen 127.0.0.1:8790 --bearer TOKEN]")
+	}
+	server := &http.Server{Addr: *listen, Handler: (registry.Server{Store: registry.FileStore{Root: filepath.Clean(*root)}, Bearer: *bearer}).Handler()}
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fatal(fmt.Sprintf("registry server: %v", err))
+		}
+	}()
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+	<-signals
+	_ = server.Close()
 }
 
 // loadRegistryKeys is kept intentionally small at the CLI boundary; the

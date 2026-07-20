@@ -832,15 +832,19 @@ claiming unsupported enforcement:
   a read-only report and both native contracts remain `ready: false` until
   signed helper and disposable-volume tests exist.
 - `internal/agent` records executable aliases plus a `rewind/v1` lifecycle
-  environment (`prepare,start,exit,run_id`). Commands are preserved exactly;
-  provider SDK callbacks remain adapter-owned acceptance work.
+  environment (`prepare,start,exit,run_id`). The same hook protocol and
+  executable aliases are persisted in the immutable run plan. Commands are
+  preserved exactly; provider SDK callbacks remain adapter-owned acceptance
+  work.
 - `internal/session` adds a WAL-backed SQLite lease store with the same
   acquire/heartbeat/takeover/release ownership and expiry semantics as the
   local JSON store. The supervisor still defaults to local storage until a
   deployment explicitly selects the SQLite/distributed backend.
-- `internal/registry` fetches signed policy envelopes over bounded HTTPS with
-  retries and pinned-key verification. Verification occurs before a bundle
-  can become a runtime policy; no remote registry is trusted by default.
+- `internal/registry` fetches and publishes signed policy envelopes over
+  bounded HTTPS with retries and pinned-key verification. A small bearer-
+  protected file-backed reference server is included for disposable VM and
+  single-operator deployments. Verification occurs before a bundle can become
+  a runtime policy; no remote registry is trusted by default.
 - `internal/pii` supports custom redacted regex rules and bounded streaming
   scans. Findings contain hashes only, and tests assert that raw values do not
   appear in JSON or redacted output. `JournalWriter` counts capped/dropped
