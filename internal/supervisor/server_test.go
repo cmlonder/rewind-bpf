@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/history"
@@ -47,8 +48,11 @@ func TestAuthenticatedActionWithoutRuntimeHandlerRefuses(t *testing.T) {
 }
 
 func TestAuthenticatedActionHandlerReceivesValidatedRequest(t *testing.T) {
+	auditPath := filepath.Join(t.TempDir(), "actions.jsonl")
 	server := Server{
 		AuthToken: "secret",
+		AuditPath: auditPath,
+		AuditMu:   &sync.Mutex{},
 		Actions: func(request Request) (Response, error) {
 			if request.Action != "status" || request.RunID != "run_1" {
 				t.Fatalf("request = %+v", request)
@@ -62,6 +66,13 @@ func TestAuthenticatedActionHandlerReceivesValidatedRequest(t *testing.T) {
 	server.Handler().ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	audit, err := os.ReadFile(auditPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(audit), `"action":"status"`) || !strings.Contains(string(audit), `"run_id":"run_1"`) {
+		t.Fatalf("audit=%s", audit)
 	}
 }
 

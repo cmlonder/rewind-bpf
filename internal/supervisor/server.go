@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rewindbpf/rewind/internal/history"
@@ -25,6 +26,8 @@ type Server struct {
 	History   history.Store
 	AuthToken string
 	Actions   ActionFunc
+	AuditPath string
+	AuditMu   *sync.Mutex
 }
 
 func (s Server) Handler() http.Handler {
@@ -65,20 +68,49 @@ func (s Server) Handler() http.Handler {
 			return
 		}
 		if s.Actions == nil {
-			writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "refused", Message: "runtime action handler is not connected"})
+			response := Response{OK: false, State: "refused", Message: "runtime action handler is not connected"}
+			s.audit(request, response, nil)
+			writeJSON(w, http.StatusNotImplemented, response)
 			return
 		}
 		response, err := s.Actions(request)
 		if err != nil {
-			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: err.Error()})
+			refused := Response{OK: false, State: "refused", Message: err.Error()}
+			s.audit(request, refused, err)
+			writeJSON(w, http.StatusConflict, refused)
 			return
 		}
+		s.audit(request, response, nil)
 		writeJSON(w, http.StatusOK, response)
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, Response{OK: false, Message: "not found"})
 	})
 	return mux
+}
+
+func (s Server) audit(request Request, response Response, actionErr error) {
+	if strings.TrimSpace(s.AuditPath) == "" {
+		return
+	}
+	entry := AuditEntry{
+		Timestamp: time.Now().UTC(),
+		Action:    request.Action,
+		RunID:     request.RunID,
+		State:     response.State,
+		OK:        response.OK,
+		Message:   response.Message,
+	}
+	if actionErr != nil {
+		entry.Error = actionErr.Error()
+	}
+	mu := s.AuditMu
+	if mu == nil {
+		mu = &sync.Mutex{}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	_ = appendAudit(s.AuditPath, entry)
 }
 
 func (s Server) authorized(r *http.Request) bool {

@@ -337,7 +337,7 @@ flowchart LR
 
 ### 31–60 days: team and CI workflow
 
-- Expand the shipped supervisor with detachable sessions, persistent action audit, and authenticated run handles suitable for CI.
+- Expand the shipped supervisor with detachable sessions and authenticated run handles suitable for CI; action audit is now persisted locally as redacted JSONL.
 - Add CI mode: every agent task runs in a disposable workspace; output is a patch/artifact rather than an implicit host merge.
 - Add remote/object-store evidence bundles, retention policies, and signed release metadata.
 - Add network namespace/proxy policy as a separate plane; make credentials injectable without placing raw secrets in the agent filesystem.

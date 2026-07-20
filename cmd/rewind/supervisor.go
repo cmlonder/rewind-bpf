@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"runtime"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/rewindbpf/rewind/internal/history"
@@ -62,6 +63,8 @@ func handleSupervisor(args []string) {
 	server := &http.Server{Handler: supervisor.Server{
 		History:   history.Open(*historyPath),
 		AuthToken: token,
+		AuditPath: *historyPath + ".actions.jsonl",
+		AuditMu:   &sync.Mutex{},
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {
 			return supervisorAction(*historyPath, request)
 		},

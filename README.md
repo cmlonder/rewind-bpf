@@ -146,9 +146,10 @@ user that owns the runtime (for example, `sudo curl --unix-socket
 is written to `/tmp/rewind-supervisor.sock.token` (mode `0600`) and is required
 for action requests. Authenticated `status`, `rollback`/`recover`, and
 explicit `commit` (`confirmation: "COMMIT"`) actions are routed through the
-same lifecycle and conflict checks as the CLI. The Control Plane’s browser
-adapter remains read-only; fixture mode remains the safe default for the
-static demo.
+same lifecycle and conflict checks as the CLI. Each accepted or refused action
+is appended to `/tmp/rewind-history.json.actions.jsonl` without tokens or file
+contents. The Control Plane’s browser adapter remains read-only; fixture mode
+remains the safe default for the static demo.
 
 Example policy:
 

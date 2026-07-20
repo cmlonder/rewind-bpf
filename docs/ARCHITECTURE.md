@@ -680,8 +680,10 @@ or reaches its idle safety timeout. Action requests resolve a run through the
 durable history index and call the same rollback, recovery, evidence,
 conflict-check, and commit code paths as the CLI. Commit additionally requires
 `confirmation: "COMMIT"`. Unknown actions, missing run IDs, missing bearer
-tokens, and incomplete evidence fail closed. The browser adapter consumes
-only read endpoints; it never receives root privileges or raw credentials.
+tokens, and incomplete evidence fail closed. Every authenticated action is
+also appended to a separate mode-`0600` redacted JSONL audit file. The browser
+adapter consumes only read endpoints; it never receives root privileges or raw
+credentials.
 
 ### Verified protected-run smoke (disposable VM)
 

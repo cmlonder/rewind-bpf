@@ -338,7 +338,7 @@ Unix-socket server, snapshot and follow-mode event endpoints, a browser
 adapter, and a fixture-backed retention view. The socket
 and bearer token are protected with mode `0600`; authenticated status,
 rollback/recover, and explicit commit actions now route through the same runtime
-lifecycle and conflict checks as the CLI. Local
+lifecycle and conflict checks as the CLI, with redacted JSONL action audit. Local
 authentication/authorization beyond that token boundary is explicitly a
 post-demo hardening item; the hackathon UI remains fixture-safe and never
 receives root access.
