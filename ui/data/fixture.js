@@ -2,7 +2,17 @@ const baseTime = "2026-07-20T10:42:18.000Z";
 
 export const fixture = {
   environment: "Fixture mode · no kernel or workspace access",
-  metrics: { activeRuns: 1, protectedWorkspaces: 4, evidenceComplete: 98, upperBytes: "18.4 MiB" },
+  metrics: {
+    activeRuns: 1,
+    protectedWorkspaces: 4,
+    evidenceComplete: 98,
+    upperBytes: "18.4 MiB",
+    vmAcceptance: "PASS",
+    releaseBundle: "verified",
+    storageAmplification: "1.0003×",
+    eventBytes: "148.47 B/event",
+    lifecycle: "64.34 s",
+  },
   runs: [
     {
       id: "run_20260720T104218Z_08e0ef80", shortId: "08e0ef80", state: "running", workspace: "payments-api", workspacePath: "/workspaces/payments-api", command: "agent --task refactor-auth", policy: "strict-agent@1.3.0", backend: "fuse-overlayfs", startedAt: baseTime, elapsed: "00:01:42", upperBytes: 19293798, upperLabel: "18.4 MiB", processCount: 4,
@@ -70,7 +80,7 @@ export const fixture = {
     { name: "Claude", kind: "claude", stage: "validated", status: "command contract" },
   ],
   hardening: {
-    namespace: { state: "review-only", title: "veth / NAT egress plan", detail: "VM broker required · fail-closed by default" },
+    namespace: { state: "verified", title: "veth / NAT egress broker", detail: "UTM acceptance passed · allowlist and cleanup verified" },
     registry: { state: "verified", title: "Signed policy registry", detail: "HTTPS + pinned Ed25519 keys + retry bound" },
     sessions: { state: "ready", title: "SQLite lease store", detail: "WAL · expiry · takeover semantics" },
     native: [

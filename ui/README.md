@@ -1,6 +1,8 @@
 # Rewind Control Plane UI
 
-This is the fixture-driven Phase 1 operational UI prototype. It is intentionally separate from the public project narrative in `site/`.
+This is the fixture-driven operational UI. It includes the Phase 2 recovery,
+release-proof, trust, and action-token surfaces for a safe jury walkthrough.
+It is intentionally separate from the public project narrative in `site/`.
 
 ## Preview
 

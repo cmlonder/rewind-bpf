@@ -331,6 +331,7 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - evidence, benchmark, and audit surfaces suitable for a jury walkthrough;
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
+- release-proof panels are now synchronized with the public benchmark ledger: VM acceptance, bundle integrity, storage amplification, event density, and lifecycle latency are visible in the overview and benchmark views.
 
 The trusted policy distribution UX is now present in the control plane. It shows
 the pinned HTTPS endpoint, current/previous Ed25519 signer IDs, verification

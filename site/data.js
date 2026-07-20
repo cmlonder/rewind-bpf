@@ -7,7 +7,7 @@ export const siteData = {
     ["Benchmarks", "#benchmarks"],
   ],
   status: {
-    label: "Linux feature-complete / verification gate",
+    label: "Linux verified / release-ready",
     sublabel: "Disposable Ubuntu VM · ARM64 · kernel 6.8",
   },
   metrics: [
