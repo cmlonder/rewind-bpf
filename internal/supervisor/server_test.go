@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/rewindbpf/rewind/internal/history"
+	"github.com/rewindbpf/rewind/internal/runstore"
 )
 
 func TestHandlerHealthAndReadOnlyActionBoundary(t *testing.T) {
@@ -69,5 +71,53 @@ func TestValidateUnixSocketPath(t *testing.T) {
 	}
 	if err := ValidateUnixSocketPath(filepath.Join(t.TempDir(), "rewind.sock")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFollowParsingAndEventDelta(t *testing.T) {
+	if follow, err := parseFollow(""); err != nil || follow {
+		t.Fatalf("empty follow = %v, %v", follow, err)
+	}
+	if follow, err := parseFollow("true"); err != nil || !follow {
+		t.Fatalf("true follow = %v, %v", follow, err)
+	}
+	if _, err := parseFollow("sometimes"); err == nil {
+		t.Fatal("invalid follow value should fail")
+	}
+	path := filepath.Join(t.TempDir(), "events.jsonl")
+	if err := os.WriteFile(path, []byte(`{"operation":"write"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	response := httptest.NewRecorder()
+	positions := map[string]int64{}
+	if !streamEventDelta(response, response, runstore.Record{EventsPath: path}, positions) {
+		t.Fatal("event delta did not emit")
+	}
+	if !strings.Contains(response.Body.String(), `data: {"operation":"write"}`) {
+		t.Fatalf("body=%q", response.Body.String())
+	}
+	if positions[path] == 0 {
+		t.Fatal("event position was not advanced")
+	}
+	if err := os.WriteFile(path, []byte(`{"operation":"write"}`+"\n"+`{"operation":"partial"`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	positions = map[string]int64{}
+	first := httptest.NewRecorder()
+	if !streamEventDelta(first, first, runstore.Record{EventsPath: path}, positions) {
+		t.Fatal("complete prefix did not emit")
+	}
+	if strings.Contains(first.Body.String(), "partial") {
+		t.Fatalf("partial event was emitted: %q", first.Body.String())
+	}
+	if err := os.WriteFile(path, []byte(`{"operation":"write"}`+"\n"+`{"operation":"partial"}`+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second := httptest.NewRecorder()
+	if !streamEventDelta(second, second, runstore.Record{EventsPath: path}, positions) {
+		t.Fatal("completed suffix did not emit")
+	}
+	if !strings.Contains(second.Body.String(), "partial") {
+		t.Fatalf("suffix body=%q", second.Body.String())
 	}
 }

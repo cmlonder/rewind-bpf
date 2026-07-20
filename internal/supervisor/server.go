@@ -1,15 +1,20 @@
 package supervisor
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/rewindbpf/rewind/internal/history"
+	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/platform"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
@@ -125,11 +130,36 @@ func (s Server) events(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
 	flusher, ok := w.(http.Flusher)
 	if !ok {
 		writeJSON(w, http.StatusInternalServerError, Response{OK: false, Message: "streaming is unavailable"})
 		return
 	}
+	follow, err := parseFollow(r.URL.Query().Get("follow"))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, Response{OK: false, Message: err.Error()})
+		return
+	}
+	if !follow {
+		streamEventSnapshot(w, flusher, record)
+		return
+	}
+	streamEventFollow(r.Context(), w, flusher, runID, recordPath, record)
+}
+
+func parseFollow(value string) (bool, error) {
+	if strings.TrimSpace(value) == "" {
+		return false, nil
+	}
+	follow, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("follow must be true or false")
+	}
+	return follow, nil
+}
+
+func streamEventSnapshot(w http.ResponseWriter, flusher http.Flusher, record runstore.Record) {
 	for _, path := range runstore.EventLogPaths(record) {
 		file, openErr := os.Open(path)
 		if openErr != nil {
@@ -145,6 +175,90 @@ func (s Server) events(w http.ResponseWriter, r *http.Request) {
 			flusher.Flush()
 		}
 		_ = file.Close()
+	}
+}
+
+// streamEventFollow replays any existing journal bytes and then tails the
+// active journal until the run reaches a terminal state or the client closes
+// the request. A bounded idle timeout prevents a forgotten browser tab from
+// holding a supervisor connection forever; reconnecting resumes from the
+// latest persisted snapshot.
+func streamEventFollow(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, runID, recordPath string, record runstore.Record) {
+	positions := make(map[string]int64)
+	deadline := time.NewTimer(30 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		current := record
+		if refreshed, err := runstore.Read(recordPath); err == nil {
+			current = refreshed
+		}
+		wrote := streamEventDelta(w, flusher, current, positions)
+		if current.Plan.Run.ID == runID && isTerminal(current.Plan.Run.State) {
+			return
+		}
+		if wrote {
+			if !deadline.Stop() {
+				select {
+				case <-deadline.C:
+				default:
+				}
+			}
+			deadline.Reset(30 * time.Second)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-deadline.C:
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func streamEventDelta(w http.ResponseWriter, flusher http.Flusher, record runstore.Record, positions map[string]int64) bool {
+	wrote := false
+	for _, path := range runstore.EventLogPaths(record) {
+		file, err := os.Open(path)
+		if err != nil {
+			continue
+		}
+		position := positions[path]
+		if _, err := file.Seek(position, io.SeekStart); err != nil {
+			_ = file.Close()
+			continue
+		}
+		data, readErr := io.ReadAll(file)
+		if readErr != nil {
+			_ = file.Close()
+			continue
+		}
+		lastNewline := strings.LastIndexByte(string(data), '\n')
+		if lastNewline >= 0 {
+			complete := string(data[:lastNewline+1])
+			for _, raw := range strings.Split(complete, "\n") {
+				line := strings.TrimSpace(raw)
+				if line == "" || !json.Valid([]byte(line)) {
+					continue
+				}
+				_, _ = fmt.Fprintf(w, "data: %s\n\n", line)
+				flusher.Flush()
+				wrote = true
+			}
+			positions[path] = position + int64(lastNewline+1)
+		}
+		_ = file.Close()
+	}
+	return wrote
+}
+
+func isTerminal(state lifecycle.State) bool {
+	switch state {
+	case lifecycle.Succeeded, lifecycle.Failed, lifecycle.Committed, lifecycle.RolledBack:
+		return true
+	default:
+		return false
 	}
 }
 

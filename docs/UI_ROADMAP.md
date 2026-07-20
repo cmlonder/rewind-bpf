@@ -332,10 +332,10 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining connected work is live follow-mode SSE/polling and end-to-end
-reconnect/recovery behavior. P4 now has a bounded history contract, signed
-policy provenance, a token-authenticated Unix-socket server, an event snapshot
-endpoint, a browser adapter, and a fixture-backed retention view. The socket
+The remaining connected work is end-to-end reconnect/recovery behavior. P4 now
+has a bounded history contract, signed policy provenance, a token-authenticated
+Unix-socket server, snapshot and follow-mode event endpoints, a browser
+adapter, and a fixture-backed retention view. The socket
 and bearer token are protected with mode `0600`; authenticated status,
 rollback/recover, and explicit commit actions now route through the same runtime
 lifecycle and conflict checks as the CLI. Local
@@ -368,8 +368,8 @@ Exit: an operator can create a package, simulate it, assign it to a workspace, a
 ### Phase 4 — Supervisor integration — read/action boundary delivered
 
 The current bridge exposes a mode-0600 Unix socket, bearer-authenticated
-history/events, and lifecycle actions. Continue with follow-mode SSE, persistent
-action audit, and recovery/reconnect behavior. Add local authentication beyond
+history/events, and lifecycle actions. Continue with persistent action audit and
+recovery/reconnect behavior. Add local authentication beyond
 the socket/token boundary after the demo unless the connected deployment
 requires it earlier.
 

@@ -668,14 +668,17 @@ deliberately narrow:
 GET  /health
 GET  /v1/capabilities
 GET  /v1/history
-GET  /v1/events?run_id=...
+GET  /v1/events?run_id=...           (snapshot)
+GET  /v1/events?run_id=...&follow=true (tail until terminal/timeout)
 POST /v1/actions  {status|rollback|recover|commit}
 ```
 
-The event endpoint is an authenticated snapshot stream over the persisted
-JSONL journals. Action requests resolve a run through the durable history
-index and call the same rollback, recovery, evidence, conflict-check, and
-commit code paths as the CLI. Commit additionally requires
+The event endpoint is an authenticated snapshot or bounded follow stream over
+the persisted JSONL journals. Follow mode replays complete lines, tails the
+active journal, and closes when the run reaches a terminal state, disconnects,
+or reaches its idle safety timeout. Action requests resolve a run through the
+durable history index and call the same rollback, recovery, evidence,
+conflict-check, and commit code paths as the CLI. Commit additionally requires
 `confirmation: "COMMIT"`. Unknown actions, missing run IDs, missing bearer
 tokens, and incomplete evidence fail closed. The browser adapter consumes
 only read endpoints; it never receives root privileges or raw credentials.
