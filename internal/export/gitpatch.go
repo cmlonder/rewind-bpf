@@ -3,8 +3,10 @@ package export
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -60,3 +62,70 @@ func rewriteGitRoots(patch, before, after string) string {
 
 // HasChanges reports whether a native Git diff contains any output.
 func HasChanges(patch string) bool { return len(bytes.TrimSpace([]byte(patch))) > 0 }
+
+// GitPatchPaths renders only the requested relative paths. It is used by the
+// branch adapter so a workspace that contains a .git directory never causes
+// Git metadata to enter an acceptance patch.
+func GitPatchPaths(beforeRoot, afterRoot string, paths []string) (string, error) {
+	unique := make(map[string]struct{}, len(paths))
+	for _, path := range paths {
+		path = filepath.ToSlash(filepath.Clean(path))
+		if path == "." || path == ".." || strings.HasPrefix(path, "../") || filepath.IsAbs(path) {
+			return "", fmt.Errorf("unsafe Git patch path %q", path)
+		}
+		unique[path] = struct{}{}
+	}
+	ordered := make([]string, 0, len(unique))
+	for path := range unique {
+		ordered = append(ordered, path)
+	}
+	sort.Strings(ordered)
+	var patches strings.Builder
+	for _, relative := range ordered {
+		beforePath := filepath.Join(beforeRoot, filepath.FromSlash(relative))
+		afterPath := filepath.Join(afterRoot, filepath.FromSlash(relative))
+		beforeInfo, beforeErr := os.Lstat(beforePath)
+		afterInfo, afterErr := os.Lstat(afterPath)
+		if beforeErr != nil && !os.IsNotExist(beforeErr) {
+			return "", fmt.Errorf("stat Git patch source %s: %w", relative, beforeErr)
+		}
+		if afterErr != nil && !os.IsNotExist(afterErr) {
+			return "", fmt.Errorf("stat Git patch candidate %s: %w", relative, afterErr)
+		}
+		if beforeErr != nil && afterErr != nil {
+			continue
+		}
+		if (beforeErr == nil && beforeInfo.IsDir()) || (afterErr == nil && afterInfo.IsDir()) {
+			continue
+		}
+		if beforeErr != nil {
+			beforePath = os.DevNull
+		}
+		if afterErr != nil {
+			afterPath = os.DevNull
+		}
+		patch, err := gitDiffPair(beforePath, afterPath)
+		if err != nil {
+			return "", fmt.Errorf("build Git patch for %s: %w", relative, err)
+		}
+		patch = rewriteGitRoots(patch, filepath.ToSlash(beforeRoot), filepath.ToSlash(afterRoot))
+		if strings.TrimSpace(patch) != "" {
+			patches.WriteString(patch)
+			if !strings.HasSuffix(patch, "\n") {
+				patches.WriteByte('\n')
+			}
+		}
+	}
+	return patches.String(), nil
+}
+
+func gitDiffPair(before, after string) (string, error) {
+	command := exec.Command("git", "diff", "--no-index", "--binary", "--src-prefix=a/", "--dst-prefix=b/", "--", before, after)
+	output, err := command.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.ExitCode() != 1 {
+			return "", fmt.Errorf("run git diff: %w", err)
+		}
+	}
+	return string(output), nil
+}

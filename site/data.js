@@ -53,7 +53,7 @@ export const siteData = {
       title: "Review before merge",
       tag: "SHIPPED",
       body: "Inspect a merged-view diff and export a non-mutating JSON review bundle, text patch, or full-fidelity Git patch with before/after manifests and created, modified, deleted, or renamed paths.",
-      detail: "A live workspace is never overwritten by the export command. JSON remains canonical for machine inspection while Git patch mode preserves binary, directory, and mode changes; `rewind commit --confirm` applies only after the destination manifest passes the conflict gate.",
+      detail: "A live workspace is never overwritten by the export command. JSON remains canonical for machine inspection while Git patch mode preserves binary, directory, and mode changes; `rewind commit --confirm` or the clean-checkout `rewind branch apply` path applies only after the destination manifest passes the conflict gate.",
       tone: "lavender",
     },
     {
@@ -73,7 +73,7 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy backend, raw/packet socket refusal plus socket-deny evidence in enforce mode, refusing credential boundary, conflict-checked commit, authenticated supervisor, signed policy import, trusted signer allow-lists, reconnecting browser event stream, text/full-fidelity patch exports, and checksummed release metadata with local Ed25519 signing are shipped. Network namespaces, a real credential provider, public trust distribution, and branch adapters remain." },
+    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy backend, raw/packet socket refusal plus socket-deny evidence in enforce mode, refusing credential boundary, conflict-checked commit, authenticated supervisor, signed policy import, trusted signer allow-lists, reconnecting browser event stream, text/full-fidelity patch exports, checksummed release metadata with local Ed25519 signing, and clean-branch Git acceptance are shipped. Network namespaces, a real credential provider, public trust distribution, and remote review adapters remain." },
     { phase: "P2", title: "P2: native macOS adapter", status: "Not implemented", body: "Seatbelt / EndpointSecurity + APFS are defined as a fail-closed capability contract. No macOS enforcement is claimed until disposable-volume tests pass." },
     { phase: "P3", title: "P3: native Windows adapter", status: "Not implemented", body: "Cross-build and fail-closed refusal are ready; native process/filesystem enforcement remains disabled until tested on disposable Windows storage." },
     { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams with reconnect, signed policy provenance, and redacted audit are shipped. Detachable sessions, remote registry/retention, agent adapters, and multi-agent checkpoints remain." },

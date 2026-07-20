@@ -17,7 +17,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Crash and stale-run recovery | **Shipped / Linux** | Parent death, open descriptors, stale FUSE mount, child drain, idempotent rollback/recover | Power-loss/startup matrix across filesystems |
 | Network policy | **Partial** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs also deny raw/packet socket creation with seccomp and record socket refusal events | Network namespace/cgroup egress enforcement, non-proxy-aware client coverage, and broader socket policy |
 | Credential safety | **Partial / refusing boundary** | Capability-only references and a broker that refuses raw secret exposure | One real keychain/secret-manager provider with leakage tests and short-lived leases |
-| Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, and full-fidelity Git patch export plus manifest conflict checks; `rewind commit --confirm`; supervisor commit requires confirmation | Branch adapters and remote review workflow |
+| Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, full-fidelity Git patch export, manifest conflict checks, and clean-branch `rewind branch apply`; `rewind commit --confirm`; supervisor commit requires confirmation | Remote review workflow and richer provider adapters |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, and optional supervisor public-key allow-list enforcement | Remote registry, revocation, and organization trust distribution |
 | Local supervisor | **Shipped / Linux** | Permissioned Unix socket, token auth, health/capabilities/history, status/rollback/recover/commit, snapshot/follow events, redacted action audit | Detachable process sessions and operator takeover/reconnect |
 | Control Plane UI | **Shipped / fixture + authenticated bridge** | Responsive operational views, local policy/workspace config store, loopback HTTP supervisor bridge, bearer-authenticated rollback/recover/commit and policy/workspace writes, authenticated SSE evidence follow with reconnect backoff, signed policy bundle import with verification and audit | Trusted remote registry, local action-token UX |
@@ -75,7 +75,7 @@ Run unit, static, UI, and disposable-VM integration tests; verify rollback, read
 
 ### P1 — Linux productisation
 
-Finish broader network namespace enforcement for non-proxy-aware clients, one real credential provider, patch/branch acceptance adapters, public release trust distribution, and connected Control Plane mutation through a local action-token bridge.
+Finish broader network namespace enforcement for non-proxy-aware clients, one real credential provider, remote review workflow, public release trust distribution, and connected Control Plane mutation through a local action-token bridge.
 
 ### P2 — Native macOS
 

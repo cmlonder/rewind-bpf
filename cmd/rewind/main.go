@@ -25,6 +25,7 @@ Usage:
   rewind evidence verify --record PATH
   rewind diff --record PATH
   rewind export --record PATH --output PATH [--format json|patch|git-patch]
+  rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
   rewind release keygen --private PATH --public PATH
   rewind release sign --input PATH --private-key PATH --output PATH
@@ -86,6 +87,8 @@ func main() {
 		handleDiff(os.Args[2:])
 	case "export":
 		handleExport(os.Args[2:])
+	case "branch":
+		handleBranch(os.Args[2:])
 	case "capabilities":
 		handleCapabilities(os.Args[2:])
 	case "release":
