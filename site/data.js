@@ -73,10 +73,10 @@ export const siteData = {
   ],
   roadmap: [
     { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy backend, refusing credential boundary, conflict-checked commit, and authenticated supervisor are shipped. Raw-socket egress, a real credential provider, patch/branch adapters, and connected browser mutation remain." },
+    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy backend, refusing credential boundary, conflict-checked commit, authenticated supervisor, signed policy import, trusted signer allow-lists, and reconnecting browser event stream are shipped. Raw-socket egress, a real credential provider, and patch/branch adapters remain." },
     { phase: "P2", title: "P2: native macOS adapter", status: "Not implemented", body: "Seatbelt / EndpointSecurity + APFS are defined as a fail-closed capability contract. No macOS enforcement is claimed until disposable-volume tests pass." },
     { phase: "P3", title: "P3: native Windows adapter", status: "Not implemented", body: "Cross-build and fail-closed refusal are ready; native process/filesystem enforcement remains disabled until tested on disposable Windows storage." },
-    { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams, and redacted audit are shipped. Detachable sessions, remote registry/retention, agent adapters, and multi-agent checkpoints remain." },
+    { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams with reconnect, signed policy provenance, and redacted audit are shipped. Detachable sessions, remote registry/retention, agent adapters, and multi-agent checkpoints remain." },
   ],
   delivered: [
     ["01", "Protected transaction", "FUSE OverlayFS workspace, lower-layer preservation, one-command rollback."],
@@ -86,7 +86,7 @@ export const siteData = {
     ["05", "Recovery paths", "SIGKILL, open-descriptor, stale-mount, and already-torn-down run recovery."],
     ["06", "Review surface", "inspect, diff, export, policy explain, policy learn, and standalone evidence verification."],
     ["07", "Acceptance safety", "Explicit conflict-checked commit, incomplete-evidence refusal, and signed Ed25519 policy envelopes."],
-    ["08", "Control plane contract", "Durable history, an authenticated Unix-socket supervisor with lifecycle actions, and a browser adapter that never receives root access."],
+    ["08", "Control plane contract", "Durable history, an authenticated Unix-socket/HTTP supervisor with lifecycle actions, signed policy imports, reconnecting event follow, and a browser adapter that never receives root access."],
   ],
   competitors: [
     { name: "RewindBPF", relation: "This project", model: "OverlayFS transaction + eBPF evidence", cow: "Yes", kernel: "Yes", rollback: "Yes", read: "Yes", agent: "Yes", highlight: true },
