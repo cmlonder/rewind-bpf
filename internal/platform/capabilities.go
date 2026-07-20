@@ -22,7 +22,7 @@ func Probe() Capability {
 	case "linux":
 		return Capability{Platform: "linux", Backend: "overlayfs-landlock-ebpf", Supported: true, ProjectIsolation: true, SensitiveReadDeny: true, Reasons: []string{"requires runtime capability probe for the selected kernel backend"}}
 	case "darwin":
-		return Capability{Platform: "darwin", Backend: "seatbelt-apfs", Reasons: []string{"native Seatbelt/EndpointSecurity adapter is planned", "APFS disposable workspace adapter is not enabled"}}
+		return Capability{Platform: "darwin", Backend: "seatbelt-apfs", Reasons: []string{"read-only prerequisite probe is available", "EndpointSecurity entitlement and APFS disposable-volume rollback require manual validation", "native backend remains fail-closed until that gate passes"}}
 	case "windows":
 		return Capability{Platform: "windows", Backend: "native-policy-workspace", Reasons: []string{"native process/filesystem policy adapter is planned", "WSL2 is compatibility-only and does not protect the Windows host"}}
 	default:

@@ -8,7 +8,9 @@ primitive must fail closed rather than silently degrade.
 
 The planned adapter combines a Seatbelt profile for process/filesystem policy,
 EndpointSecurity for high-fidelity process and file telemetry, and an APFS
-disposable workspace/snapshot boundary. The current `internal/platform`
+disposable workspace/snapshot boundary. `platform.PlanForWorkspace` now
+performs a read-only prerequisite probe for APFS, `sandbox-exec`, and
+`diskutil`; it does not clone, mount, launch, or delete anything. The current
 capability report intentionally marks this backend unavailable. No macOS
 command is allowed to claim project isolation until a native helper has been
 tested on a disposable APFS volume.
@@ -28,3 +30,11 @@ never be presented as protection for the Windows host filesystem.
 Native backend tests require a disposable VM/volume and explicit platform
 fixtures. The development Mac is not a test target for destructive or
 privileged operations.
+
+The first safe command is:
+
+```bash
+rewind platform plan --workspace /path/to/disposable-apfs-fixture
+```
+
+This only reports prerequisites. It is not an enforcement or rollback test.

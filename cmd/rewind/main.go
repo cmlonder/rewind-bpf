@@ -29,6 +29,7 @@ Usage:
   rewind bundle verify --input PATH
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
+  rewind platform plan --workspace PATH
   rewind release keygen --private PATH --public PATH
   rewind release sign --input PATH --private-key PATH --output PATH
   rewind release verify --input PATH --signature PATH [--public-key PATH]
@@ -95,6 +96,8 @@ func main() {
 		handleBranch(os.Args[2:])
 	case "capabilities":
 		handleCapabilities(os.Args[2:])
+	case "platform":
+		handlePlatform(os.Args[2:])
 	case "release":
 		handleRelease(os.Args[2:])
 	case "supervisor":

@@ -87,6 +87,16 @@ It reports APFS, `sandbox-exec`, and `diskutil` availability. It does not
 clone, mount, launch, or delete anything. The macOS backend remains refused
 until the disposable-volume manual gate is completed.
 
+On macOS, the safe prerequisite probe is read-only:
+
+```bash
+rewind platform plan --workspace /path/to/disposable-apfs-fixture
+```
+
+It reports APFS, `sandbox-exec`, and `diskutil` availability. It does not
+clone, mount, launch, or delete anything. The macOS backend remains refused
+until the disposable-volume manual gate is completed.
+
 ## Control Plane UI
 
 The operational UI prototype lives in [`ui/`](ui/) and is tracked in [`docs/UI_ROADMAP.md`](docs/UI_ROADMAP.md). It is fixture-driven in Phase 1: no eBPF program, mount, process, workspace, or host file is touched. Preview it safely with:
