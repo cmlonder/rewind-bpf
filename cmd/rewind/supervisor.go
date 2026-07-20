@@ -40,6 +40,8 @@ func handleSupervisor(args []string) {
 	trustedPolicyKeys := flags.String("trusted-policy-keys", "", "optional comma-separated raw Ed25519 public-key files for signed policy imports")
 	credentialProvider := flags.String("credential-provider-command", "", "optional command-provider executable for short-lived credential leases")
 	credentialTimeout := flags.Duration("credential-provider-timeout", 10*time.Second, "timeout for the credential provider command")
+	sessionBackend := flags.String("session-backend", "local", "session backend: local or sqlite")
+	sessionPath := flags.String("session-path", "", "optional session store path (defaults beside history)")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
 		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,... --credential-provider-command PATH]")
 	}
@@ -97,14 +99,36 @@ func handleSupervisor(args []string) {
 	if err := os.Chmod(*socketPath, 0o600); err != nil {
 		fatal(fmt.Sprintf("protect supervisor socket: %v", err))
 	}
+	if *sessionPath == "" {
+		*sessionPath = *historyPath + ".sessions.json"
+	}
+	var sessionStore session.LeaseStore
+	var closeSessionStore func() error
+	switch strings.ToLower(strings.TrimSpace(*sessionBackend)) {
+	case "local", "json":
+		store := session.Open(*sessionPath)
+		sessionStore = store
+	case "sqlite":
+		store, openErr := session.OpenSQLite(*sessionPath)
+		if openErr != nil {
+			fatal(openErr.Error())
+		}
+		sessionStore = store
+		closeSessionStore = store.Close
+	default:
+		fatal("--session-backend must be local or sqlite")
+	}
+	if closeSessionStore != nil {
+		defer closeSessionStore()
+	}
 	baseServer := supervisor.Server{
 		History:           history.Open(*historyPath),
 		AuthToken:         token,
 		Config:            controlplane.Open(*configPath),
 		TrustedPolicyKeys: trustedKeys,
 		CredentialBroker:  credentialBroker,
-		Sessions:          session.Open(*historyPath + ".sessions.json"),
-		SessionPath:       *historyPath + ".sessions.json",
+		Sessions:          sessionStore,
+		SessionPath:       *sessionPath,
 		AuditPath:         *historyPath + ".actions.jsonl",
 		AuditMu:           &sync.Mutex{},
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {

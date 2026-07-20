@@ -43,7 +43,7 @@ Usage:
   rewind release keygen --private PATH --public PATH
   rewind release sign --input PATH --private-key PATH --output PATH
   rewind release verify --input PATH --signature PATH [--public-key PATH]
-  rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
+  rewind supervisor --socket PATH --history PATH [--session-backend local|sqlite --session-path PATH --config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
   rewind history prune --path PATH --keep N
   rewind pii scan --path PATH [--output PATH --redact-output PATH]
   rewind agent list|contract KIND

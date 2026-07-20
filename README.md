@@ -212,6 +212,9 @@ supervisor has an authenticated authorization layer:
 
 ```sh
 sudo rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json
+# Optional durable SQLite session coordination for multi-process supervisors:
+sudo rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json \
+  --session-backend sqlite --session-path /var/lib/rewind/sessions.db
 ```
 
 The supervisor keeps credential issuance disabled unless an operator explicitly

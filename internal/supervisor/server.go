@@ -42,7 +42,7 @@ type Server struct {
 	Config            *controlplane.Store
 	TrustedPolicyKeys []ed25519.PublicKey
 	CredentialBroker  credentials.Broker
-	Sessions          session.Store
+	Sessions          session.LeaseStore
 	SessionPath       string
 }
 

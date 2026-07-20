@@ -31,6 +31,14 @@ type Request struct {
 	TTL    int    `json:"ttl_seconds,omitempty"`
 }
 
+// LeaseStore is implemented by the local JSON, SQLite, and remote protocol
+// backends. Keeping the supervisor on this narrow interface makes storage
+// selection explicit without changing lease semantics.
+type LeaseStore interface {
+	List() ([]Lease, error)
+	Apply(Request, time.Time) (Lease, error)
+}
+
 type Store struct {
 	path string
 	mu   *sync.Mutex
