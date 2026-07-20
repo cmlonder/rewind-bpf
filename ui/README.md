@@ -33,6 +33,7 @@ Local authentication is intentionally deferred until after the hackathon demo. T
 ## Adapter boundary
 
 `data/fixture.js` remains the safe demo adapter. `data/supervisor-adapter.js`
-can connect to the read-only local supervisor bridge without changing view
-components. The browser requests health, capabilities, and history only; it
-must never receive root privileges or raw credentials.
+can connect to the local supervisor bridge without changing view components.
+The browser requests health, capabilities, history, and redacted audit data
+only; it must never receive root privileges or raw credentials. Privileged
+actions remain an explicit supervisor/CLI boundary.
