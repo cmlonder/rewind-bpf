@@ -20,6 +20,7 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Open a confirmation dialog for rollback, recovery, and export actions.
 - Create and select versioned policy packages, copy a policy preview, and simulate deny/allow/audit outcomes.
 - Import an Ed25519-signed policy bundle through the connected supervisor; invalid or tampered envelopes are refused and audited.
+- Export a persisted signed envelope for review or transfer without exposing private keys.
 - Show supervisor connection state and retry an interrupted authenticated event stream with bounded exponential backoff.
 - Add or edit workspace assignments and run a fixture boundary test before a future run.
 - Edit global runtime settings through revisioned controls; active runs remain unchanged.
