@@ -108,6 +108,7 @@ sudo "$BIN" branch apply --record "$ROOT/branch/runtime/record.json" --repo "$RO
 test "$(cat "$ROOT/branch/workspace/accepted.txt")" = accepted
 test "$(cat "$ROOT/branch/workspace/generated.txt")" = generated
 test "$(git -C "$ROOT/branch/workspace" log -1 --pretty=%s)" = "accept reviewed result"
+sudo "$BIN" rollback --record "$ROOT/branch/runtime/record.json"
 echo "clean-branch acceptance: PASS"
 
 mkdir -p "$ROOT/conflict/workspace"
