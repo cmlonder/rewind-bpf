@@ -190,6 +190,14 @@ func (s Server) Handler() http.Handler {
 			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
 			return
 		}
+		if r.Method == http.MethodGet {
+			state := "unavailable"
+			if s.CredentialBroker != nil {
+				state = "available"
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"available": s.CredentialBroker != nil, "state": state, "secret_exposed": false})
+			return
+		}
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "credential leases require POST"})
 			return

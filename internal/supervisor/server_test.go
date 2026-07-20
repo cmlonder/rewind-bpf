@@ -84,6 +84,13 @@ func TestCredentialLeaseEndpointRequiresAuthAndNeverReturnsSecret(t *testing.T) 
 	if strings.Contains(response.Body.String(), `"secret":"`) || !strings.Contains(response.Body.String(), `"secret_exposed":false`) {
 		t.Fatalf("credential response leaked or omitted safety marker: %s", response.Body.String())
 	}
+	statusRequest := httptest.NewRequest(http.MethodGet, "/v1/credential-leases", nil)
+	statusRequest.Header.Set("Authorization", "Bearer secret")
+	statusResponse := httptest.NewRecorder()
+	server.Handler().ServeHTTP(statusResponse, statusRequest)
+	if statusResponse.Code != http.StatusOK || !strings.Contains(statusResponse.Body.String(), `"available":true`) || !strings.Contains(statusResponse.Body.String(), `"secret_exposed":false`) {
+		t.Fatalf("credential status=%d body=%s", statusResponse.Code, statusResponse.Body.String())
+	}
 }
 
 func TestConfigEndpointsRequireAuthAndPersistValidatedChanges(t *testing.T) {

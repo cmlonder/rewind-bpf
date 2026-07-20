@@ -69,7 +69,7 @@ function handleAction(action, element) {
   if (action === "notifications") return openModal("Notifications", `<div class="notification-list"><div><span class="notification-dot"></span><div><strong>Evidence stream healthy</strong><p>Run <code>${currentRun().shortId}</code> has no dropped or truncated events.</p><small>just now · system</small></div></div><div><span class="notification-dot notification-dot-muted"></span><div><strong>Fixture adapter active</strong><p>Actions are simulated in memory until the supervisor API is connected.</p><small>today · control plane</small></div></div></div>`, { confirm: "Done", onConfirm: closeModal });
   if (action === "connect-supervisor") return openSupervisorConnector();
   if (action === "hold-review") { currentRun().state = "succeeded"; return setToast("Run held for review. Conflict-checked acceptance is now available.", "neutral"); }
-  if (action === "simulate-credentials") return setToast("Boundary check passed: broker unavailable, raw secret exposure refused.", "neutral");
+  if (action === "simulate-credentials") return openCredentialLeaseCheck();
   if (action === "retention") return setToast("Retention is fixture-backed in this demo; the P4 index prunes by keep-latest policy.", "neutral");
   if (action === "rollback") return openConfirm({ title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: () => runSupervisorAction("rollback", rollback) });
   if (action === "commit") return openConfirm({ title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: () => runSupervisorAction("commit", commitRun, "COMMIT") });
@@ -106,8 +106,24 @@ function openSupervisorConnector() {
   } });
 }
 
+function openCredentialLeaseCheck() {
+  if (!state.supervisor?.issueCredentialLease) return setToast("Boundary check passed: broker unavailable, raw secret exposure refused.", "neutral");
+  openModal("Issue a scoped credential lease", `<form id="credential-form" class="modal-form"><label>Credential reference<input name="ref" value="github" required /></label><label>Scopes<input name="scopes" value="read:org" placeholder="comma-separated scopes" /></label><div class="form-note">Only opaque lease metadata returns to the browser. Secret bytes stay inside the supervisor broker and are never shown here.</div></form>`, { confirm: "Issue lease", onConfirm: async () => {
+    const form = document.querySelector("#credential-form");
+    if (!form?.reportValidity()) return false;
+    const data = new FormData(form);
+    try {
+      const lease = await state.supervisor.issueCredentialLease({ ref: String(data.get("ref")).trim(), scopes: String(data.get("scopes") || "").split(",").map((item) => item.trim()).filter(Boolean) });
+      closeModal();
+      setToast(`Lease ${String(lease.id || "issued").slice(0, 12)}… issued · secret_exposed=${lease.secret_exposed === false ? "false" : "unknown"}`, lease.secret_exposed === false ? "success" : "error");
+      return true;
+    } catch (error) { setToast(`Credential lease refused: ${error.message}`, "error"); }
+  } });
+}
+
 function applySupervisorSnapshot(connected) {
   state.supervisor = connected;
+  fixture.credentialStatus = connected.credentialStatus || { available: false, state: "unavailable" };
   fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
   fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
   if (connected.history.length) {
