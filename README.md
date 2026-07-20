@@ -84,7 +84,7 @@ python3 -m http.server 4174 --directory ui
 open http://127.0.0.1:4174
 ```
 
-The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and simulation, workspace-to-policy assignments, revisioned global configuration controls, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A future `rewindd` supervisor will replace the fixture adapter through a localhost-only or Unix-socket API; local authentication is intentionally post-demo, and the browser will never receive root privileges.
+The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and simulation, workspace-to-policy assignments, revisioned global configuration controls, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A local supervisor bridge now exposes authenticated health, capability, history, event-snapshot, status, rollback/recover, and explicit commit actions; the browser adapter remains read-only and never receives root privileges. Local authentication beyond the Unix-socket and bearer-token boundary is intentionally post-demo.
 
 ## Safety warning
 
@@ -130,7 +130,7 @@ rewind policy verify strict-agent.bundle.json --public-key /path/to/policy-publi
 
 Signatures authenticate package contents; they do not bypass runtime capability checks or operator confirmation.
 
-### Local supervisor (read-only control plane)
+### Local supervisor control plane
 
 The Linux VM can expose health, capability, and durable-history data over a
 permissioned Unix socket. Action endpoints intentionally refuse until the

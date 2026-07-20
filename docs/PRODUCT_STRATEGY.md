@@ -35,7 +35,8 @@ The agent never writes directly into the real workspace. The operator reviews a 
 2. export a patch/review bundle;
 3. apply through a conflict-checked branch or patch workflow.
 
-`commit` stays disabled until the lower-layer manifest and destination state can be checked safely.
+`commit` is enabled only after the lower-layer manifest and destination state
+are checked safely; same-path drift and incomplete evidence refuse the apply.
 
 ### 2.4 Fail-closed trust
 

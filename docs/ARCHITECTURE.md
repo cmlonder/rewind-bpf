@@ -656,7 +656,29 @@ When the parent runtime is invoked through `sudo`, the helper reads `SUDO_UID`/`
 
 The privileged filesystem manager similarly chowns only the validated temporary `upper` and `work` directories to that agent identity before mounting. The default VM backend is `fuse-overlayfs`, launched with explicit `uid`, `gid`, and `allow_other` options so the unprivileged helper can use the merged view. The kernel backend deliberately does not pass the unsupported `override_creds` option; kernels that do not provide compatible copy-up credential semantics should use FUSE. The manager never chowns or removes `lowerdir`, so the original workspace remains owned and protected by its existing permissions.
 
-`internal/runstore` persists the plan, lifecycle record, telemetry log path, capability report, cgroup path, and event evidence atomically with mode `0600`. When invoked with `sudo`, it restores record/log ownership to `SUDO_UID`/`SUDO_GID`; the privileged FUSE mount still requires `sudo` for unmount. The CLI can reconstruct a stale or completed run for idempotent rollback through `rollback` or `recover`. `commit` is still disabled: preserving the lower layer and merging an intentional diff need a separate conflict-safe implementation. `rewind diff --record PATH` provides a read-only manifest comparison while the merged mount is live, and `rewind export --record PATH --output PATH` writes a review-only bundle without mutating the workspace.
+`internal/runstore` persists the plan, lifecycle record, telemetry log path, capability report, cgroup path, and event evidence atomically with mode `0600`. When invoked with `sudo`, it restores record/log ownership to `SUDO_UID`/`SUDO_GID`; the privileged FUSE mount still requires `sudo` for unmount. The CLI can reconstruct a stale or completed run for idempotent rollback through `rollback` or `recover`. `rewind commit --confirm` performs a conflict-checked apply from the reviewed merged view to the lower workspace, then unmounts and discards the temporary layer. `rewind diff --record PATH` provides a read-only manifest comparison while the merged mount is live, and `rewind export --record PATH --output PATH` writes a review-only bundle without mutating the workspace.
+
+### Local supervisor control plane
+
+`cmd/rewind supervisor` exposes the same lifecycle through a mode-`0600` Unix
+socket and a generated mode-`0600` bearer-token file. The HTTP surface is
+deliberately narrow:
+
+```text
+GET  /health
+GET  /v1/capabilities
+GET  /v1/history
+GET  /v1/events?run_id=...
+POST /v1/actions  {status|rollback|recover|commit}
+```
+
+The event endpoint is an authenticated snapshot stream over the persisted
+JSONL journals. Action requests resolve a run through the durable history
+index and call the same rollback, recovery, evidence, conflict-check, and
+commit code paths as the CLI. Commit additionally requires
+`confirmation: "COMMIT"`. Unknown actions, missing run IDs, missing bearer
+tokens, and incomplete evidence fail closed. The browser adapter consumes
+only read endpoints; it never receives root privileges or raw credentials.
 
 ### Verified protected-run smoke (disposable VM)
 

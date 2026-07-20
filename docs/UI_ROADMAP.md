@@ -27,7 +27,7 @@ The UI follows the same four P0 promises as the runtime:
 |---|---|
 | Immutable project | Show `DISCARD BY DEFAULT`, lower-layer integrity, upper-layer bytes, and an explicit review hold. |
 | Invisible secrets | Show the matched pattern and decision without rendering secret contents; expose degraded/refused backend state. |
-| Explicit acceptance | Keep commit disabled until conflict checks exist; make export and discard the primary paths. |
+| Explicit acceptance | Enable commit only for succeeded review runs, show the conflict gate, and keep export/discard available. |
 | Fail-closed trust | Surface dropped events, truncation, stale descendants, mount failures, and recovery progress as actionable states. |
 
 ## 2. Users and jobs to be done
@@ -365,9 +365,13 @@ Add global config, policy package CRUD, workspace assignments, effective-policy 
 
 Exit: an operator can create a package, simulate it, assign it to a workspace, and see the immutable snapshot used by a new run.
 
-### Phase 4 — Supervisor integration — next runtime boundary
+### Phase 4 — Supervisor integration — read/action boundary delivered
 
-Add `rewindd`, Unix-socket API, SSE event stream, signed packages, persistent action audit, and recovery/reconnect behavior. Add local authentication/authorization after the demo unless the connected deployment boundary requires it earlier.
+The current bridge exposes a mode-0600 Unix socket, bearer-authenticated
+history/events, and lifecycle actions. Continue with follow-mode SSE, persistent
+action audit, and recovery/reconnect behavior. Add local authentication beyond
+the socket/token boundary after the demo unless the connected deployment
+requires it earlier.
 
 Exit: UI state matches runtime state under refresh, reconnect, supervisor restart, and recovery scenarios.
 
@@ -381,7 +385,7 @@ Add remote package registry, organization profiles, role-based approval, signed/
 - A terminal emulator with root privileges.
 - A command deny-list editor pretending to be a transaction boundary.
 - A green “safe” badge that hides dropped or truncated evidence.
-- A commit button before conflict-safe merge semantics exist. The button is enabled only for a succeeded review run and requires an impact summary plus explicit confirmation.
+- A commit button without conflict-safe merge semantics. The button is enabled only for a succeeded review run and requires an impact summary plus explicit confirmation.
 - A second, divergent policy source that disagrees with the CLI/runtime.
 
 ## 14. First code slice
