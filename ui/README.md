@@ -28,18 +28,23 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Edit global runtime settings through revisioned controls; active runs remain unchanged.
 - Inspect broker status and request metadata-only credential leases when an opt-in provider is configured.
 - Document the opt-in native macOS Keychain/Linux Secret Service provider boundary; the UI still displays lease metadata only.
-- Apply keep-latest history pruning and manage expiring reconnect/takeover session leases through the authenticated supervisor.
+- Apply keep-latest history pruning and manage expiring reconnect/takeover session leases; fixture mode previews these in memory, while connected mode persists them through the authenticated supervisor.
 - Show the optional content PII scanner as audit-only: findings are hashed/redacted and the scanner never changes read permissions.
 - Select a generic, Codex, OpenHands, or Claude Code adapter per workspace; the adapter is an auditable launch identity, not an SDK wrapper yet.
-- Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
+- Open notifications, inspect audit event details, and see explicit empty-search feedback.
 - Use the Trust & Actions screen to understand one-time action-token challenges,
   edit a pinned HTTPS registry profile, verify signer rotation, and preview a
   signed policy fetch without exposing bearer tokens or private keys. A connected
   supervisor also renders the server-proxied registry package inventory.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
+- Use the dedicated **System Boundaries** screen to distinguish the lower/merged/upper invariant, process scope, network/secret boundary, and platform support from editable defaults.
+- Open the small `i` help affordances beside controls for a deeper explanation of authority, retention, session leases, evidence, PII, registry verification, and benchmark caveats.
 
-These actions deliberately stop at the fixture adapter until a supervisor is
-connected. When connected to the explicit loopback HTTP bridge, policy and
+Fixture mode has no browser authentication because it has no kernel, mount,
+process, workspace, or host access. The retention and session dialogs remain
+usable there as in-memory previews, so a reviewer can understand the workflow
+without a misleading “authenticated user” dead end. When connected to the
+explicit loopback HTTP bridge, policy and
 workspace forms persist validated local config, signed bundle imports are
 verified by the supervisor, rollback/recovery/commit
 confirmations POST authenticated intents, and the run detail view follows its
@@ -51,9 +56,17 @@ connected supervisor the token is issued and consumed server-side, with replay
 and action/run mismatches refused. It is a human-intent challenge, not a
 replacement for supervisor bearer authentication.
 
-## Demo scope decision
+## Authority and authentication boundary
 
-Local authentication is intentionally deferred until after the hackathon demo. The demo runs in fixture mode and does not expose a connected runtime, so authentication would add complexity without improving the jury flow. When `rewindd` is connected, authentication and authorization will be introduced at the Unix-socket/API boundary rather than inside browser components.
+There is no separate browser login in this UI. The demo runs in fixture mode,
+where all actions are deterministic in-memory previews and no authentication is
+needed. Connected mode uses a bearer token issued by `rewind supervisor`; the
+browser keeps it in memory and sends it only to the local supervisor bridge.
+The supervisor—not the browser—owns privileged mounts, action-token challenges,
+retention pruning, session leases, registry signature verification, and run
+mutations. Local authentication beyond that Unix-socket/bearer boundary remains
+a post-demo hardening item. “Manage session” means a detachable run lease
+(acquire, heartbeat, takeover, release), not a user account login.
 
 ## Adapter boundary
 

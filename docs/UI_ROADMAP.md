@@ -358,6 +358,26 @@ never receives root access.
 
 The UI is being kept platform-neutral. It must show the active backend and capability matrix explicitly: Linux OverlayFS/FUSE + Landlock/eBPF, macOS Seatbelt/EndpointSecurity + APFS/disposable workspace, or Windows native process/filesystem policy + disposable workspace. A platform adapter that cannot provide one of the four product promises must render degraded/refused state rather than silently presenting Linux-level guarantees.
 
+### Current UX correctness pass
+
+The control plane now keeps **System Boundaries** as a dedicated read-only
+orientation screen; it is not an alias for **Global Config**. Global Config
+contains future-run defaults and revisioned retention/evidence/session values,
+while Policy Packages contain per-agent contracts and Trust & Actions contains
+authority, registry, and action-token metadata. Selecting a policy re-renders
+the effective policy, YAML preview, signer state, and simulation target.
+
+Fixture mode intentionally has no authentication because it cannot touch a
+kernel, mount, process, workspace, or host file. Retention and detachable
+session dialogs remain available as in-memory previews so the UI is testable
+without a misleading authenticated-user dead end. Connected mode is different:
+the browser uses a bearer token issued by the local supervisor, while the
+supervisor owns privileged lifecycle, persistent retention/session state,
+registry verification, and run mutations. “Manage session” means an expiring
+run lease (acquire/heartbeat/takeover/release), not browser login. Contextual
+`i` buttons expose these distinctions, evidence/PII/benchmark caveats, and
+platform limits inline.
+
 ## 12. Implementation phases and exit criteria
 
 ### Phase 1 — Fixture-driven control room — delivered

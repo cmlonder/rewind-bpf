@@ -11,15 +11,20 @@ function currentRun() { return getRun(state.selectedRun); }
 function escapeUI(value) { return String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[character])); }
 
 function render() {
+  globalThis.__rewindSelectedPolicy = state.selectedPolicy;
   app.innerHTML = AppShell({ view: state.view, run: currentRun(), fixture, connection: state.connection });
   bindInteractions();
   if (state.toast) showToast(state.toast.message, state.toast.tone);
 }
 
 function bindInteractions() {
+  decorateInfoButtons();
   document.querySelectorAll("[data-view]").forEach((element) => element.addEventListener("click", () => { state.view = element.dataset.view; render(); }));
   document.querySelectorAll("[data-run-id]").forEach((element) => element.addEventListener("click", () => { const match = fixture.runs.find((item) => item.id === element.dataset.runId || item.shortId === element.dataset.runId); if (match) state.selectedRun = match.id; state.view = "run-detail"; render(); }));
   document.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", () => handleAction(element.dataset.action, element)));
+  document.querySelectorAll("[data-info]").forEach((element) => element.addEventListener("click", (event) => { event.preventDefault(); event.stopPropagation(); openInfoModal(element.dataset.info); }));
+  document.querySelectorAll(".diff-panel .text-button").forEach((element) => element.addEventListener("click", () => openDiffPreview()));
+  document.querySelectorAll(".avatar").forEach((element) => element.addEventListener("click", () => openInfoModal("supervisor-auth")));
   const policyFooter = document.querySelector(".policy-editor .editor-foot");
   if (policyFooter && !policyFooter.querySelector("[data-action=export-policy-bundle]")) {
     const exportButton = document.createElement("button");
@@ -43,6 +48,25 @@ function bindInteractions() {
   }
 }
 
+function decorateInfoButtons() {
+  const add = (selector, key, label) => {
+    const target = document.querySelector(selector);
+    if (!target || target.querySelector("[data-info]")) return;
+    const button = document.createElement("button");
+    button.className = "info-button";
+    button.dataset.info = key;
+    button.type = "button";
+    button.setAttribute("aria-label", label);
+    button.title = label;
+    button.textContent = "i";
+    target.append(button);
+  };
+  if (state.view === "trust") { add(".trust-hero .panel-kicker", "supervisor-auth", "Explain action-token authority"); add(".registry-panel .panel-kicker", "registry", "Explain trusted registry"); }
+  if (state.view === "evidence") { add(".hash-panel .panel-kicker", "evidence-integrity", "Explain evidence integrity"); }
+  if (state.view === "benchmarks") { add(".benchmark-hero .panel-kicker", "benchmark", "Explain benchmark controls"); }
+  if (state.view === "recovery") { add(".hardening-panel .panel-kicker", "platform", "Explain platform support"); add(".panel:nth-child(2) .panel-kicker", "pii", "Explain PII findings"); }
+}
+
 function filterRuns(query, filter) {
   const normalized = query.trim().toLowerCase();
   let visible = 0;
@@ -61,9 +85,8 @@ function filterRuns(query, filter) {
 
 function selectPolicy(name) {
   state.selectedPolicy = name;
-  document.querySelectorAll("[data-policy]").forEach((card) => card.classList.toggle("is-selected", card.dataset.policy === name));
   const policy = fixture.policies.find((item) => item.name === name);
-  if (policy) setToast(`${name}@${policy.version} selected for review.`, "neutral");
+  if (policy) { render(); setToast(`${name}@${policy.version} selected. Effective policy and simulation are now updated.`, "neutral"); }
 }
 
 function handleAction(action, element) {
@@ -76,7 +99,7 @@ function handleAction(action, element) {
   if (action === "rollback") return openActionTokenConfirm({ action: "rollback", title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: (token) => runSupervisorAction("rollback", rollback, "", token) });
   if (action === "commit") return openActionTokenConfirm({ action: "commit", title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: (token) => runSupervisorAction("commit", commitRun, "COMMIT", token) });
   if (action === "recover") return openActionTokenConfirm({ action: "recover", title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: (token) => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success"), "", token) });
-  if (action === "export") return setToast("Review bundle prepared in fixture mode.", "success");
+  if (action === "export") return openExportPreview(element);
   if (action === "copy-policy") return copyPolicy();
   if (action === "export-policy-bundle") return exportPolicyBundle();
   if (action === "simulate-policy") return openSimulation();
@@ -84,9 +107,9 @@ function handleAction(action, element) {
   if (action === "import-policy") return openSignedPolicyImport();
   if (action === "new-workspace") return openWorkspaceEditor();
   if (action === "edit-workspace") return openWorkspaceEditor(element.closest(".workspace-card")?.querySelector("h2")?.textContent);
-  if (action === "simulate-workspace") return setToast("Boundary test: 2 denied · 3 allowed · 1 audited.", "success");
-  if (action === "view-revisions") return setToast("Revision history is already visible in this fixture.", "neutral");
-  if (action === "inspect-audit") return setToast("Audit event details are available after supervisor integration.", "neutral");
+  if (action === "simulate-workspace") return openBoundaryTest(element);
+  if (action === "view-revisions") return openRevisionHistory();
+  if (action === "inspect-audit") return openAuditDetail(element);
   if (action === "config-change") return openConfigEditor(element.dataset.configKey);
   if (action === "pii-scan") return setToast("PII scan is audit-only: findings are hashed and redacted; it never broadens read access.", "neutral");
   if (action === "pii-rescan") return setToast("Post-run PII scan queued: new files are hashed, redacted, and attached to the run record.", "success");
@@ -100,7 +123,7 @@ function handleAction(action, element) {
 }
 
 function openSupervisorConnector() {
-  openModal("Connect local supervisor", `<form id="supervisor-form" class="modal-form"><label>Read-only endpoint<input name="endpoint" value="http://127.0.0.1:8787" inputmode="url" pattern="https?://[^ ]+" required /></label><label>Bearer token<input name="token" type="password" autocomplete="off" placeholder="from supervisor token file" /></label><div class="form-note">The browser requests health, capability, and history only. It never receives root access or raw credentials.</div></form>`, { confirm: "Connect", onConfirm: async () => {
+  openModal("Connect local supervisor", `<form id="supervisor-form" class="modal-form"><label>Supervisor endpoint<input name="endpoint" value="http://127.0.0.1:8787" inputmode="url" pattern="https?://[^ ]+" required /></label><label>Bearer token<input name="token" type="password" autocomplete="off" placeholder="from supervisor token file" /></label><div class="form-note"><b>Fixture mode needs no authentication.</b> Connected mode uses the bearer token issued by <code>rewind supervisor</code>. The token authorizes the supervisor bridge only; the browser never receives root access, secret bytes, or registry credentials.</div></form>`, { confirm: "Connect", onConfirm: async () => {
     const form = document.querySelector("#supervisor-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
@@ -133,28 +156,29 @@ function openCredentialLeaseCheck() {
 }
 
 function openRetentionEditor() {
-  if (!state.supervisor?.pruneHistory) return setToast("Retention preview: keep-latest pruning is available through the authenticated supervisor.", "neutral");
-  openModal("Prune run history", `<form id="retention-form" class="modal-form"><label>Keep newest entries<input name="keep" type="number" min="0" value="30" required /></label><div class="form-note">Only bounded run metadata is pruned. Workspace layers and evidence archives are not silently deleted.</div></form>`, { confirm: "Prune history", onConfirm: async () => {
+  openModal("Prune run history", `<form id="retention-form" class="modal-form"><label>Keep newest entries<input name="keep" type="number" min="0" value="30" required /></label><div class="form-note"><b>${state.supervisor ? "Connected supervisor:" : "Fixture preview:"}</b> ${state.supervisor ? "the authenticated supervisor prunes bounded metadata after validating the request." : "this updates in-memory preview state only; no files are deleted."} Workspace layers and evidence archives are never silently deleted.</div></form>`, { confirm: "Prune history", onConfirm: async () => {
     const form = document.querySelector("#retention-form");
     if (!form?.reportValidity()) return false;
+    const keep = Number(new FormData(form).get("keep"));
     try {
-      const result = await state.supervisor.pruneHistory(Number(new FormData(form).get("keep")));
-      closeModal();
-      setToast(`History retention applied: ${result.message || "pruned"}`, "success");
+      const result = state.supervisor?.pruneHistory ? await state.supervisor.pruneHistory(keep) : { message: `fixture keeps latest ${keep}` };
+      fixture.config.values.retention = `keep latest ${keep}`;
+      fixture.config.revision += 1;
+      closeModal(); render(); setToast(`History retention applied: ${result.message || "pruned"}`, "success");
     } catch (error) { setToast(`Retention refused: ${error.message}`, "error"); }
   } });
 }
 
 function openSessionEditor() {
-  if (!state.supervisor?.session) return setToast("Session leases are available after connecting the authenticated supervisor.", "neutral");
   const run = currentRun();
-  openModal("Manage detachable run session", `<form id="session-form" class="modal-form"><label>Run ID<input name="run_id" value="${run.id}" required /></label><label>Owner<input name="owner" value="control-plane" required /></label><label>Action<select name="action"><option value="acquire">Acquire</option><option value="heartbeat">Heartbeat</option><option value="takeover">Take over</option><option value="release">Release</option></select></label><label>Lease seconds<input name="ttl_seconds" type="number" min="30" max="86400" value="600" required /></label><div class="form-note">A session lease coordinates reconnect and takeover; it does not bypass run authorization or expose credentials.</div></form>`, { confirm: "Apply session action", onConfirm: async () => {
+  openModal("Manage detachable run session", `<form id="session-form" class="modal-form"><label>Run ID<input name="run_id" value="${run.id}" required /></label><label>Owner<input name="owner" value="control-plane" required /></label><label>Action<select name="action"><option value="acquire">Acquire</option><option value="heartbeat">Heartbeat</option><option value="takeover">Take over</option><option value="release">Release</option></select></label><label>Lease seconds<input name="ttl_seconds" type="number" min="30" max="86400" value="600" required /></label><div class="form-note"><b>${state.supervisor ? "Connected supervisor:" : "Fixture preview:"}</b> ${state.supervisor ? "the authenticated supervisor persists this lease and enforces takeover rules." : "this simulates the lease in memory; no authenticated session store is contacted."} A lease coordinates reconnect and takeover; it never bypasses run authorization or exposes credentials.</div></form>`, { confirm: "Apply session action", onConfirm: async () => {
     const form = document.querySelector("#session-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
     try {
-      const lease = await state.supervisor.session({ action: data.get("action"), run_id: data.get("run_id"), owner: data.get("owner"), ttl_seconds: Number(data.get("ttl_seconds")) });
+      const lease = state.supervisor?.session ? await state.supervisor.session({ action: data.get("action"), run_id: data.get("run_id"), owner: data.get("owner"), ttl_seconds: Number(data.get("ttl_seconds")) }) : { id: `fixture-${Date.now()}` };
       closeModal();
+      fixture.config.values.session = `${data.get("action")} · ${data.get("owner")}`;
       setToast(`Session ${data.get("action")}: ${String(lease.id || "updated").slice(0, 12)}…`, "success");
     } catch (error) { setToast(`Session action refused: ${error.message}`, "error"); }
   } });
@@ -507,6 +531,55 @@ function openTrustKeyRotation() {
     fixture.registry.state = "needs-verification";
     closeModal(); render(); setToast("Signer rotation staged. Verify the registry before use.", "neutral");
   } });
+}
+
+function openExportPreview(element) {
+  const run = currentRun();
+  const kind = state.view === "evidence" ? "evidence bundle" : state.view === "audit" ? "audit log" : "review bundle";
+  openModal(`Export ${kind}`, `<div class="export-preview"><div class="verification-stack"><div><span>FORMAT</span><strong>JSON + JSONL manifest</strong><b class="check-badge">✓ READY</b></div><div><span>SCOPE</span><strong>${run.shortId} · ${run.evidence.count.toLocaleString()} events</strong><b class="check-badge">✓ BOUNDED</b></div><div><span>AUTHORITY</span><strong>${state.supervisor ? "Supervisor-backed record" : "Fixture preview record"}</strong><b class="check-badge">${state.supervisor ? "✓ LIVE" : "i PREVIEW"}</b></div></div><p class="form-note">${state.supervisor ? "The supervisor record is exported from its persisted path." : "Fixture mode does not write a file. This preview shows exactly which artifacts a connected run would export."}</p></div>`, { confirm: state.supervisor ? "Prepare download" : "Close preview", onConfirm: () => { if (!state.supervisor) return; const payload = JSON.stringify({ run_id: run.id, state: run.state, evidence: run.evidence, exported_at: new Date().toISOString() }, null, 2); const url = URL.createObjectURL(new Blob([payload + "\n"], { type: "application/json" })); const link = document.createElement("a"); link.href = url; link.download = `${run.shortId}-${kind.replaceAll(" ", "-")}.json`; link.click(); URL.revokeObjectURL(url); setToast(`${kind} download prepared.`, "success"); } });
+}
+
+function openBoundaryTest(element) {
+  const workspace = element?.closest(".workspace-card")?.querySelector("h2")?.textContent || "workspace fixture";
+  openModal("Workspace boundary test", `<div class="simulation-summary"><span class="verified-icon">✓</span><div><strong>${workspace}</strong><p>Deterministic checks exercise the same policy boundary without starting an agent.</p></div></div><div class="simulation-list"><div><b>DENY</b><code>config/.env</code><span>read pattern matched</span></div><div><b>DENY</b><code>rm -rf src</code><span>write isolated in upper layer</span></div><div><b>ALLOW</b><code>src/main.go</code><span>workspace write captured</span></div><div><b>AUDIT</b><code>api.github.com</code><span>network decision recorded</span></div></div>`, { confirm: "Close test", onConfirm: closeModal });
+}
+
+function openRevisionHistory() {
+  const rows = fixture.audit.map(([time, action, target, actor]) => `<div class="revision-row"><time>${time}</time><div><strong>${action}</strong><span>${target}</span></div><small>${actor}</small></div>`).join("");
+  openModal("Configuration revision history", `<div class="revision-modal"><p class="form-note">Global configuration revisions affect future runs only. The active transaction keeps the snapshot it started with.</p>${rows || '<p class="empty-state">No revisions recorded.</p>'}</div>`, { confirm: "Close", onConfirm: closeModal });
+}
+
+function openAuditDetail(element) {
+  const row = element?.closest(".audit-row");
+  const values = row ? [...row.querySelectorAll("time, strong, div span, small")].map((item) => item.textContent.trim()).filter(Boolean) : [];
+  openModal("Audit event detail", `<div class="verification-stack"><div><span>TIME</span><strong>${values[0] || "—"}</strong></div><div><span>ACTION</span><strong>${values[1] || "—"}</strong></div><div><span>TARGET</span><strong>${values[2] || "—"}</strong></div><div><span>ACTOR</span><strong>${values.at(-1) || "—"}</strong></div></div><p class="form-note">${state.supervisor ? "This event came from the authenticated supervisor audit stream." : "Fixture mode displays a deterministic audit record; connected mode adds the persisted request and response digest."}</p>`, { confirm: "Close", onConfirm: closeModal });
+}
+
+function openDiffPreview() {
+  const run = currentRun();
+  openModal("Filesystem diff", `<div class="diff-list">${run.diff.map((item) => `<div class="diff-row"><span class="diff-kind kind-${item.kind}">${item.kind === "deleted" ? "−" : item.kind === "created" ? "+" : item.kind === "denied" ? "!" : "~"}</span><div><strong>${item.path}</strong><span>${item.note}</span></div><small>${item.bytes}</small></div>`).join("")}</div><p class="form-note">The diff is computed against the immutable lower-layer manifest. In connected mode this is a read-only view of the persisted run record.</p>`, { confirm: "Close", onConfirm: closeModal });
+}
+
+function openInfoModal(key) {
+  const copy = {
+    "system-boundaries": ["System boundaries", "Rewind is a scoped transaction guard, not an unconditional host-wide undo. The lower workspace remains the source of truth; the agent sees a merged copy-on-write view. eBPF supplies evidence, Landlock controls reads, cgroups scope descendants, and the supervisor owns privileged lifecycle mutations. Linux VM support is the verified path; native macOS and Windows adapters remain separate work.", "The map is deliberately separate from Global Config so operators can understand the invariant before changing a default."],
+    "filesystem-boundary": ["Filesystem boundary", "The workspace is mounted as lowerdir + upperdir + workdir. Deletes become upper-layer tombstones; writes copy blocks into the upper layer. Rollback discards upper/work. Commit is the only path that applies a candidate, and it first compares the immutable base manifest with the destination to refuse same-path drift."],
+    "process-boundary": ["Process boundary", "The run admission gate tracks the agent and descendants in a cgroup. Landlock denies configured read patterns before the process can open them. The eBPF program observes syscalls and lifecycle events for evidence; telemetry alone never grants or revokes access."],
+    "network-boundary": ["Network and secret boundary", "Network policy is explicit: off, audit, enforce, proxy, or namespace broker depending on the backend. Credential leases return opaque metadata only; secret bytes stay in the supervisor broker. PII scanning hashes and redacts findings and never broadens read access."],
+    "global-config": ["Global config", "These are defaults for future runs: overlay backend, read/write/network defaults, retention, evidence caps, encryption, trust rotation, and session behavior. A running transaction keeps its immutable start snapshot. Use Policy Packages for per-agent contracts and Trust & Actions for authority and signer metadata."],
+    "policy-packages": ["Policy packages", "A package is a versioned read/write/network contract. Selecting a card updates the effective-policy panel immediately and only changes what a future run will review. Signed packages carry an Ed25519 envelope; local drafts are visibly marked. Simulation exercises denies and allows without mutating a workspace."],
+    "effective-policy": ["Effective policy", "This panel is the resolved view used for review: package values are shown alongside their source, while runtime defaults fill scope and resource limits. It is a review artifact; changing it here does not silently alter an active run."],
+    retention: ["Retention", "Keep-latest pruning bounds metadata indexes and is separate from the workspace upper layer and evidence archive. In fixture mode the action is an in-memory preview. In connected mode the bearer-authenticated supervisor validates and performs the prune; it does not delete an active transaction."],
+    "session-leases": ["Session leases", "A lease coordinates reconnect, heartbeat, takeover, and release for a detachable run. It is not a login session and it does not grant filesystem or credential access. Fixture mode simulates the state locally; connected mode persists and enforces the lease in the supervisor store."],
+    "supervisor-auth": ["Supervisor authority", "There is no browser login in the current UI. Fixture mode intentionally requires no authentication and has no host access. Connected mode uses a bearer token from the local supervisor token file; the browser keeps it in memory and sends it only to the supervisor endpoint. Privileged mounts, action challenges, sessions, registry verification, and retention remain server-side."],
+    "evidence-integrity": ["Evidence integrity", "Events are ordered into a hash chain and tied to the run record. Dropped or truncated evidence makes verification incomplete and the safe path fails closed. Export contains bounded metadata plus the evidence journal; it does not expose raw secrets."],
+    registry: ["Trusted registry", "The supervisor fetches a signed policy envelope over HTTPS, verifies its Ed25519 signature against pinned current/previous keys, checks revocation, and only then exposes package metadata to this UI. Registry bearer credentials never enter browser state."],
+    pii: ["PII findings", "The scanner reports bounded file/event findings with a stable hash and redacted replacement. A finding is evidence and a remediation cue; it cannot automatically allow a read or rewrite the original file."],
+    benchmark: ["Benchmark evidence", "B0 is native ext4, B2 is FUSE overlay control, B4 is the protected lifecycle, and B5 covers telemetry/lifecycle overhead. Compare warm and cold runs separately, report IOPS, p95/p99 latency, storage amplification, event bytes, and lifecycle latency on the same VM."],
+    platform: ["Platform support", "The privileged reference implementation targets Linux 6.8+ with OverlayFS/FUSE, Landlock, cgroup-v2, and eBPF. macOS Seatbelt/EndpointSecurity/APFS and Windows Job Object/minifilter/VHDX adapters are planned native backends, not implied by the Linux fixture."],
+  };
+  const [title, body, note] = copy[key] || ["Control explanation", "This control is documented in the architecture and runbook.", "Ask the supervisor for the persisted record in connected mode."];
+  openModal(title, `<div class="info-modal-copy"><p>${body}</p>${note ? `<p class="form-note">${note}</p>` : ""}</div>`, { confirm: "Close", onConfirm: closeModal });
 }
 
 function openModal(title, body, { confirm, tone = "orange", onConfirm }) {
