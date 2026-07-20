@@ -706,6 +706,11 @@ evidence case verified with `dropped=0`; the intentionally capped case recorded
 The script creates only a generated temporary directory and performs cleanup
 of that exact directory with the privileged unmount path.
 
+The separate `REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm` gate also
+passed on 2026-07-20. It verified Unix-socket health, unauthenticated `401`
+rejection, bearer-token status, explicit supervisor commit, and redacted action
+audit using a synthetic review run.
+
 ### Optional BPF-LSM backend
 
 `ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:

@@ -55,6 +55,10 @@ and eBPF object. The gate covered:
 - proxy allow/deny for a local HTTP endpoint and `example.invalid`; and
 - bounded-event evidence marked incomplete and rejected by verification.
 
+The separate supervisor smoke also passed: the mode-`0600` Unix socket returned
+`401` without a bearer token, authenticated status and explicit commit succeeded,
+and the redacted action audit contained the commit record.
+
 Host-side `go test ./...`, `go vet ./...`, UI syntax checks, and shell syntax
 checks also pass. Privileged OverlayFS/eBPF tests remain VM-only by design.
 

@@ -105,6 +105,8 @@ REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm
 
 This gate is VM-only and covers rollback/read denial, review/commit,
 destination-drift refusal, proxy allow/deny, and incomplete-evidence refusal.
+The supervisor boundary can be checked separately with
+`REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm`.
 
 ## User workflow
 

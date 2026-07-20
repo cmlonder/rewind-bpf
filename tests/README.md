@@ -17,3 +17,13 @@ It creates only synthetic data under a temporary VM directory and checks read
 denial, recursive deletion rollback, explicit commit, destination-drift
 refusal, proxy allow/deny behavior, and incomplete-evidence refusal. The script
 requires a built `/tmp/rewind` binary and compiled `ebpf/rewind_trace.bpf.o`.
+
+The authenticated local control-plane smoke is separate because it starts a
+short-lived privileged Unix-socket supervisor:
+
+```bash
+REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm
+```
+
+It checks unauthenticated rejection, authenticated status, explicit commit, and
+redacted action audit using only the same synthetic temporary workspace.
