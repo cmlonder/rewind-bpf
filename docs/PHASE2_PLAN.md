@@ -255,7 +255,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 
 **Build**
 
-- Add a capability probe that reports kernel OverlayFS, FUSE OverlayFS, xattrs, `d_type`, same-filesystem workdir, Landlock ABI, BPF-LSM, cgroup-v2, and seccomp support.
+- Keep the read-only capability probe authoritative for kernel OverlayFS, FUSE OverlayFS, Landlock, BPF-LSM, cgroup-v2, and seccomp support; enforce-mode raw-socket defense refuses the run before mount/process release when seccomp is unavailable.
 - Keep kernel OverlayFS and FUSE OverlayFS as separate measured backends; refuse incompatible combinations instead of guessing.
 - Add workload classes: small-file tree, full-file overwrite, sparse overwrite, delete/rename storm, read-only workload, and mixed agent build workload.
 - Add warm/cold order randomisation, at least five repetitions for warm and three for cold, and confidence intervals.
