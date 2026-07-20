@@ -13,6 +13,7 @@ These values are the measurements captured in the disposable Ubuntu 24.04 ARM64 
 | B0 native ext4 | 10,334.2 | 4,421.0 | 41,336.6 KiB/s | 17,683.4 KiB/s | 79.2 µs | 3.344 µs | 134,217,728 | Five repetitions |
 | B2 FUSE-only | 9,143.8 | 3,915.4 | 36,574.8 KiB/s | 15,661.4 KiB/s | 66.2 µs | 68.096 µs | 134,217,728 | Five repetitions |
 | B4 Rewind protected | 9,181.7 | 3,932.6 | 36,726.2 KiB/s | 15,729.8 KiB/s | 66.7 µs | 68.710 µs | 134,253,346 | Five repetitions in one run |
+| B5 telemetry-only | — | — | — | — | — | — | 0 | 16,620 events / 2,467,528 telemetry bytes |
 
 B4 throughput was approximately 11.1% below B0 and 0.4% above B2. The current result is warm/page-cache exploratory data, not the final cold-cache claim.
 

@@ -867,3 +867,9 @@ performed authenticated lease list and acquire requests over its Unix socket,
 and stopped with a non-empty SQLite database (`SQLITE_SESSION_VM_PASS`). This
 validated the wiring without exposing the supervisor over TCP or touching the
 host filesystem.
+
+The final rehearsal script was also run in the same VM on 2026-07-20. It
+demonstrated a denied synthetic secret read, recursive `src` deletion isolated
+to the merged upper layer, generated output, and explicit rollback with the
+lower marker intact (`JURY_DEMO_VM_PASS`). The script refuses non-Linux hosts
+and requires `REWIND_DEMO_CONFIRM=VM_ONLY`.

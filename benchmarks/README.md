@@ -1,6 +1,6 @@
 # Benchmarks
 
-The benchmark design and B0–B5 comparison groups are defined in [docs/PROJECT_PLAN.md](../docs/PROJECT_PLAN.md).
+The benchmark design and B0–B5 comparison groups are defined in [docs/PROJECT_PLAN.md](../docs/PROJECT_PLAN.md). B5 is the telemetry-only control: it measures event volume and journal cost without OverlayFS protection, so it is not plotted as an I/O variant.
 
 The external comparison ledger is [COMPETITOR_MATRIX.md](COMPETITOR_MATRIX.md). It covers nono, Tetragon, KubeArmor, AgentFS, and DeltaBox with feature overlap, fair benchmark dimensions, provenance, and an explicit no-ranking rule for non-comparable workloads.
 
@@ -21,6 +21,15 @@ python3 benchmarks/plot_results.py
 ```
 
 This writes `benchmarks/results_chart.svg`. The script uses only the Python standard library; no plotting package is required.
+
+To normalize a new raw run into the ledger, use the collector instead of
+manually copying fio values:
+
+```bash
+python3 benchmarks/collect_results.py --variant B0-native-ext4 \
+  --fio-glob '/tmp/rewind-benchmark/native/*.json' \
+  --upper-bytes 134217728 --telemetry-bytes 0 --event-count 0
+```
 
 The PII protocol is intentionally separate from the I/O chart. Create a
 synthetic corpus, run `python3 benchmarks/pii_benchmark.py --input corpus.txt`,

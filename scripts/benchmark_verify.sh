@@ -9,7 +9,7 @@ if [[ ! -s "$CSV" || ! -s "$CHART" ]]; then
   exit 1
 fi
 
-for variant in B0-native-ext4 B2-fuse-only B4-rewind-protected; do
+for variant in B0-native-ext4 B2-fuse-only B4-rewind-protected B5-telemetry-only; do
   if ! awk -F, -v wanted="$variant" 'NR > 1 && $1 == wanted { found = 1 } END { exit(found ? 0 : 1) }' "$CSV"; then
     echo "benchmark verification: missing variant $variant" >&2
     exit 1
@@ -24,4 +24,4 @@ for field in read_iops write_iops upper_bytes telemetry_bytes event_count; do
   esac
 done
 
-echo "BENCHMARK_LEDGER=PASS variants=B0,B2,B4 chart=present"
+echo "BENCHMARK_LEDGER=PASS variants=B0,B2,B4,B5 chart=present"

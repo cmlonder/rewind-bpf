@@ -63,6 +63,23 @@ func TestAllowlistInstallPropagatesCommandFailure(t *testing.T) {
 	}
 }
 
+func TestAllowlistCleanupIsScopedToOwnedNames(t *testing.T) {
+	plan, _ := BuildAllowlistPlan([]string{"api.example.com"})
+	runner := &fakeRunner{}
+	if err := plan.cleanup(context.Background(), runner, false); err != nil {
+		t.Fatal(err)
+	}
+	joined := strings.Join(runner.calls, "\n")
+	for _, expected := range []string{"FORWARD", "REWIND_ALLOWLIST", "REWIND_ALLOWLIST4", "ip link del rewind-host"} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("missing %q in %s", expected, joined)
+		}
+	}
+	if len(runner.calls) != 6 {
+		t.Fatalf("calls=%v", runner.calls)
+	}
+}
+
 type failingRunner struct{ at, calls int }
 
 func (f *failingRunner) Run(_ context.Context, name string, args ...string) error {

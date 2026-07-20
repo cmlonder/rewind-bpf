@@ -64,7 +64,7 @@ See [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md) for the adopted native-
 
 The benchmark plan deliberately compares these tradeoffs rather than relying on a “near-zero overhead” slogan: native ext4, eBPF-only, OverlayFS-only, OverlayFS + eBPF, and the full daemon path are measured separately. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the test matrix and safety boundary.
 
-Captured VM measurements are summarized in [benchmarks/RESULTS.md](benchmarks/RESULTS.md) and [benchmarks/results_summary.csv](benchmarks/results_summary.csv). The CSV is the input for the final Python charts; raw VM artifacts remain outside Git unless explicitly archived.
+Captured VM measurements are summarized in [benchmarks/RESULTS.md](benchmarks/RESULTS.md) and [benchmarks/results_summary.csv](benchmarks/results_summary.csv). The ledger now separates B0 native, B2 FUSE, B4 protected, and B5 telemetry-only controls. The CSV is the input for the final Python charts; raw VM artifacts remain outside Git unless explicitly archived.
 
 ## Project site
 
@@ -108,6 +108,17 @@ The approved integration-test boundary is a disposable Ubuntu VM where RewindBPF
 macOS host → disposable Ubuntu VM → RewindBPF directly
 ```
 
+On macOS itself, use the non-destructive contract/simulation smoke only:
+
+```bash
+make mac-safe-smoke
+```
+
+It validates PII scanning, native capability contracts, registry/session/run
+plan packages, and confirms that the Linux protected-run path refuses instead
+of touching the Mac filesystem. It does not mount, load eBPF, change cgroups,
+or attempt to roll back a real Mac workspace.
+
 After building the binary and eBPF object inside that VM, run the repeatable
 synthetic acceptance matrix with:
 
@@ -124,6 +135,16 @@ The supervisor boundary can be checked separately with
 The same VM-only gate now includes `read.pii.mode: enforce`: a synthetic email
 file is denied before agent start, and the lower workspace remains intact after
 rollback. Do not run this against a real project or on the personal Mac.
+
+For the final jury rehearsal inside the disposable VM:
+
+```bash
+REWIND_DEMO_CONFIRM=VM_ONLY make jury-demo-vm
+```
+
+The script uses only generated files, demonstrates sensitive-read denial and
+recursive deletion in the merged view, then rolls back and proves the lower
+workspace remains intact. It refuses to run on macOS or an unconfirmed host.
 
 ## User workflow
 

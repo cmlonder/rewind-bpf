@@ -37,6 +37,36 @@ func (p AllowlistPlan) Install(ctx context.Context, runner CommandRunner) error 
 	return p.install(ctx, runner, true)
 }
 
+// Cleanup removes only names owned by this plan. It is intentionally explicit
+// and idempotent-friendly so a broker can run it from both normal and crash
+// recovery paths without touching an operator's unrelated firewall rules.
+func (p AllowlistPlan) Cleanup(ctx context.Context, runner CommandRunner) error {
+	return p.cleanup(ctx, runner, true)
+}
+
+func (p AllowlistPlan) cleanup(ctx context.Context, runner CommandRunner, requireRoot bool) error {
+	if requireRoot && os.Geteuid() != 0 {
+		return fmt.Errorf("namespace allowlist cleanup requires root")
+	}
+	if runner == nil {
+		return fmt.Errorf("namespace allowlist command runner is required")
+	}
+	commands := [][]string{
+		{"iptables", "-D", "FORWARD", "-s", "10.231.0.2/32", "-j", "REWIND_ALLOWLIST"},
+		{"iptables", "-t", "nat", "-D", "POSTROUTING", "-s", "10.231.0.0/30", "-j", "MASQUERADE"},
+		{"iptables", "-F", "REWIND_ALLOWLIST"},
+		{"iptables", "-X", "REWIND_ALLOWLIST"},
+		{"ipset", "destroy", "REWIND_ALLOWLIST4"},
+		{"ip", "link", "del", "rewind-host"},
+	}
+	for _, command := range commands {
+		if err := runner.Run(ctx, command[0], command[1:]...); err != nil {
+			return fmt.Errorf("namespace allowlist cleanup command %s: %w", strings.Join(command, " "), err)
+		}
+	}
+	return nil
+}
+
 // install is split from Install so unit tests can validate the complete
 // command sequence without requiring a real host network namespace.
 func (p AllowlistPlan) install(ctx context.Context, runner CommandRunner, requireRoot bool) error {

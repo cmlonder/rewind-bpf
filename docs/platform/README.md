@@ -25,6 +25,11 @@ signed EndpointSecurity entitlements and an APFS disposable-volume acceptance
 test exist. `platform.SeatbeltProfile` is a reviewable profile generator, not a
 launcher.
 
+The darwin build also contains a `SeatbeltCommand` wrapper that creates a
+disposable profile file and launches a command through `sandbox-exec`, with an
+explicit cleanup callback. This is a safe process/read boundary, not a claim
+of APFS rollback or EndpointSecurity coverage.
+
 ## Windows (P3 preview)
 
 Windows will use a native process/filesystem policy adapter and a disposable
@@ -35,11 +40,21 @@ never be presented as protection for the Windows host filesystem.
 Job Object/restricted-token/VHDX boundary and its manual gates. The portable
 contract does not pretend to enforce a Windows host from Linux or WSL2.
 
+The windows build contains a Job Object helper with
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`; the helper is cross-compiled and
+intentionally not advertised as filesystem protection until the signed
+minifilter and disposable VHDX tests exist.
+
 ## Test rule
 
 Native backend tests require a disposable VM/volume and explicit platform
 fixtures. The development Mac is not a test target for destructive or
 privileged operations.
+
+`make mac-safe-smoke` is the approved host-side check. It tests contracts,
+PII scanning, registry/session/run-plan packages, and the expected refusal of
+the Linux protected-run path without mounting, loading eBPF, changing cgroups,
+or touching a real workspace.
 
 The first safe command is:
 

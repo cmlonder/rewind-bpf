@@ -105,6 +105,7 @@ export const siteData = {
     { label: "B4 · protected run", read: 9181.7, write: 3932.6, readLabel: "9,182", writeLabel: "3,933", note: "FUSE + eBPF + helper" },
     { label: "B0/B2/B4 · cold control", read: 10918.6, write: 4672.9, readLabel: "10,919", writeLabel: "4,673", note: "Cold values are separate controls; B4 includes mount/copy-up cost" },
   ],
+  telemetryBenchmark: { label: "B5 · telemetry-only", events: "16,620", bytes: "2.47 MiB", note: "Direct fio PID validation · no OverlayFS protection" },
   evidence: [
     ["16,620", "events in direct fio telemetry smoke"],
     ["148.5 B", "average JSONL bytes per event"],
