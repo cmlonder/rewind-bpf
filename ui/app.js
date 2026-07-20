@@ -3,7 +3,7 @@ import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, reconnectAttempts: 0, connection: "fixture" };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, reconnectAttempts: 0, connection: "fixture" };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
@@ -19,6 +19,15 @@ function bindInteractions() {
   document.querySelectorAll("[data-view]").forEach((element) => element.addEventListener("click", () => { state.view = element.dataset.view; render(); }));
   document.querySelectorAll("[data-run-id]").forEach((element) => element.addEventListener("click", () => { state.selectedRun = element.dataset.runId; state.view = "run-detail"; render(); }));
   document.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", () => handleAction(element.dataset.action, element)));
+  const policyFooter = document.querySelector(".policy-editor .editor-foot");
+  if (policyFooter && !policyFooter.querySelector("[data-action=export-policy-bundle]")) {
+    const exportButton = document.createElement("button");
+    exportButton.className = "text-button";
+    exportButton.dataset.action = "export-policy-bundle";
+    exportButton.innerHTML = "Export signed bundle <span>↗</span>";
+    exportButton.addEventListener("click", () => handleAction("export-policy-bundle", exportButton));
+    policyFooter.prepend(exportButton);
+  }
   document.querySelectorAll("[data-policy]").forEach((element) => element.addEventListener("click", () => selectPolicy(element.dataset.policy)));
   const search = document.querySelector("[data-run-search]");
   if (search) search.addEventListener("input", () => filterRuns(search.value, state.runFilter));
@@ -50,6 +59,7 @@ function filterRuns(query, filter) {
 }
 
 function selectPolicy(name) {
+  state.selectedPolicy = name;
   document.querySelectorAll("[data-policy]").forEach((card) => card.classList.toggle("is-selected", card.dataset.policy === name));
   const policy = fixture.policies.find((item) => item.name === name);
   if (policy) setToast(`${name}@${policy.version} selected for review.`, "neutral");
@@ -66,6 +76,7 @@ function handleAction(action, element) {
   if (action === "recover") return openConfirm({ title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success")) });
   if (action === "export") return setToast("Review bundle prepared in fixture mode.", "success");
   if (action === "copy-policy") return copyPolicy();
+  if (action === "export-policy-bundle") return exportPolicyBundle();
   if (action === "simulate-policy") return openSimulation();
   if (action === "new-policy") return openPolicyEditor();
   if (action === "import-policy") return openSignedPolicyImport();
@@ -103,7 +114,8 @@ function applySupervisorSnapshot(connected) {
     fixture.runs = connected.history.map(remoteRun);
     state.selectedRun = fixture.runs[0].id;
   }
-  if (connected.policies.length) fixture.policies = connected.policies.map(remotePolicy);
+      if (connected.policies.length) fixture.policies = connected.policies.map(remotePolicy);
+      state.selectedPolicy = fixture.policies[0]?.name || state.selectedPolicy;
   if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
   if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
 }
@@ -298,6 +310,31 @@ function policyFromSignedEnvelope(signed) {
     const payload = JSON.parse(new TextDecoder().decode(bytes));
     return { name: payload.name, version: payload.version, state: "available", signed: true, description: payload.description || "Verified policy bundle", reads: payload.policy?.read?.mode || "off", writes: payload.policy?.write?.mode || "rollback", network: payload.policy?.network?.mode || "off", assigned: 0, updated: "just now" };
   } catch (_) { return null; }
+}
+
+function exportPolicyBundle() {
+  if (!state.supervisor) {
+    setToast("Connect the local supervisor to export a signed bundle.", "neutral");
+    return;
+  }
+  const bundle = (state.supervisor.policyBundles || []).find((item) => bundleName(item) === state.selectedPolicy);
+  if (!bundle) {
+    setToast("No persisted signed envelope is available for this package.", "neutral");
+    return;
+  }
+  const json = JSON.stringify(bundle, null, 2);
+  const blob = new Blob([json + "\n"], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${state.selectedPolicy || "policy"}.signed.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+  setToast("Signed policy bundle downloaded for review or transfer.", "success");
+}
+
+function bundleName(bundle) {
+  try { return JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(bundle.payload), (character) => character.charCodeAt(0)))).name; } catch (_) { return ""; }
 }
 
 function openWorkspaceEditor(name = "") {
