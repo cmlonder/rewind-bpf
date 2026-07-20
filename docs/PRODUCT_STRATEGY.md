@@ -92,7 +92,7 @@ Complete the current Linux transaction: automatic discard semantics, sensitive-r
 
 ### Track B — Confidentiality plane
 
-Add network enforcement and a credential broker. The broker must never pass raw credentials through argv, the agent workspace, or an unrestricted environment variable. Start with one provider and short-lived, scoped tokens; expand only after leakage tests pass.
+Add network enforcement and a credential broker. The current product slice has a loopback HTTP/CONNECT proxy backend for proxy-aware clients and a refusal-safe credential broker contract. The broker must never pass raw credentials through argv, the agent workspace, or an unrestricted environment variable. Start with one provider and short-lived, scoped tokens; expand only after leakage tests pass. Raw sockets and non-proxy-aware clients remain unsupported until a namespace/eBPF backend is available.
 
 ### Track C — Explicit acceptance
 
@@ -117,7 +117,7 @@ Native adapters are not allowed to silently downgrade the four promises. Each ru
 
 ### Track E — Durable history and supervisor UX
 
-Only after Tracks A–D: persistent checkpoints, retention, detachable sessions, long-lived supervisor, and registry/provenance features.
+The current slice includes bounded history, signed policy provenance, a token-authenticated read-only supervisor API, and a browser adapter. Remaining work is authenticated mutation handlers, live follow-mode event streaming, detachable sessions, and registry/provenance distribution.
 
 ## 7. Platform roadmap
 

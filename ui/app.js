@@ -77,12 +77,14 @@ function handleAction(action, element) {
 }
 
 function openSupervisorConnector() {
-  openModal("Connect local supervisor", `<form id="supervisor-form" class="modal-form"><label>Read-only endpoint<input name="endpoint" value="http://127.0.0.1:8787" inputmode="url" pattern="https?://[^ ]+" required /></label><div class="form-note">The browser requests health, capability, and history only. It never receives root access or raw credentials.</div></form>`, { confirm: "Connect", onConfirm: async () => {
+  openModal("Connect local supervisor", `<form id="supervisor-form" class="modal-form"><label>Read-only endpoint<input name="endpoint" value="http://127.0.0.1:8787" inputmode="url" pattern="https?://[^ ]+" required /></label><label>Bearer token<input name="token" type="password" autocomplete="off" placeholder="from supervisor token file" /></label><div class="form-note">The browser requests health, capability, and history only. It never receives root access or raw credentials.</div></form>`, { confirm: "Connect", onConfirm: async () => {
     const form = document.querySelector("#supervisor-form");
     if (!form?.reportValidity()) return false;
-    const endpoint = new FormData(form).get("endpoint");
+    const data = new FormData(form);
+    const endpoint = data.get("endpoint");
+    const token = data.get("token");
     try {
-      const connected = await connectSupervisor(endpoint);
+      const connected = await connectSupervisor(endpoint, token);
       fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
       fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
       closeModal(); render(); setToast("Supervisor connected in read-only mode.", "success");

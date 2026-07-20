@@ -18,6 +18,7 @@ import (
 // separately installed helper.
 type ExecStarter struct {
 	HelperPath string
+	Env        []string
 }
 
 func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, plan *landlock.Plan) (Process, error) {
@@ -61,7 +62,7 @@ func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, pl
 		return nil, fmt.Errorf("start agent: create start gate: %w", err)
 	}
 	process.ExtraFiles = []*os.File{gateRead}
-	process.Env = append(os.Environ(), "REWIND_START_GATE_FD=3")
+	process.Env = append(os.Environ(), append([]string{"REWIND_START_GATE_FD=3"}, s.Env...)...)
 	// Preserve the agent's terminal streams so helper and policy failures are
 	// visible to the operator instead of collapsing into "exit status 2".
 	process.Stdin = os.Stdin

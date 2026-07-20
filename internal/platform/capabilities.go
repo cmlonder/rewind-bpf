@@ -36,3 +36,7 @@ func (c Capability) ValidateForRun() error {
 	}
 	return nil
 }
+
+func NativeBackend() Backend {
+	return UnavailableBackend{Report: Probe()}
+}

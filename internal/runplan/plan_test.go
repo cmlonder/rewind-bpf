@@ -67,3 +67,14 @@ func TestBuildFailsClosedForUnavailableNetworkEnforcement(t *testing.T) {
 		t.Fatal("expected network enforcement to fail closed")
 	}
 }
+
+func TestBuildAcceptsExplicitProxyNetworkBackend(t *testing.T) {
+	workspace := t.TempDir()
+	plan, err := Build(Config{Workspace: workspace, RuntimeRoot: filepath.Join(t.TempDir(), "run"), NetworkBackend: "proxy", Policy: policy.Policy{Network: policy.NetworkPolicy{Mode: policy.ModeEnforce, AllowDomains: []string{"example.com"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Network.Mode != policy.ModeEnforce || len(plan.Network.AllowDomains) != 1 {
+		t.Fatalf("network plan=%+v", plan.Network)
+	}
+}

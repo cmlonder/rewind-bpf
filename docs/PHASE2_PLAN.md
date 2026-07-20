@@ -70,7 +70,7 @@ This is deliberately narrower than “protect the whole operating system” or �
 4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
 5. Conflict-aware `commit --confirm` is now implemented for regular files/directories. It refuses incomplete evidence, destination drift, unsafe paths, and symlink/other entries; branch/patch integration remains a separate product adapter.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
-7. Network and capability policy are represented in the policy model but are not equivalent to filesystem rollback.
+7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients. It is not equivalent to namespace-level or raw-socket isolation; unsupported clients must remain refused or visibly degraded.
 
 ### Phase 2 implementation progress
 

@@ -12,6 +12,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/landlock"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
+	"github.com/rewindbpf/rewind/internal/netpolicy"
 	"github.com/rewindbpf/rewind/internal/overlay"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policycompile"
@@ -23,6 +24,7 @@ type Config struct {
 	Policy         policy.Policy
 	RuntimeRoots   []string
 	OverlayBackend overlay.Backend
+	NetworkBackend string
 }
 
 type Plan struct {
@@ -36,6 +38,7 @@ type Plan struct {
 	CgroupPath     string                  `json:"cgroup_path,omitempty"`
 	Capabilities   capabilities.Report     `json:"capabilities,omitempty"`
 	HistoryPath    string                  `json:"history_path,omitempty"`
+	Network        netpolicy.Plan          `json:"network"`
 }
 
 // Build validates and composes all pre-execution state. The workspace is used
@@ -50,8 +53,12 @@ func Build(config Config) (Plan, error) {
 	if err := config.Policy.Validate(); err != nil {
 		return Plan{}, fmt.Errorf("build run plan: policy: %w", err)
 	}
-	if config.Policy.Network.Mode == policy.ModeEnforce {
-		return Plan{}, fmt.Errorf("build run plan: network enforce is unavailable; use off or audit until a network backend is configured")
+	networkPlan, err := netpolicy.Compile(config.Policy.Network)
+	if err != nil {
+		return Plan{}, fmt.Errorf("build run plan: network policy: %w", err)
+	}
+	if networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend != "proxy" {
+		return Plan{}, fmt.Errorf("build run plan: network enforce requires --network-backend proxy")
 	}
 	runtimeRoot, err := resolveRuntimeRoot(config.RuntimeRoot)
 	if err != nil {
@@ -93,7 +100,7 @@ func Build(config Config) (Plan, error) {
 	if backend != overlay.BackendFuse && backend != overlay.BackendKernel {
 		return Plan{}, fmt.Errorf("build run plan: unsupported overlay backend %q", backend)
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend}, nil
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan}, nil
 }
 
 func resolveWorkspace(value string) (string, error) {

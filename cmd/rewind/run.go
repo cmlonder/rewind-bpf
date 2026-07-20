@@ -25,6 +25,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
+	"github.com/rewindbpf/rewind/internal/netpolicy"
 	"github.com/rewindbpf/rewind/internal/overlay"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/protectedrun"
@@ -46,6 +47,7 @@ func handleRun(args []string) {
 	sensorObject := flags.String("sensor-object", "", "optional compiled telemetry object")
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
+	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	historyPath := flags.String("history", "", "optional durable run history JSON path")
 	if err := flags.Parse(args); err != nil {
@@ -71,6 +73,7 @@ func handleRun(args []string) {
 		Policy:         value,
 		RuntimeRoots:   splitCSV(*runtimeRoots),
 		OverlayBackend: overlay.Backend(*overlayBackend),
+		NetworkBackend: *networkBackend,
 	})
 	if err != nil {
 		fatal(err.Error())
@@ -129,14 +132,32 @@ func handleRun(args []string) {
 	if err != nil {
 		fatal(fmt.Sprintf("resolve rewind helper: %v", err))
 	}
+	var networkProxy *netpolicy.Proxy
+	var stopNetworkProxy context.CancelFunc
+	starter := protectedrun.ExecStarter{HelperPath: helper}
+	if plan.Network.Mode == policy.ModeEnforce {
+		networkProxy, err = netpolicy.ListenProxy(plan.Network)
+		if err != nil {
+			fatal(fmt.Sprintf("start network policy proxy: %v", err))
+		}
+		proxyCtx, cancel := context.WithCancel(context.Background())
+		stopNetworkProxy = cancel
+		go func() { _ = networkProxy.Serve(proxyCtx) }()
+		proxyURL := networkProxy.URL()
+		starter.Env = []string{"HTTP_PROXY=" + proxyURL, "HTTPS_PROXY=" + proxyURL, "ALL_PROXY=" + proxyURL, "NO_PROXY="}
+	}
 	coordinator := protectedrun.Coordinator{
 		Overlay: overlay.Manager{Owner: &owner, Backend: plan.OverlayBackend},
-		Starter: protectedrun.ExecStarter{HelperPath: helper},
+		Starter: starter,
 		Sensor:  telemetry,
 		Scope:   &scope,
 	}
 	handle, err := coordinator.Start(context.Background(), &plan, command, *sensorObject)
 	if err != nil {
+		if stopNetworkProxy != nil {
+			stopNetworkProxy()
+			_ = networkProxy.Close()
+		}
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		fatal(err.Error())
 	}
@@ -149,6 +170,9 @@ func handleRun(args []string) {
 		fatal(fmt.Sprintf("persist running history: %v", err))
 	}
 	waitErr := handle.Wait()
+	if stopNetworkProxy != nil {
+		defer func() { stopNetworkProxy(); _ = networkProxy.Close() }()
+	}
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
