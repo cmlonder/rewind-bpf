@@ -17,7 +17,7 @@ function render() {
 
 function bindInteractions() {
   document.querySelectorAll("[data-view]").forEach((element) => element.addEventListener("click", () => { state.view = element.dataset.view; render(); }));
-  document.querySelectorAll("[data-run-id]").forEach((element) => element.addEventListener("click", () => { state.selectedRun = element.dataset.runId; state.view = "run-detail"; render(); }));
+  document.querySelectorAll("[data-run-id]").forEach((element) => element.addEventListener("click", () => { const match = fixture.runs.find((item) => item.id === element.dataset.runId || item.shortId === element.dataset.runId); if (match) state.selectedRun = match.id; state.view = "run-detail"; render(); }));
   document.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", () => handleAction(element.dataset.action, element)));
   const policyFooter = document.querySelector(".policy-editor .editor-foot");
   if (policyFooter && !policyFooter.querySelector("[data-action=export-policy-bundle]")) {
@@ -405,7 +405,7 @@ function openWorkspaceEditor(name = "") {
 }
 
 function openConfigEditor(key) {
-  const labels = { overlay: ["Overlay backend", ["fuse-overlayfs", "kernel-overlayfs"]], readMode: ["Default read mode", ["off", "audit", "enforce"]], writeMode: ["Write behavior", ["rollback"]], network: ["Network mode", ["off", "audit", "enforce"]], eventCap: ["Total event cap", ["unlimited", "1 MiB", "16 MiB"]], rotation: ["Rotation size", ["256 KiB", "512 KiB", "1 MiB"]], retention: ["Retention", ["24 hours", "7 days", "30 days"]], truncation: ["On truncation", ["fail closed", "audit only"]], encryption: ["Bundle encryption", ["AES-256-GCM", "off"]], trustRotation: ["Trust rotation", ["2 pinned keys", "1 pinned key"]], remoteRetention: ["Remote hand-off", ["signed HTTPS", "local only"]], session: ["Session", ["reconnectable", "single-owner"]], pii: ["Content PII scan", ["audit-only", "off"]] };
+  const labels = { overlay: ["Overlay backend", ["fuse-overlayfs", "kernel-overlayfs"]], readMode: ["Default read mode", ["off", "audit", "enforce"]], writeMode: ["Write behavior", ["rollback"]], network: ["Network mode", ["off", "audit", "enforce"]], eventCap: ["Total event cap", ["unlimited", "1 MiB", "16 MiB"]], rotation: ["Rotation size", ["256 KiB", "512 KiB", "1 MiB"]], retention: ["Retention", ["24 hours", "7 days", "30 days"]], truncation: ["On truncation", ["fail closed", "audit only"]], encryption: ["Bundle encryption", ["AES-256-GCM", "off"]], trustRotation: ["Trust rotation", ["2 pinned keys", "1 pinned key"]], remoteRetention: ["Remote hand-off", ["signed HTTPS", "local only"]], session: ["Session", ["reconnectable", "single-owner"]], pii: ["Content PII scan", ["audit-only", "enforce", "off"]] };
   const [label, options] = labels[key] || [key, [fixture.config.values[key]]];
   openModal(`Edit ${label}`, `<form id="config-form" class="modal-form"><label>${label}<select name="value">${options.map((option) => `<option ${option === fixture.config.values[key] ? "selected" : ""}>${option}</option>`).join("")}</select></label><div class="form-note">This creates revision ${fixture.config.revision + 1}; active runs remain unchanged.</div></form>`, { confirm: "Save revision", onConfirm: () => { const value = new FormData(document.querySelector("#config-form")).get("value"); fixture.config.values[key] = value; fixture.config.revision += 1; closeModal(); render(); setToast(`${label} updated in revision ${fixture.config.revision}.`, "success"); } });
 }
@@ -440,7 +440,8 @@ function openModal(title, body, { confirm, tone = "orange", onConfirm }) {
     else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   };
   document.addEventListener("keydown", layer._onKeyDown);
-  layer.querySelector("[data-modal-confirm]").focus();
+  const initialFocus = layer.querySelector("input, select, textarea, [data-modal-confirm]");
+  initialFocus?.focus();
 }
 
 function closeModal() {
