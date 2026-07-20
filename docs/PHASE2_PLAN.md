@@ -69,7 +69,7 @@ This is deliberately narrower than “protect the whole operating system” or �
 2. Cgroup-v2 is now the primary process identity and drain boundary; PID descendant tracking remains in the eBPF sensor for event correlation and compatibility.
 3. The event stream is JSONL and can grow much faster than the run record; kernel-side reserve failures are now counted and make evidence incomplete. A bounded `REWIND_EVENT_MAX_BYTES` cap marks userspace truncation explicitly, while `REWIND_EVENT_ROTATE_BYTES` rotates the stream into ordered files without resetting the hash chain. The read-only evidence verifier checks the combined digest and chain; backpressure remains future work.
 4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
-5. Conflict-aware `commit --confirm` is now implemented for regular files/directories. It refuses incomplete evidence, destination drift, unsafe paths, and symlink/other entries; branch/patch integration remains a separate product adapter.
+5. Conflict-aware `commit --confirm` is now implemented for regular files/directories. It refuses incomplete evidence, destination drift, unsafe paths, and symlink/other entries; JSON export plus a text-file-only unified patch export are review artifacts, while branch and full-fidelity patch integration remain separate adapters.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
 7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients. Enforced runs also deny AF_PACKET and raw AF_INET/AF_INET6 socket creation through seccomp, but this is not equivalent to namespace-level or full egress isolation; unsupported clients must remain refused or visibly degraded.
 
@@ -151,7 +151,7 @@ These are product hypotheses to validate, not current claims:
 
 1. **Transaction-native writes:** make the lower/upper/merged filesystem boundary the primary object from which diffs, rollback, and future commit are derived, instead of treating undo as a post-session snapshot feature.
 2. **Filesystem and policy timeline in one run:** correlate the eBPF event stream, Landlock decisions, process/cgroup identity, upper-layer diff, and final state in one evidence bundle.
-3. **Conflict-safe export:** make `commit` refuse when the destination lower manifest changed, then export a reviewable patch/diff rather than overwriting the live workspace.
+3. **Conflict-safe export:** make `commit` refuse when the destination lower manifest changed, then export a reviewable JSON bundle or text-file patch rather than overwriting the live workspace.
 4. **Capability honesty:** report exactly which guarantees are active on this kernel (Landlock ABI, BPF-LSM, cgroup-v2, OverlayFS/FUSE, network backend) and fail closed when an enforce-mode guarantee cannot be provided.
 5. **Agent-agnostic deployment:** keep the core runtime independent of Claude/Codex/OpenHands/etc.; integrations remain thin adapters.
 
@@ -240,7 +240,7 @@ Each day has a demonstrable exit criterion. All privileged or destructive comman
 - Add a bounded ring-buffer/event pipeline with sequence numbers, dropped-event counters, backpressure policy, and rotation limits. Implemented slices: `REWIND_EVENT_MAX_BYTES` caps total retention, `REWIND_EVENT_ROTATE_BYTES` rolls the JSONL stream into ordered files while preserving the chain, and the reader continues draining the ring; capped streams persist `truncated=true` so verification fails closed.
 - Store compact JSONL for streaming plus a queryable run index (SQLite or an append-only compact format) for summaries.
 - Hash-chain event batches and include the final digest in the run record; document that this is tamper evidence, not a trusted remote log.
-- Add `rewind diff` to summarize created, modified, deleted, renamed, and policy-denied paths without printing secret contents. The non-mutating `rewind export` review bundle is implemented; conflict-checked commit remains separate.
+- Add `rewind diff` to summarize created, modified, deleted, renamed, and policy-denied paths without printing secret contents. The non-mutating JSON and text-file patch exports are implemented; conflict-checked commit remains separate.
 - Add `rewind capabilities`, `rewind inspect`, `rewind verify`, and machine-readable status output.
 
 **Tests**

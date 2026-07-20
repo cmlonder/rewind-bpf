@@ -487,6 +487,7 @@ func handleExport(args []string) {
 	flags.SetOutput(os.Stderr)
 	recordPath := flags.String("record", "", "run record JSON path")
 	outputPath := flags.String("output", "", "review bundle JSON output path")
+	format := flags.String("format", "json", "output format: json or patch (text files only)")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -515,10 +516,24 @@ func handleExport(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	if err := export.Write(*outputPath, bundle); err != nil {
-		fatal(err.Error())
+	switch strings.ToLower(strings.TrimSpace(*format)) {
+	case "json":
+		if err := export.Write(*outputPath, bundle); err != nil {
+			fatal(err.Error())
+		}
+		fmt.Printf("wrote review export with %d changes to %s\n", len(bundle.Changes), *outputPath)
+	case "patch":
+		patch, err := export.UnifiedPatch(bundle, record.Plan.Layout.Lower, record.Plan.Layout.Merged)
+		if err != nil {
+			fatal(err.Error())
+		}
+		if err := export.WritePatch(*outputPath, patch); err != nil {
+			fatal(err.Error())
+		}
+		fmt.Printf("wrote review patch with %d changes to %s\n", len(bundle.Changes), *outputPath)
+	default:
+		fatal(fmt.Sprintf("unsupported export format %q", *format))
 	}
-	fmt.Printf("wrote review export with %d changes to %s\n", len(bundle.Changes), *outputPath)
 }
 
 func pathWithin(root, candidate string) bool {
