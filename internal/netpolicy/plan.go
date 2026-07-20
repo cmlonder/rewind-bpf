@@ -25,11 +25,13 @@ type Plan struct {
 	CredentialRefs []policy.CredentialRef
 	RawSocketDeny  bool `json:"raw_socket_deny,omitempty"`
 	NetworkDeny    bool `json:"network_deny,omitempty"`
+	NetworkNS      bool `json:"network_namespace,omitempty"`
 }
 
 const (
 	BackendProxy = "proxy"
 	BackendDeny  = "deny"
+	BackendNS    = "namespace"
 )
 
 func Compile(value policy.NetworkPolicy) (Plan, error) {

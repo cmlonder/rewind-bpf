@@ -57,17 +57,18 @@ func Build(config Config) (Plan, error) {
 	if err != nil {
 		return Plan{}, fmt.Errorf("build run plan: network policy: %w", err)
 	}
-	if networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend != netpolicy.BackendProxy && config.NetworkBackend != netpolicy.BackendDeny {
-		return Plan{}, fmt.Errorf("build run plan: network enforce requires --network-backend proxy or deny")
+	if networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend != netpolicy.BackendProxy && config.NetworkBackend != netpolicy.BackendDeny && config.NetworkBackend != netpolicy.BackendNS {
+		return Plan{}, fmt.Errorf("build run plan: network enforce requires --network-backend proxy, deny, or namespace")
 	}
-	if config.NetworkBackend == netpolicy.BackendDeny && len(networkPlan.AllowDomains) > 0 {
-		return Plan{}, fmt.Errorf("build run plan: deny network backend cannot provide allow_domains; use proxy backend")
+	if (config.NetworkBackend == netpolicy.BackendDeny || config.NetworkBackend == netpolicy.BackendNS) && len(networkPlan.AllowDomains) > 0 {
+		return Plan{}, fmt.Errorf("build run plan: %s network backend cannot provide allow_domains; use proxy backend", config.NetworkBackend)
 	}
 	// Keep the defense decision in the inert plan that is persisted before
 	// process start. This makes the run record auditable and prevents the
 	// coordinator from silently changing the security posture after planning.
 	networkPlan.RawSocketDeny = networkPlan.Mode == policy.ModeEnforce && (config.NetworkBackend == netpolicy.BackendProxy || config.NetworkBackend == netpolicy.BackendDeny)
 	networkPlan.NetworkDeny = networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend == netpolicy.BackendDeny
+	networkPlan.NetworkNS = networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend == netpolicy.BackendNS
 	runtimeRoot, err := resolveRuntimeRoot(config.RuntimeRoot)
 	if err != nil {
 		return Plan{}, err

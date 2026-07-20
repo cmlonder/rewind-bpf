@@ -17,10 +17,11 @@ import (
 // intentionally explicit so the final CLI can use the same binary or a
 // separately installed helper.
 type ExecStarter struct {
-	HelperPath     string
-	Env            []string
-	DenyRawNetwork bool
-	DenyNetwork    bool
+	HelperPath       string
+	Env              []string
+	DenyRawNetwork   bool
+	DenyNetwork      bool
+	NetworkNamespace bool
 }
 
 func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, plan *landlock.Plan) (Process, error) {
@@ -46,6 +47,9 @@ func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, pl
 	}
 	if s.DenyNetwork {
 		args = append(args, "--deny-network")
+	}
+	if s.NetworkNamespace {
+		args = append(args, "--network-namespace")
 	}
 	var planPath string
 	if plan != nil {

@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/rewindbpf/rewind/internal/landlock"
+	"github.com/rewindbpf/rewind/internal/netns"
 	"github.com/rewindbpf/rewind/internal/seccomp"
 )
 
@@ -19,6 +20,7 @@ func handleHelper(args []string) {
 	planPath := flags.String("plan-file", "", "JSON Landlock plan written by the parent runtime")
 	denyRawNetwork := flags.Bool("deny-raw-network", false, "deny raw and packet socket creation before exec")
 	denyNetwork := flags.Bool("deny-network", false, "deny Internet and packet sockets before exec")
+	networkNamespace := flags.Bool("network-namespace", false, "enter an isolated Linux network namespace before exec")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -43,6 +45,11 @@ func handleHelper(args []string) {
 			fatal(fmt.Sprintf("close Landlock plan: %v", closeErr))
 		}
 		plan = &value
+	}
+	if *networkNamespace {
+		if err := netns.Enter(); err != nil {
+			fatal(err.Error())
+		}
 	}
 	if err := dropRootAgentPrivileges(); err != nil {
 		fatal(err.Error())

@@ -48,7 +48,7 @@ func handleRun(args []string) {
 	sensorObject := flags.String("sensor-object", "", "optional compiled telemetry object")
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
-	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy or deny")
+	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy, deny, or namespace")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	historyPath := flags.String("history", "", "optional durable run history JSON path")
 	if err := flags.Parse(args); err != nil {
@@ -97,6 +97,9 @@ func handleRun(args []string) {
 	if err := capabilityReport.ValidateForProtectedRun(string(*overlayBackend), plan.Landlock != nil, plan.Network.RawSocketDeny); err != nil {
 		fatal(fmt.Sprintf("protected-run capability check: %v", err))
 	}
+	if plan.Network.NetworkNS && !capabilityReport.NetworkNS {
+		fatal("protected-run capability check: network namespace backend is unavailable")
+	}
 	plan.Capabilities = capabilityReport
 	plan.HistoryPath = *historyPath
 	// Prepare the dedicated runtime tree before the first journal write. The
@@ -144,7 +147,7 @@ func handleRun(args []string) {
 		stopNetworkProxy = nil
 		networkProxy = nil
 	}
-	starter := protectedrun.ExecStarter{HelperPath: helper, DenyRawNetwork: plan.Network.RawSocketDeny, DenyNetwork: plan.Network.NetworkDeny}
+	starter := protectedrun.ExecStarter{HelperPath: helper, DenyRawNetwork: plan.Network.RawSocketDeny, DenyNetwork: plan.Network.NetworkDeny, NetworkNamespace: plan.Network.NetworkNS}
 	// An explicit proxy backend can observe audit mode as well as enforce mode.
 	// Audit stays zero-overhead when no backend is selected; enforce remains
 	// fail-closed in runplan.Build unless the proxy is explicitly requested.

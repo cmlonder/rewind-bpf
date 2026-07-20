@@ -179,6 +179,17 @@ sudo "$BIN" rollback --record "$ROOT/network-deny/runtime/record.json"
 # the telemetry hook; the process outcome is the authoritative evidence here.
 echo "non-proxy deny backend: PASS"
 
+# 4c. The namespace backend provides a kernel network boundary independent of
+# seccomp. No route or interface is configured, so a normal TCP connect fails
+# while local Unix-domain socket creation remains usable.
+mkdir -p "$ROOT/network-namespace/workspace"
+make_policy "$ROOT/network-namespace/policy.yaml" off enforce
+sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/network-namespace/workspace" "$ROOT/network-namespace/runtime" "$ROOT/network-namespace/policy.yaml" "$ROOT/network-namespace/runtime/record.json") --network-backend namespace --on-success review -- \
+  /bin/sh -c '/usr/bin/python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(0.2); s.connect((\"127.0.0.1\", 9))" && printf "network-connected\\n" > net.status || printf "network-isolated\\n" > net.status; /usr/bin/python3 -c "import socket; socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)" && printf "unix-allowed\\n" >> net.status'
+test "$(cat "$ROOT/network-namespace/runtime/merged/net.status")" = $'network-isolated\nunix-allowed'
+sudo "$BIN" rollback --record "$ROOT/network-namespace/runtime/record.json"
+echo "network namespace isolation: PASS"
+
 # 5. Bounded evidence must fail verification rather than look complete.
 mkdir -p "$ROOT/evidence/workspace"
 make_policy "$ROOT/evidence/policy.yaml" off audit

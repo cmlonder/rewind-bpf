@@ -22,6 +22,7 @@ type Report struct {
 	BPFLSM        bool     `json:"bpf_lsm"`
 	CgroupV2      bool     `json:"cgroup_v2"`
 	Seccomp       bool     `json:"seccomp"`
+	NetworkNS     bool     `json:"network_namespace"`
 	Warnings      []string `json:"warnings,omitempty"`
 }
 
@@ -36,6 +37,9 @@ func Probe() Report {
 	report.CgroupV2 = exists("/sys/fs/cgroup/cgroup.controllers") && readTrimmed("/sys/fs/cgroup/cgroup.controllers") != ""
 	if _, err := exec.LookPath("fuse-overlayfs"); err == nil {
 		report.FuseOverlayFS = true
+	}
+	if _, err := exec.LookPath("unshare"); err == nil {
+		report.NetworkNS = true
 	}
 	// The Seccomp field in /proc/self/status only reports this process' current
 	// mode (usually 0); it is not a capability probe. The actions_avail kernel

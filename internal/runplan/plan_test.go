@@ -144,3 +144,19 @@ func TestBuildRejectsAllowListWithDenyNetworkBackend(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestBuildAcceptsIsolatedNetworkNamespaceBackend(t *testing.T) {
+	workspace := t.TempDir()
+	plan, err := Build(Config{
+		Workspace:      workspace,
+		RuntimeRoot:    filepath.Join(t.TempDir(), "run"),
+		NetworkBackend: "namespace",
+		Policy:         policy.Policy{Network: policy.NetworkPolicy{Mode: policy.ModeEnforce}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Network.NetworkNS || plan.Network.RawSocketDeny || plan.Network.NetworkDeny {
+		t.Fatalf("network plan=%+v, want namespace-only boundary", plan.Network)
+	}
+}

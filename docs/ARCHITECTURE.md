@@ -138,7 +138,7 @@ The daemon is expected to run with narrowly scoped Linux capabilities inside the
 
 The kernel data plane observes target process/cgroup activity and emits compact events through a ring buffer. It does not create snapshots after the fact. Candidate observation points include `execve`, `openat/openat2`, `unlinkat`, `renameat2`, `write`, `pwrite`, `truncate`, and `ftruncate`.
 
-For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; `network.mode: audit` can use the same explicit backend to persist observed decisions without denying. Each proxy decision is appended to the run evidence chain. Enforce runs additionally install a narrow seccomp filter that denies AF_PACKET and AF_INET/AF_INET6 `SOCK_RAW` creation while leaving normal TCP/UDP sockets available to the proxy. The eBPF `socket` tracepoint records the attempted family class as an allow/deny evidence event, so the operator can correlate refusal with the process timeline. Network namespaces, non-proxy-aware egress, and broader socket policy remain outside this guarantee.
+For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; `network.mode: audit` can use the same explicit backend to persist observed decisions without denying. Each proxy decision is appended to the run evidence chain. Proxy enforce runs additionally install a narrow seccomp filter that denies AF_PACKET and AF_INET/AF_INET6 `SOCK_RAW` creation while leaving normal TCP/UDP sockets available to the proxy. The explicit `deny` backend extends seccomp to refuse Internet socket creation and connect attempts; the `namespace` backend enters a new Linux network namespace without configuring interfaces or routes. Both are fail-closed no-egress boundaries for non-proxy-aware clients, not allow-listed egress. The eBPF `socket` tracepoint records the attempted family class where the syscall reaches the hook; seccomp-only refusals remain process-outcome evidence. Allow-listed namespace/cgroup egress remains a separate deployment backend.
 
 #### OverlayFS transaction
 
@@ -550,7 +550,7 @@ A module is ready when it has:
 
 The package does not start processes, mount filesystems, parse policies, or load eBPF. Those operations remain separate integration boundaries for the daemon. Its tests run on the development host and require no kernel or privileged filesystem state.
 
-The serialized `runplan.Plan.Network` section is persisted before process release. In enforced proxy runs it records `raw_socket_deny=true`, making the seccomp defense part of the auditable pre-execution posture rather than an implicit coordinator-side mutation.
+The serialized `runplan.Plan.Network` section is persisted before process release. In enforced proxy and deny runs it records `raw_socket_deny=true`; deny runs also record `network_deny=true`, while namespace runs record `network_namespace=true`. These fields make the selected defense part of the auditable pre-execution posture rather than an implicit coordinator-side mutation.
 
 ## 20. Stage 4 event contract foundation
 
