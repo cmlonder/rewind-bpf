@@ -172,9 +172,9 @@ for action requests. Authenticated `status`, `rollback`/`recover`, and
 explicit `commit` (`confirmation: "COMMIT"`) actions are routed through the
 same lifecycle and conflict checks as the CLI. Each accepted or refused action
 is appended to `/tmp/rewind-history.json.actions.jsonl` without tokens or file
-contents. The Control Plane’s browser adapter can send those same intents when
-the explicit HTTP bridge is enabled; fixture mode remains the safe default for
-the static demo.
+contents. The Control Plane’s browser adapter can send those same intents and
+persist validated local policy/workspace assignments when the explicit HTTP
+bridge is enabled; fixture mode remains the safe default for the static demo.
 
 Example policy:
 

@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/supervisor"
 )
@@ -28,10 +29,11 @@ func handleSupervisor(args []string) {
 	socketPath := flags.String("socket", "", "Unix socket path")
 	historyPath := flags.String("history", "", "durable history JSON path")
 	tokenPath := flags.String("token-file", "", "bearer token file (created with mode 0600 when absent)")
+	configPath := flags.String("config", "", "local policy/workspace config JSON path")
 	httpListen := flags.String("http-listen", "", "optional loopback HTTP bridge address, e.g. 127.0.0.1:8787")
 	corsOrigin := flags.String("cors-origin", "", "optional exact browser origin allowed for the HTTP bridge")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fatal("usage: rewind supervisor --socket PATH --history PATH [--http-listen 127.0.0.1:8787 --cors-origin ORIGIN]")
+		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN]")
 	}
 	if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
 		fatal(err.Error())
@@ -49,6 +51,9 @@ func handleSupervisor(args []string) {
 	}
 	if *tokenPath == "" {
 		*tokenPath = *socketPath + ".token"
+	}
+	if strings.TrimSpace(*configPath) == "" {
+		*configPath = *historyPath + ".config.json"
 	}
 	token, err := loadSupervisorToken(*tokenPath)
 	if err != nil {
@@ -73,6 +78,7 @@ func handleSupervisor(args []string) {
 	baseServer := supervisor.Server{
 		History:   history.Open(*historyPath),
 		AuthToken: token,
+		Config:    controlplane.Open(*configPath),
 		AuditPath: *historyPath + ".actions.jsonl",
 		AuditMu:   &sync.Mutex{},
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {

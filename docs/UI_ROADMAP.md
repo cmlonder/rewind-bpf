@@ -1,6 +1,6 @@
 # Rewind Control Plane UI Roadmap
 
-Status: Fixture control plane delivered; authenticated loopback supervisor bridge available
+Status: Fixture control plane delivered; authenticated loopback supervisor bridge and local config writes available
 Audience: hackathon jurors, security-minded engineers, and developers running autonomous agents on Linux
 
 ## 1. Product decision
@@ -332,16 +332,17 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining connected work is browser-side mutation and end-to-end reconnect/
-recovery behavior. P4 now has a bounded history contract, signed policy
-provenance, a token-authenticated Unix-socket server, snapshot and follow-mode
-event endpoints, a browser adapter, and a fixture-backed retention view. The socket
-and bearer token are protected with mode `0600`; authenticated status,
-rollback/recover, and explicit commit actions now route through the same runtime
-lifecycle and conflict checks as the CLI, with redacted JSONL action audit. Local
-authentication/authorization beyond that token boundary is explicitly a
-post-demo hardening item; the hackathon UI remains fixture-safe and never
-receives root access.
+The remaining connected work is end-to-end reconnect/recovery behavior and
+signed policy upload UX. P4 now has a bounded history contract, signed policy
+provenance, a token-authenticated Unix-socket server, an optional loopback HTTP
+bridge, snapshot and follow-mode event endpoints, local policy/workspace config
+writes, a browser adapter, and a fixture-backed retention view. The socket,
+HTTP bridge, and bearer token are protected by explicit loopback/mode `0600`
+boundaries; authenticated status, rollback/recover, commit, policy creation,
+and workspace assignment route through supervisor code with redacted JSONL
+action audit. Local authentication/authorization beyond that token boundary is
+explicitly a post-demo hardening item; the hackathon UI remains fixture-safe and
+never receives root access.
 
 The UI is being kept platform-neutral. It must show the active backend and capability matrix explicitly: Linux OverlayFS/FUSE + Landlock/eBPF, macOS Seatbelt/EndpointSecurity + APFS/disposable workspace, or Windows native process/filesystem policy + disposable workspace. A platform adapter that cannot provide one of the four product promises must render degraded/refused state rather than silently presenting Linux-level guarantees.
 
@@ -365,14 +366,14 @@ Add global config, policy package CRUD, workspace assignments, effective-policy 
 
 Exit: an operator can create a package, simulate it, assign it to a workspace, and see the immutable snapshot used by a new run.
 
-### Phase 4 — Supervisor integration — read/action boundary delivered
+### Phase 4 — Supervisor integration — authenticated action/config boundary delivered
 
-The current bridge exposes a mode-0600 Unix socket, bearer-authenticated
-history/events, lifecycle actions, follow-mode streams, and persistent redacted
-action audit. Continue with browser mutation through a local action-token bridge
-and recovery/reconnect behavior. Add local authentication beyond the
-socket/token boundary after the demo unless the connected deployment requires it
-earlier.
+The current bridge exposes a mode-0600 Unix socket, an optional loopback HTTP
+bridge, bearer-authenticated history/events, lifecycle actions, policy/workspace
+config writes, follow-mode streams, and persistent redacted action audit. Add
+recovery/reconnect behavior and signed policy upload UX. Add local authentication
+beyond the socket/token boundary after the demo unless the connected deployment
+requires it earlier.
 
 Exit: UI state matches runtime state under refresh, reconnect, supervisor restart, and recovery scenarios.
 

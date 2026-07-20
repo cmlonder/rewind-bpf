@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
@@ -52,6 +53,37 @@ func TestHTTPBridgeRequiresAuthForReadEndpointsAndSetsCORS(t *testing.T) {
 	server.Handler().ServeHTTP(preflight, httptest.NewRequest(http.MethodOptions, "/v1/actions", nil))
 	if preflight.Code != http.StatusNoContent {
 		t.Fatalf("preflight status=%d", preflight.Code)
+	}
+}
+
+func TestConfigEndpointsRequireAuthAndPersistValidatedChanges(t *testing.T) {
+	server := Server{AuthToken: "secret", RequireAuth: true, Config: controlplane.Open(filepath.Join(t.TempDir(), "config.json")), AuditPath: filepath.Join(t.TempDir(), "audit.jsonl"), AuditMu: &sync.Mutex{}}
+	unauthorized := httptest.NewRecorder()
+	server.Handler().ServeHTTP(unauthorized, httptest.NewRequest(http.MethodGet, "/v1/policies", nil))
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("policies status=%d", unauthorized.Code)
+	}
+	policyPayload := `{"name":"strict-agent","version":"1.0.0","description":"review first","policy":{"read":{"mode":"audit"},"write":{"mode":"rollback","scope":"workspace"},"network":{"mode":"off"}}}`
+	request := httptest.NewRequest(http.MethodPost, "/v1/policies", strings.NewReader(policyPayload))
+	request.Header.Set("Authorization", "Bearer secret")
+	created := httptest.NewRecorder()
+	server.Handler().ServeHTTP(created, request)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create policy status=%d body=%s", created.Code, created.Body.String())
+	}
+	workspace := httptest.NewRequest(http.MethodPost, "/v1/workspaces", strings.NewReader(`{"name":"payments-api","path":"/workspaces/payments-api","policy":"strict-agent@1.0.0"}`))
+	workspace.Header.Set("Authorization", "Bearer secret")
+	assigned := httptest.NewRecorder()
+	server.Handler().ServeHTTP(assigned, workspace)
+	if assigned.Code != http.StatusCreated {
+		t.Fatalf("assign workspace status=%d body=%s", assigned.Code, assigned.Body.String())
+	}
+	read := httptest.NewRequest(http.MethodGet, "/v1/workspaces", nil)
+	read.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, read)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "payments-api") {
+		t.Fatalf("workspace response status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 

@@ -92,6 +92,8 @@ function openSupervisorConnector() {
         fixture.runs = connected.history.map(remoteRun);
         state.selectedRun = fixture.runs[0].id;
       }
+      if (connected.policies.length) fixture.policies = connected.policies.map(remotePolicy);
+      if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
       if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
       followConnectedEvents();
       closeModal(); render(); setToast("Supervisor connected: live evidence and authenticated actions enabled.", "success");
@@ -143,6 +145,33 @@ function remoteRun(item) {
     resources: { pids: "—", memory: "—", cpu: "—" },
     events: [{ time: "—", type: "lifecycle", operation: "SUPERVISOR SNAPSHOT", path: id, decision: "allow", risk: "low", detail: "Connect to the event stream for live evidence." }],
     diff: [],
+  };
+}
+
+function remotePolicy(item) {
+  return {
+    name: item.name,
+    version: item.version,
+    state: "available",
+    signed: Boolean(item.signed),
+    description: item.description || "Local supervisor policy package",
+    reads: item.policy?.read?.mode || "off",
+    writes: item.policy?.write?.mode || "rollback",
+    network: item.policy?.network?.mode || "off",
+    assigned: 0,
+    updated: item.updated_at ? new Date(item.updated_at).toLocaleString() : "just now",
+  };
+}
+
+function remoteWorkspace(item) {
+  return {
+    name: item.name,
+    path: item.path,
+    policy: item.policy,
+    status: "protected",
+    lastRun: "—",
+    agent: "not configured",
+    network: "reported by policy",
   };
 }
 
@@ -198,8 +227,13 @@ function openPolicyEditor() {
     const form = document.querySelector("#policy-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
-    fixture.policies.unshift({ name: data.get("name"), version: data.get("version"), state: "available", description: data.get("description"), reads: "audit", writes: "rollback", network: "off", assigned: 0, updated: "just now" });
-    closeModal(); render(); setToast("Policy package created in fixture mode.", "success");
+    const value = { name: data.get("name"), version: data.get("version"), description: data.get("description"), policy: { read: { mode: "audit" }, write: { mode: "rollback", scope: "workspace" }, network: { mode: "off" } } };
+    const save = state.supervisor ? state.supervisor.createPolicy(value) : Promise.resolve();
+    save.then(() => {
+      fixture.policies.unshift({ name: value.name, version: value.version, state: "available", signed: false, description: value.description, reads: "audit", writes: "rollback", network: "off", assigned: 0, updated: "just now" });
+      closeModal(); render(); setToast(state.supervisor ? "Policy package persisted by supervisor." : "Policy package created in fixture mode.", "success");
+    }).catch((error) => setToast(`Policy package refused: ${error.message}`, "error"));
+    return save;
   } });
 }
 
@@ -208,9 +242,14 @@ function openWorkspaceEditor(name = "") {
     const form = document.querySelector("#workspace-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
-    const existing = fixture.workspaces.find((workspace) => workspace.name === name);
-    if (existing) { existing.path = data.get("path"); existing.policy = data.get("policy"); } else fixture.workspaces.push({ name: data.get("name"), path: data.get("path"), policy: data.get("policy"), status: "protected", lastRun: "—", agent: "not configured", network: "off" });
-    closeModal(); render(); setToast("Workspace assignment saved for future runs.", "success");
+    const value = { name: data.get("name"), path: data.get("path"), policy: data.get("policy") };
+    const save = state.supervisor ? state.supervisor.assignWorkspace(value) : Promise.resolve();
+    save.then(() => {
+      const existing = fixture.workspaces.find((workspace) => workspace.name === name);
+      if (existing) { existing.path = value.path; existing.policy = value.policy; } else fixture.workspaces.push({ name: value.name, path: value.path, policy: value.policy, status: "protected", lastRun: "—", agent: "not configured", network: "off" });
+      closeModal(); render(); setToast(state.supervisor ? "Workspace assignment persisted by supervisor." : "Workspace assignment saved for future runs.", "success");
+    }).catch((error) => setToast(`Workspace assignment refused: ${error.message}`, "error"));
+    return save;
   } });
 }
 

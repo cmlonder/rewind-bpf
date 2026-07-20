@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/platform"
@@ -34,6 +35,7 @@ type Server struct {
 	// because the socket itself is mode 0600.
 	RequireAuth bool
 	CORSOrigin  string
+	Config      *controlplane.Store
 }
 
 func (s Server) Handler() http.Handler {
@@ -63,6 +65,72 @@ func (s Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, entries)
+	})
+	mux.HandleFunc("/v1/policies", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if s.RequireAuth && !s.authorized(r) {
+				writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+				return
+			}
+			snapshot, err := s.configSnapshot()
+			if err != nil {
+				writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "refused", Message: err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, snapshot.Policies)
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "policies require GET or POST"})
+			return
+		}
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		var value controlplane.PolicyPackage
+		if err := json.NewDecoder(r.Body).Decode(&value); err != nil {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "invalid policy package"})
+			return
+		}
+		if err := s.createPolicy(value); err != nil {
+			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusCreated, Response{OK: true, State: "created", Message: value.Name + "@" + value.Version})
+	})
+	mux.HandleFunc("/v1/workspaces", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if s.RequireAuth && !s.authorized(r) {
+				writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+				return
+			}
+			snapshot, err := s.configSnapshot()
+			if err != nil {
+				writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "refused", Message: err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, snapshot.Workspaces)
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "workspaces require GET or POST"})
+			return
+		}
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		var value controlplane.Workspace
+		if err := json.NewDecoder(r.Body).Decode(&value); err != nil {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "invalid workspace assignment"})
+			return
+		}
+		if err := s.assignWorkspace(value); err != nil {
+			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusCreated, Response{OK: true, State: "assigned", Message: value.Name})
 	})
 	mux.HandleFunc("/v1/audit", s.auditLog)
 	mux.HandleFunc("/v1/events", s.events)
@@ -116,6 +184,35 @@ func (s Server) Handler() http.Handler {
 		}
 		mux.ServeHTTP(w, r)
 	})
+}
+
+func (s Server) configSnapshot() (controlplane.Snapshot, error) {
+	if s.Config == nil || !s.Config.Enabled() {
+		return controlplane.Snapshot{}, fmt.Errorf("control-plane config store is disabled")
+	}
+	return s.Config.Snapshot()
+}
+
+func (s Server) createPolicy(value controlplane.PolicyPackage) error {
+	if s.Config == nil || !s.Config.Enabled() {
+		return fmt.Errorf("control-plane config store is disabled")
+	}
+	if err := s.Config.CreatePolicy(value); err != nil {
+		return err
+	}
+	s.recordAudit(Request{Action: "policy_create", Policy: value.Name + "@" + value.Version}, Response{OK: true, State: "created", Message: value.Name + "@" + value.Version}, nil)
+	return nil
+}
+
+func (s Server) assignWorkspace(value controlplane.Workspace) error {
+	if s.Config == nil || !s.Config.Enabled() {
+		return fmt.Errorf("control-plane config store is disabled")
+	}
+	if err := s.Config.AssignWorkspace(value); err != nil {
+		return err
+	}
+	s.recordAudit(Request{Action: "workspace_assign", Workspace: value.Name, Policy: value.Policy}, Response{OK: true, State: "assigned", Message: value.Name}, nil)
+	return nil
 }
 
 func (s Server) recordAudit(request Request, response Response, actionErr error) {

@@ -1,25 +1,42 @@
 // The browser adapter is intentionally unprivileged. It talks to a local
-// authenticated supervisor HTTP endpoint; privileged actions remain supervisor
-// decisions and never run in browser code.
+// authenticated supervisor HTTP endpoint; privileged actions and config writes
+// remain supervisor decisions and never run in browser code.
 export async function connectSupervisor(baseUrl, token = "") {
   const root = baseUrl.replace(/\/$/, "");
   const headers = { Accept: "application/json" };
   if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-  const [health, capabilities, history, audit] = await Promise.all([
+  const [health, capabilities, history, audit, policies, workspaces] = await Promise.all([
     fetch(`${root}/health`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/capabilities`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/history`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/audit?limit=100`, { headers }).then(assertResponse).then((response) => response.json()),
+    fetch(`${root}/v1/policies`, { headers }).then(assertResponse).then((response) => response.json()),
+    fetch(`${root}/v1/workspaces`, { headers }).then(assertResponse).then((response) => response.json()),
   ]);
   return {
     health,
     capabilities,
     history: Array.isArray(history) ? history : [],
     audit: Array.isArray(audit) ? audit : [],
+    policies: Array.isArray(policies) ? policies : [],
+    workspaces: Array.isArray(workspaces) ? workspaces : [],
     token: token.trim(),
     baseUrl: root,
     action: (request) => executeAction(root, token.trim(), request),
+    createPolicy: (value) => createResource(root, token.trim(), "policies", value),
+    assignWorkspace: (value) => createResource(root, token.trim(), "workspaces", value),
   };
+}
+
+async function createResource(baseUrl, token, resource, value) {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/${resource}`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify(value),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
 }
 
 export async function executeAction(baseUrl, token, request) {
