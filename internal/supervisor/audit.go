@@ -1,6 +1,7 @@
 package supervisor
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -36,4 +37,34 @@ func appendAudit(path string, entry AuditEntry) error {
 		return fmt.Errorf("write supervisor audit: %w", err)
 	}
 	return nil
+}
+
+func readAudit(path string, limit int) ([]AuditEntry, error) {
+	if path == "" {
+		return []AuditEntry{}, nil
+	}
+	file, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return []AuditEntry{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("open supervisor audit: %w", err)
+	}
+	defer file.Close()
+	entries := make([]AuditEntry, 0, limit)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		var entry AuditEntry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			continue
+		}
+		entries = append(entries, entry)
+		if len(entries) > limit {
+			entries = entries[1:]
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("read supervisor audit: %w", err)
+	}
+	return entries, nil
 }

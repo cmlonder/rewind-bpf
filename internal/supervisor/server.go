@@ -48,6 +48,7 @@ func (s Server) Handler() http.Handler {
 		}
 		writeJSON(w, http.StatusOK, entries)
 	})
+	mux.HandleFunc("/v1/audit", s.auditLog)
 	mux.HandleFunc("/v1/events", s.events)
 	mux.HandleFunc("/v1/actions", func(w http.ResponseWriter, r *http.Request) {
 		if !s.authorized(r) {
@@ -69,18 +70,18 @@ func (s Server) Handler() http.Handler {
 		}
 		if s.Actions == nil {
 			response := Response{OK: false, State: "refused", Message: "runtime action handler is not connected"}
-			s.audit(request, response, nil)
+			s.recordAudit(request, response, nil)
 			writeJSON(w, http.StatusNotImplemented, response)
 			return
 		}
 		response, err := s.Actions(request)
 		if err != nil {
 			refused := Response{OK: false, State: "refused", Message: err.Error()}
-			s.audit(request, refused, err)
+			s.recordAudit(request, refused, err)
 			writeJSON(w, http.StatusConflict, refused)
 			return
 		}
-		s.audit(request, response, nil)
+		s.recordAudit(request, response, nil)
 		writeJSON(w, http.StatusOK, response)
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
@@ -89,7 +90,7 @@ func (s Server) Handler() http.Handler {
 	return mux
 }
 
-func (s Server) audit(request Request, response Response, actionErr error) {
+func (s Server) recordAudit(request Request, response Response, actionErr error) {
 	if strings.TrimSpace(s.AuditPath) == "" {
 		return
 	}
@@ -111,6 +112,35 @@ func (s Server) audit(request Request, response Response, actionErr error) {
 	mu.Lock()
 	defer mu.Unlock()
 	_ = appendAudit(s.AuditPath, entry)
+}
+
+func (s Server) auditLog(w http.ResponseWriter, r *http.Request) {
+	if !s.authorized(r) {
+		writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+		return
+	}
+	if r.Method != http.MethodGet {
+		writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "audit is read-only over this endpoint"})
+		return
+	}
+	limit := 100
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		value, err := strconv.Atoi(raw)
+		if err != nil || value < 1 {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, Message: "audit limit must be a positive integer"})
+			return
+		}
+		if value > 500 {
+			value = 500
+		}
+		limit = value
+	}
+	entries, err := readAudit(s.AuditPath, limit)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, Response{OK: false, Message: err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusOK, entries)
 }
 
 func (s Server) authorized(r *http.Request) bool {

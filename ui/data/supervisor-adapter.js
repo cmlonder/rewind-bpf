@@ -5,12 +5,13 @@ export async function connectSupervisor(baseUrl, token = "") {
   const root = baseUrl.replace(/\/$/, "");
   const headers = { Accept: "application/json" };
   if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-  const [health, capabilities, history] = await Promise.all([
+  const [health, capabilities, history, audit] = await Promise.all([
     fetch(`${root}/health`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/capabilities`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/history`, { headers }).then(assertResponse).then((response) => response.json()),
+    fetch(`${root}/v1/audit?limit=100`, { headers }).then(assertResponse).then((response) => response.json()),
   ]);
-  return { health, capabilities, history: Array.isArray(history) ? history : [], token: token.trim() };
+  return { health, capabilities, history: Array.isArray(history) ? history : [], audit: Array.isArray(audit) ? audit : [], token: token.trim() };
 }
 
 async function assertResponse(response) {

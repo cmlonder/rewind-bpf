@@ -87,6 +87,7 @@ function openSupervisorConnector() {
       const connected = await connectSupervisor(endpoint, token);
       fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
       fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
+      if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
       closeModal(); render(); setToast("Supervisor connected in read-only mode.", "success");
     } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
   } });

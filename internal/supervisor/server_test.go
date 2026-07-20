@@ -76,6 +76,30 @@ func TestAuthenticatedActionHandlerReceivesValidatedRequest(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedAuditReadIsBounded(t *testing.T) {
+	auditPath := filepath.Join(t.TempDir(), "actions.jsonl")
+	for i := 0; i < 3; i++ {
+		if err := appendAudit(auditPath, AuditEntry{Action: "status", RunID: string(rune('a' + i))}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	server := Server{AuthToken: "secret", AuditPath: auditPath}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/v1/audit?limit=2", nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	server.Handler().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var entries []AuditEntry
+	if err := json.Unmarshal(recorder.Body.Bytes(), &entries); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 2 || entries[0].RunID != "b" || entries[1].RunID != "c" {
+		t.Fatalf("entries=%+v", entries)
+	}
+}
+
 func TestValidateUnixSocketPath(t *testing.T) {
 	if err := ValidateUnixSocketPath(""); err == nil {
 		t.Fatal("empty socket path should fail")

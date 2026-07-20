@@ -668,6 +668,7 @@ deliberately narrow:
 GET  /health
 GET  /v1/capabilities
 GET  /v1/history
+GET  /v1/audit?limit=100
 GET  /v1/events?run_id=...           (snapshot)
 GET  /v1/events?run_id=...&follow=true (tail until terminal/timeout)
 POST /v1/actions  {status|rollback|recover|commit}
