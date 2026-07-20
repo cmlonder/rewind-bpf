@@ -185,6 +185,7 @@ function remotePolicy(item) {
     version: item.version,
     state: "available",
     signed: Boolean(item.signed),
+    signerKeyId: item.signer_key_id || "",
     description: item.description || "Local supervisor policy package",
     reads: item.policy?.read?.mode || "off",
     writes: item.policy?.write?.mode || "rollback",
