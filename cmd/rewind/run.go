@@ -804,6 +804,13 @@ func (a *telemetryAdapter) readLoop() {
 }
 
 func (a *telemetryAdapter) append(value event.Event) error {
+	// Event paths and network hosts are metadata, but they can still contain
+	// an email, token-shaped segment, or other user data. Redact before the
+	// event enters the hash chain so the persisted evidence cannot leak the
+	// original value through JSONL, follow streams, or exported bundles.
+	if value.Path != "" {
+		value.Path = string(pii.RedactBytes([]byte(value.Path)))
+	}
 	a.writerMu.Lock()
 	defer a.writerMu.Unlock()
 	a.mu.Lock()

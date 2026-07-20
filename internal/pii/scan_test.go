@@ -54,3 +54,13 @@ func TestRedactBytesMasksMatches(t *testing.T) {
 		t.Fatalf("redacted=%q", redacted)
 	}
 }
+
+func TestRedactBytesIsSafeForEventMetadata(t *testing.T) {
+	path := string(RedactBytes([]byte("/workspace/alice@example.com/ghp_1234567890abcdef")))
+	if strings.Contains(path, "alice@example.com") || strings.Contains(path, "ghp_1234567890abcdef") {
+		t.Fatalf("event metadata leaked raw PII: %q", path)
+	}
+	if !strings.Contains(path, "[REDACTED:email]") || !strings.Contains(path, "[REDACTED:api_token]") {
+		t.Fatalf("event metadata was not redacted: %q", path)
+	}
+}
