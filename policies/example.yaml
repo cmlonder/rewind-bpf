@@ -3,6 +3,8 @@
 
 read:
   mode: enforce # off | audit | enforce
+  pii:
+    mode: audit # off | audit | enforce; enforce requires read.mode: enforce
   deny:
     - "**/.env"
     - "**/*.pem"

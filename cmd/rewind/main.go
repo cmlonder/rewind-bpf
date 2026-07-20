@@ -30,6 +30,7 @@ Usage:
   rewind bundle decrypt --input PATH --output PATH --key-file PATH
   rewind bundle sign --input PATH --private-key PATH --output PATH
   rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --trusted-public-keys PATH,... --token-file PATH --encrypted --allow-insecure-localhost]
+  rewind bundle fetch --endpoint URL --output PATH [--token TOKEN --sha256 HEX]
   rewind bundle verify --input PATH [--signature PATH --public-key PATH]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
@@ -41,6 +42,7 @@ Usage:
   rewind history prune --path PATH --keep N
   rewind pii scan --path PATH [--output PATH --redact-output PATH]
   rewind agent list
+  rewind checkpoint graph inspect|add|transition
   rewind rollback --record PATH
   rewind recover --record PATH
   rewind commit --record PATH --confirm
@@ -115,6 +117,8 @@ func main() {
 		handlePII(os.Args[2:])
 	case "agent":
 		handleAgent(os.Args[2:])
+	case "checkpoint":
+		handleCheckpoint(os.Args[2:])
 	case "commit":
 		handleCommit(os.Args[2:])
 	default:

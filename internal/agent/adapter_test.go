@@ -22,3 +22,14 @@ func TestValidateCommandRejectsEmptyVector(t *testing.T) {
 		t.Fatal("expected empty command error")
 	}
 }
+
+func TestPreparePreservesCommandAndAddsIdentityMarker(t *testing.T) {
+	spec, _ := Resolve("codex")
+	launch, err := Prepare(spec, []string{"codex", "--task", "review"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(launch.Command) != 3 || launch.Command[1] != "--task" || launch.Environment[0] != "REWIND_AGENT_ADAPTER=codex" {
+		t.Fatalf("launch=%+v", launch)
+	}
+}

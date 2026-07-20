@@ -15,6 +15,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/netpolicy"
 	"github.com/rewindbpf/rewind/internal/overlay"
+	"github.com/rewindbpf/rewind/internal/pii"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policycompile"
 )
@@ -42,6 +43,7 @@ type Plan struct {
 	HistoryPath    string                  `json:"history_path,omitempty"`
 	Network        netpolicy.Plan          `json:"network"`
 	AgentAdapter   agent.Kind              `json:"agent_adapter"`
+	PIIFindings    []pii.Finding           `json:"pii_findings,omitempty"`
 }
 
 // Build validates and composes all pre-execution state. The workspace is used
@@ -92,7 +94,21 @@ func Build(config Config) (Plan, error) {
 	if err != nil {
 		return Plan{}, fmt.Errorf("build run plan: manifest: %w", err)
 	}
-	readRules, err := policycompile.CompileRead(config.Policy.Read, layout.Merged, snapshot)
+	piiFindings, err := piiFindingsForPlan(config.Policy.Read.PII, workspace)
+	if err != nil {
+		return Plan{}, err
+	}
+	readPolicy := config.Policy.Read
+	if readPolicy.PII.Mode == policy.ModeEnforce {
+		for _, finding := range piiFindings {
+			relative, err := filepath.Rel(workspace, finding.Path)
+			if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+				return Plan{}, fmt.Errorf("build run plan: PII finding escapes workspace: %s", finding.Path)
+			}
+			readPolicy.Deny = append(readPolicy.Deny, filepath.ToSlash(filepath.Join(layout.Merged, relative)))
+		}
+	}
+	readRules, err := policycompile.CompileRead(readPolicy, layout.Merged, snapshot)
 	if err != nil {
 		return Plan{}, fmt.Errorf("build run plan: read policy: %w", err)
 	}
@@ -116,7 +132,21 @@ func Build(config Config) (Plan, error) {
 	if backend != overlay.BackendFuse && backend != overlay.BackendKernel {
 		return Plan{}, fmt.Errorf("build run plan: unsupported overlay backend %q", backend)
 	}
-	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind}, nil
+	return Plan{Run: run, Layout: layout, Manifest: snapshot, ReadRules: readRules, Landlock: landlockPlan, Resources: config.Policy.Resources, OverlayBackend: backend, Network: networkPlan, AgentAdapter: agentSpec.Kind, PIIFindings: piiFindings}, nil
+}
+
+func piiFindingsForPlan(config policy.PIIPolicy, workspace string) ([]pii.Finding, error) {
+	if config.Mode == "" || config.Mode == policy.ModeOff {
+		return nil, nil
+	}
+	findings, err := pii.ScanPath(workspace)
+	if err != nil {
+		return nil, fmt.Errorf("build run plan: PII scan: %w", err)
+	}
+	if config.Mode == policy.ModeAudit || config.Mode == policy.ModeEnforce {
+		return findings, nil
+	}
+	return nil, fmt.Errorf("build run plan: unsupported PII mode %q", config.Mode)
 }
 
 func resolveWorkspace(value string) (string, error) {

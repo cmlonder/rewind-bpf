@@ -2,10 +2,13 @@ package bundle
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -65,6 +68,23 @@ func TestPublishUsesJSONContentTypeForEncryptedEnvelope(t *testing.T) {
 	defer server.Close()
 	if _, err := Publish(context.Background(), path, server.URL, "", "", true); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestFetchPinsDigestAndWritesBoundedPayload(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write([]byte("payload")) }))
+	defer server.Close()
+	digest := sha256.Sum256([]byte("payload"))
+	output := filepath.Join(t.TempDir(), "bundle.bin")
+	if err := Fetch(context.Background(), server.URL, "", hex.EncodeToString(digest[:]), output, true); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "payload" {
+		t.Fatalf("payload=%q", data)
 	}
 }
 

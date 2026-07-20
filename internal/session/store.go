@@ -39,6 +39,10 @@ type Store struct {
 func Open(path string) Store { return Store{path: path, mu: &sync.Mutex{}} }
 
 func (s Store) List() ([]Lease, error) {
+	if err := s.lockFile(); err != nil {
+		return nil, err
+	}
+	defer s.unlockFile()
 	return s.listAt(time.Now())
 }
 
@@ -85,6 +89,10 @@ func (s Store) Apply(request Request, now time.Time) (Lease, error) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if err := s.lockFile(); err != nil {
+		return Lease{}, err
+	}
+	defer s.unlockFile()
 	leases, err := s.listAt(now)
 	if err != nil {
 		return Lease{}, err
@@ -154,6 +162,45 @@ func (s Store) Apply(request Request, now time.Time) (Lease, error) {
 		return lease, nil
 	default:
 		return Lease{}, fmt.Errorf("unsupported session action %q", request.Action)
+	}
+}
+
+// lockFile coordinates separate supervisor processes sharing the same local
+// session index. The in-memory mutex alone is insufficient when operators run
+// multiple supervisor instances or reconnect through a second process.
+func (s Store) lockFile() error {
+	if strings.TrimSpace(s.path) == "" {
+		return fmt.Errorf("session path is required")
+	}
+	lockPath := s.path + ".lock"
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o700); err != nil {
+		return fmt.Errorf("create session directory: %w", err)
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		file, err := os.OpenFile(lockPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+		if err == nil {
+			_, _ = fmt.Fprintf(file, "%d\n", os.Getpid())
+			_ = file.Close()
+			return nil
+		}
+		if !os.IsExist(err) {
+			return fmt.Errorf("create session lock: %w", err)
+		}
+		if info, statErr := os.Stat(lockPath); statErr == nil && time.Since(info.ModTime()) > 30*time.Second {
+			_ = os.Remove(lockPath)
+			continue
+		}
+		if time.Now().After(deadline) {
+			return fmt.Errorf("session store is busy")
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+func (s Store) unlockFile() {
+	if strings.TrimSpace(s.path) != "" {
+		_ = os.Remove(s.path + ".lock")
 	}
 }
 

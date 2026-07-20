@@ -119,7 +119,7 @@ Modes:
 
 Users write glob patterns; a policy compiler turns them into filesystem hierarchy and access rules. Avoid running expensive regex matching on every read syscall. Use Landlock and/or BPF LSM for enforcement. eBPF tracepoints are useful for audit and telemetry but should not be presented as the sole deny mechanism.
 
-The first MVP provides path-based access control. An optional bounded audit scanner now detects common PII/token patterns without returning raw values; runtime content-based enforcement, configurable classifiers, and leakage benchmarks remain future work.
+The runtime provides path-based access control plus an optional bounded content scan. `read.pii.mode: audit` records hashed findings; `read.pii.mode: enforce` converts findings into exact pre-run Landlock denies without returning raw values. Configurable classifiers, streaming/new-file coverage, and leakage benchmarks remain future work.
 
 ### 5.3 Privilege, network, and resource policies
 

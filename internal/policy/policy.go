@@ -26,9 +26,16 @@ type Policy struct {
 }
 
 type ReadPolicy struct {
-	Mode  Mode     `yaml:"mode" json:"mode"`
-	Deny  []string `yaml:"deny" json:"deny"`
-	Allow []string `yaml:"allow" json:"allow"`
+	Mode  Mode      `yaml:"mode" json:"mode"`
+	Deny  []string  `yaml:"deny" json:"deny"`
+	Allow []string  `yaml:"allow" json:"allow"`
+	PII   PIIPolicy `yaml:"pii" json:"pii"`
+}
+
+// PIIPolicy controls the optional pre-run content audit. Enforce mode turns
+// findings into exact sensitive-read denies; it never grants access.
+type PIIPolicy struct {
+	Mode Mode `yaml:"mode" json:"mode"`
 }
 
 type WritePolicy struct {
@@ -186,6 +193,12 @@ func (p ReadPolicy) Validate() error {
 		if strings.TrimSpace(pattern) == "" {
 			return fmt.Errorf("read patterns cannot be empty")
 		}
+	}
+	if err := validateMode("read.pii.mode", p.PII.Mode, true); err != nil {
+		return err
+	}
+	if p.PII.Mode == ModeEnforce && p.Mode != ModeEnforce {
+		return fmt.Errorf("read.pii.mode enforce requires read.mode enforce")
 	}
 	return nil
 }

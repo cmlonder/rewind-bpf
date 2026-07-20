@@ -55,7 +55,7 @@ export const fixture = {
     { id: "d1b08d60", state: "rolled_back", workspace: "rewind-demo", updated: "2 min ago", size: "128 MiB upper" },
     { id: "08e0ef80", state: "running", workspace: "payments-api", updated: "now", size: "18.4 MiB upper" },
   ],
-  effectivePolicy: [["read.mode", "enforce", "strict-agent@1.3.0"], ["read.deny", "**/*.env · **/*.pem · /home/*/.ssh/**", "package"], ["write.mode", "rollback", "global default"], ["write.scope", "workspace", "workspace override"], ["network.mode", "audit", "package"], ["resources", "256 PIDs · 512 MiB · 50% CPU", "global default"]],
+  effectivePolicy: [["read.mode", "enforce", "strict-agent@1.3.0"], ["read.deny", "**/*.env · **/*.pem · /home/*/.ssh/**", "package"], ["read.pii.mode", "audit", "global default"], ["write.mode", "rollback", "global default"], ["write.scope", "workspace", "workspace override"], ["network.mode", "audit", "package"], ["resources", "256 PIDs · 512 MiB · 50% CPU", "global default"]],
   audit: [["10:42:18", "Run started", "strict-agent@1.3.0", "system"], ["10:41:52", "Policy assigned", "payments-api", "cemal"], ["10:39:10", "Evidence exported", "run_d1b08d60", "cemal"]],
 };
 

@@ -318,7 +318,7 @@ function openPolicyEditor() {
     const form = document.querySelector("#policy-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
-    const value = { name: data.get("name"), version: data.get("version"), description: data.get("description"), policy: { read: { mode: "audit" }, write: { mode: "rollback", scope: "workspace" }, network: { mode: "off" } } };
+    const value = { name: data.get("name"), version: data.get("version"), description: data.get("description"), policy: { read: { mode: "audit", pii: { mode: "audit" } }, write: { mode: "rollback", scope: "workspace" }, network: { mode: "off" } } };
     const save = state.supervisor ? state.supervisor.createPolicy(value) : Promise.resolve();
     save.then(() => {
       fixture.policies.unshift({ name: value.name, version: value.version, state: "available", signed: false, description: value.description, reads: "audit", writes: "rollback", network: "off", assigned: 0, updated: "just now" });

@@ -39,6 +39,10 @@ func handleBundle(args []string) {
 		handleBundlePublish(args[1:])
 		return
 	}
+	if args[0] == "fetch" {
+		handleBundleFetch(args[1:])
+		return
+	}
 	if args[0] != "create" {
 		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle encrypt --input PATH --output PATH --key-file PATH | rewind bundle decrypt --input PATH --output PATH --key-file PATH | rewind bundle sign --input PATH --private-key PATH --output PATH | rewind bundle publish --input PATH --endpoint URL --signature PATH | rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
 	}
@@ -67,6 +71,22 @@ func handleBundle(args []string) {
 		fatal(err.Error())
 	}
 	fmt.Printf("wrote evidence bundle: %s artifacts=%d run_id=%s\n", outputAbs, len(metadata.Artifacts), metadata.RunID)
+}
+
+func handleBundleFetch(args []string) {
+	flags := flag.NewFlagSet("bundle fetch", flag.ContinueOnError)
+	endpoint := flags.String("endpoint", "", "HTTPS evidence endpoint")
+	output := flags.String("output", "", "downloaded envelope/archive output path")
+	bearer := flags.String("token", "", "optional bearer token")
+	expectedSHA := flags.String("sha256", "", "optional expected SHA-256 digest")
+	allowInsecure := flags.Bool("allow-insecure-localhost", false, "allow HTTP only for localhost test endpoints")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*endpoint) == "" || strings.TrimSpace(*output) == "" {
+		fatal("usage: rewind bundle fetch --endpoint URL --output PATH [--token TOKEN --sha256 HEX --allow-insecure-localhost]")
+	}
+	if err := evidencebundle.Fetch(context.Background(), *endpoint, *bearer, *expectedSHA, filepath.Clean(*output), *allowInsecure); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("fetched signed evidence payload: %s\n", filepath.Clean(*output))
 }
 
 func handleBundlePublish(args []string) {

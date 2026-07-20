@@ -69,6 +69,34 @@ func TestBuildRejectsUnknownAgentAdapter(t *testing.T) {
 	}
 }
 
+func TestBuildPIIEnforceAddsExactSensitiveReadDeny(t *testing.T) {
+	workspace := t.TempDir()
+	if err := os.WriteFile(filepath.Join(workspace, "notes.txt"), []byte("contact alice@example.com\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	plan, err := Build(Config{
+		Workspace:   workspace,
+		RuntimeRoot: filepath.Join(t.TempDir(), "run"),
+		Policy:      policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeEnforce, PII: policy.PIIPolicy{Mode: policy.ModeEnforce}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.PIIFindings) != 1 || plan.PIIFindings[0].ValueHash == "" {
+		t.Fatalf("PII findings=%+v", plan.PIIFindings)
+	}
+	if len(plan.ReadRules.Rules) != 1 || plan.ReadRules.Rules[0].Decision != "deny" {
+		t.Fatalf("read rules=%+v", plan.ReadRules.Rules)
+	}
+}
+
+func TestBuildRejectsPIIEnforceWithAuditRead(t *testing.T) {
+	_, err := Build(Config{Workspace: t.TempDir(), RuntimeRoot: filepath.Join(t.TempDir(), "run"), Policy: policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeAudit, PII: policy.PIIPolicy{Mode: policy.ModeEnforce}}}})
+	if err == nil || !strings.Contains(err.Error(), "requires read.mode enforce") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestBuildRejectsWorkspaceRuntimeOverlap(t *testing.T) {
 	workspace := t.TempDir()
 	if _, err := Build(Config{Workspace: workspace, RuntimeRoot: filepath.Join(workspace, "run")}); err == nil {

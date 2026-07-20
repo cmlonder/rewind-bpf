@@ -21,14 +21,24 @@ func handlePlatform(args []string) {
 	if err := flags.Parse(args[1:]); err != nil || flags.NArg() != 0 || strings.TrimSpace(*workspace) == "" {
 		fatal("usage: rewind platform plan --workspace PATH")
 	}
-	if runtime.GOOS != "darwin" {
-		fatal("rewind platform plan currently targets macOS")
-	}
-	plan, err := platform.PlanForWorkspace(context.Background(), *workspace)
-	if err != nil {
-		fatal(fmt.Sprintf("macOS platform plan: %v", err))
-	}
-	if err := json.NewEncoder(os.Stdout).Encode(plan); err != nil {
-		fatal(fmt.Sprintf("encode macOS platform plan: %v", err))
+	switch runtime.GOOS {
+	case "darwin":
+		plan, err := platform.PlanForWorkspace(context.Background(), *workspace)
+		if err != nil {
+			fatal(fmt.Sprintf("macOS platform plan: %v", err))
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(plan); err != nil {
+			fatal(fmt.Sprintf("encode macOS platform plan: %v", err))
+		}
+	case "windows":
+		plan, err := platform.PlanForWindowsWorkspace(context.Background(), *workspace)
+		if err != nil {
+			fatal(fmt.Sprintf("Windows platform plan: %v", err))
+		}
+		if err := json.NewEncoder(os.Stdout).Encode(plan); err != nil {
+			fatal(fmt.Sprintf("encode Windows platform plan: %v", err))
+		}
+	default:
+		fatal("rewind platform plan targets native macOS or Windows hosts")
 	}
 }

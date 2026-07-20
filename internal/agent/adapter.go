@@ -22,6 +22,12 @@ type Spec struct {
 	Description string `json:"description"`
 }
 
+type Launch struct {
+	Spec        Spec
+	Command     []string
+	Environment []string
+}
+
 var specs = []Spec{
 	{Kind: Generic, DisplayName: "Generic command", Description: "Any executable launched under the protected runtime."},
 	{Kind: Codex, DisplayName: "Codex", Description: "Codex-compatible command; the operator command remains unchanged."},
@@ -49,4 +55,15 @@ func ValidateCommand(spec Spec, command []string) error {
 		return fmt.Errorf("agent adapter %s: command cannot be empty", spec.Kind)
 	}
 	return nil
+}
+
+// Prepare is the stable lifecycle seam for SDK-specific adapters. Current
+// adapters are intentionally command-preserving: they add only an auditable
+// identity marker and leave command arguments under operator control.
+func Prepare(spec Spec, command []string) (Launch, error) {
+	if err := ValidateCommand(spec, command); err != nil {
+		return Launch{}, err
+	}
+	copyCommand := append([]string(nil), command...)
+	return Launch{Spec: spec, Command: copyCommand, Environment: []string{"REWIND_AGENT_ADAPTER=" + string(spec.Kind)}}, nil
 }

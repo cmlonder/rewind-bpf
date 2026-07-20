@@ -635,9 +635,11 @@ The compiler preserves deny-before-allow precedence, supports `off`/`audit`/`enf
 
 `rewind pii scan` is an optional, deterministic audit tool outside the protected
 run hot path. It scans bounded text files for common PII/token patterns, stores
-only SHA-256 value hashes in findings, and can emit a redacted copy. It is not a
-read-policy substitute: path-based Landlock enforcement remains the mechanism
-that denies sensitive reads, and the scanner never grants access.
+only SHA-256 value hashes in findings, and can emit a redacted copy. A policy can
+set `read.pii.mode: audit` to persist those findings in the immutable plan, or
+`read.pii.mode: enforce` to turn each finding into an exact pre-run deny before
+Landlock is loaded. It never grants access; content discovered after start is
+outside this first contract.
 
 ## 28. Stage 5 read enforcement preparation
 

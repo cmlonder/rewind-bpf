@@ -67,6 +67,10 @@ func handleRun(args []string) {
 	if err := agent.ValidateCommand(agentSpec, command); err != nil {
 		fatal(err.Error())
 	}
+	launch, err := agent.Prepare(agentSpec, command)
+	if err != nil {
+		fatal(err.Error())
+	}
 	if *overlayBackend != string(overlay.BackendFuse) && *overlayBackend != string(overlay.BackendKernel) {
 		fatal(fmt.Sprintf("unsupported overlay backend %q (want fuse or kernel)", *overlayBackend))
 	}
@@ -157,7 +161,7 @@ func handleRun(args []string) {
 		stopNetworkProxy = nil
 		networkProxy = nil
 	}
-	starter := protectedrun.ExecStarter{HelperPath: helper, DenyRawNetwork: plan.Network.RawSocketDeny, DenyNetwork: plan.Network.NetworkDeny, NetworkNamespace: plan.Network.NetworkNS}
+	starter := protectedrun.ExecStarter{HelperPath: helper, Env: launch.Environment, DenyRawNetwork: plan.Network.RawSocketDeny, DenyNetwork: plan.Network.NetworkDeny, NetworkNamespace: plan.Network.NetworkNS}
 	// An explicit proxy backend can observe audit mode as well as enforce mode.
 	// Audit stays zero-overhead when no backend is selected; enforce remains
 	// fail-closed in runplan.Build unless the proxy is explicitly requested.
@@ -175,7 +179,7 @@ func handleRun(args []string) {
 		stopNetworkProxy = cancel
 		go func() { _ = networkProxy.Serve(proxyCtx) }()
 		proxyURL := networkProxy.URL()
-		starter.Env = []string{"HTTP_PROXY=" + proxyURL, "HTTPS_PROXY=" + proxyURL, "ALL_PROXY=" + proxyURL, "NO_PROXY="}
+		starter.Env = append(starter.Env, "HTTP_PROXY="+proxyURL, "HTTPS_PROXY="+proxyURL, "ALL_PROXY="+proxyURL, "NO_PROXY=")
 	}
 	coordinator := protectedrun.Coordinator{
 		Overlay: overlay.Manager{Owner: &owner, Backend: plan.OverlayBackend},
@@ -183,7 +187,7 @@ func handleRun(args []string) {
 		Sensor:  telemetry,
 		Scope:   &scope,
 	}
-	handle, err := coordinator.Start(context.Background(), &plan, command, *sensorObject)
+	handle, err := coordinator.Start(context.Background(), &plan, launch.Command, *sensorObject)
 	if err != nil {
 		closeNetworkProxy()
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
