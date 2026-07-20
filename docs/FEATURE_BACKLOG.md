@@ -15,7 +15,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Process and resource scope | **Shipped / Linux** | cgroup-v2 scope, descendant drain gate, PID/memory/CPU limits, fail-closed cleanup | Windows Job Object and macOS native process scope |
 | eBPF evidence | **Shipped / Linux** | CO-RE trace sensor, start gate, sequence numbers, hash chain, dropped-event accounting, bounded cap, ordered rotation, standalone verifier | Kernel-side backpressure policy and remote signed evidence storage |
 | Crash and stale-run recovery | **Shipped / Linux** | Parent death, open descriptors, stale FUSE mount, child drain, idempotent rollback/recover | Power-loss/startup matrix across filesystems |
-| Network policy | **Partial** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients | Network namespace/cgroup egress enforcement and raw-socket coverage |
+| Network policy | **Partial** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs also deny raw/packet socket creation with seccomp | Network namespace/cgroup egress enforcement, non-proxy-aware client coverage, and broader socket policy |
 | Credential safety | **Partial / refusing boundary** | Capability-only references and a broker that refuses raw secret exposure | One real keychain/secret-manager provider with leakage tests and short-lived leases |
 | Explicit acceptance | **Shipped / Linux** | Review-only export plus manifest conflict checks; `rewind commit --confirm`; supervisor commit requires confirmation | Branch/patch adapters and remote review workflow |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, and optional supervisor public-key allow-list enforcement | Remote registry, revocation, and organization trust distribution |
@@ -56,7 +56,9 @@ and eBPF object. The gate covered:
 - bounded-event evidence marked incomplete and rejected by verification.
 
 The network case also persisted one `allow` and one `deny` `network_connect`
-event in the ordered hash-chained evidence stream.
+event in the ordered hash-chained evidence stream. The same acceptance matrix
+verified that an enforce-mode agent receives `EPERM` when creating an IPv4 raw
+socket, while the ordinary proxy path remains usable.
 
 The separate supervisor smoke also passed: the mode-`0600` Unix socket returned
 `401` without a bearer token, authenticated status and explicit commit succeeded,

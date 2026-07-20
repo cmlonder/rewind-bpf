@@ -144,7 +144,7 @@ func handleRun(args []string) {
 		stopNetworkProxy = nil
 		networkProxy = nil
 	}
-	starter := protectedrun.ExecStarter{HelperPath: helper}
+	starter := protectedrun.ExecStarter{HelperPath: helper, DenyRawNetwork: plan.Network.Mode == policy.ModeEnforce && *networkBackend == "proxy"}
 	// An explicit proxy backend can observe audit mode as well as enforce mode.
 	// Audit stays zero-overhead when no backend is selected; enforce remains
 	// fail-closed in runplan.Build unless the proxy is explicitly requested.

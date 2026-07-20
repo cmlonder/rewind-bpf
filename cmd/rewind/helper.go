@@ -10,12 +10,14 @@ import (
 	"strconv"
 
 	"github.com/rewindbpf/rewind/internal/landlock"
+	"github.com/rewindbpf/rewind/internal/seccomp"
 )
 
 func handleHelper(args []string) {
 	flags := flag.NewFlagSet("rewind helper", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	planPath := flags.String("plan-file", "", "JSON Landlock plan written by the parent runtime")
+	denyRawNetwork := flags.Bool("deny-raw-network", false, "deny raw and packet socket creation before exec")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -46,6 +48,11 @@ func handleHelper(args []string) {
 	}
 	if plan != nil {
 		if err := landlock.Apply(*plan); err != nil {
+			fatal(err.Error())
+		}
+	}
+	if *denyRawNetwork {
+		if err := seccomp.InstallDenyRawSockets(); err != nil {
 			fatal(err.Error())
 		}
 	}

@@ -124,7 +124,17 @@ sudo jq -s -e 'any(.[]; .operation == "network_connect" and .decision == "allow"
 sudo jq -s -e 'any(.[]; .operation == "network_connect" and .decision == "deny")' "$ROOT/network/runtime/events.jsonl" >/dev/null
 echo "proxy network allow/deny: PASS"
 
-# 4. Bounded evidence must fail verification rather than look complete.
+# 4. Enforced proxy runs also deny raw/packet socket creation while keeping
+# ordinary proxy-aware TCP clients available.
+mkdir -p "$ROOT/raw-network/workspace"
+make_policy "$ROOT/raw-network/policy.yaml" off enforce
+sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/raw-network/workspace" "$ROOT/raw-network/runtime" "$ROOT/raw-network/policy.yaml" "$ROOT/raw-network/runtime/record.json") --network-backend proxy --on-success review -- \
+  /bin/sh -c '/usr/bin/python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)" && printf "raw-allowed\\n" > raw.status || printf "raw-denied\\n" > raw.status'
+test "$(cat "$ROOT/raw-network/runtime/merged/raw.status")" = raw-denied
+sudo "$BIN" rollback --record "$ROOT/raw-network/runtime/record.json"
+echo "raw socket refusal: PASS"
+
+# 5. Bounded evidence must fail verification rather than look complete.
 mkdir -p "$ROOT/evidence/workspace"
 make_policy "$ROOT/evidence/policy.yaml" off audit
 REWIND_EVENT_MAX_BYTES=512 sudo env PATH="$PATH" REWIND_EVENT_MAX_BYTES=512 "$BIN" run $(run_args "$ROOT/evidence/workspace" "$ROOT/evidence/runtime" "$ROOT/evidence/policy.yaml" "$ROOT/evidence/runtime/record.json") -- \

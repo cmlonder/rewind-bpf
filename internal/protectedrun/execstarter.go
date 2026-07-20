@@ -17,8 +17,9 @@ import (
 // intentionally explicit so the final CLI can use the same binary or a
 // separately installed helper.
 type ExecStarter struct {
-	HelperPath string
-	Env        []string
+	HelperPath     string
+	Env            []string
+	DenyRawNetwork bool
 }
 
 func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, plan *landlock.Plan) (Process, error) {
@@ -39,6 +40,9 @@ func (s ExecStarter) Start(ctx context.Context, command []string, cwd string, pl
 	}
 
 	args := []string{"helper"}
+	if s.DenyRawNetwork {
+		args = append(args, "--deny-raw-network")
+	}
 	var planPath string
 	if plan != nil {
 		if plan.Root == "" {
