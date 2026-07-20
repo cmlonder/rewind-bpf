@@ -26,7 +26,7 @@ Usage:
   rewind diff --record PATH
   rewind export --record PATH --output PATH
   rewind capabilities
-  rewind supervisor --socket PATH --history PATH
+  rewind supervisor --socket PATH --history PATH [--http-listen 127.0.0.1:8787 --cors-origin ORIGIN]
   rewind rollback --record PATH
   rewind recover --record PATH
   rewind commit --record PATH --confirm

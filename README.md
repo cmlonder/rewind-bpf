@@ -84,7 +84,7 @@ python3 -m http.server 4174 --directory ui
 open http://127.0.0.1:4174
 ```
 
-The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and simulation, workspace-to-policy assignments, revisioned global configuration controls, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A local supervisor bridge now exposes authenticated health, capability, history, snapshot/follow event streams, status, rollback/recover, and explicit commit actions; the browser adapter remains read-only and never receives root privileges. Local authentication beyond the Unix-socket and bearer-token boundary is intentionally post-demo.
+The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and simulation, workspace-to-policy assignments, revisioned global configuration controls, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A local supervisor bridge exposes authenticated health, capability, history, snapshot/follow event streams, status, rollback/recover, and explicit commit actions; the browser adapter can invoke those actions only through the bearer-token bridge and never receives root privileges. Local authentication beyond the Unix-socket and bearer-token boundary is intentionally post-demo.
 
 ## Safety warning
 
@@ -152,6 +152,18 @@ supervisor has an authenticated authorization layer:
 sudo rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json
 ```
 
+For the browser Control Plane, expose an optional loopback-only HTTP bridge. It
+requires an exact CORS origin and bearer token; non-loopback bind addresses are
+refused:
+
+```bash
+sudo rewind supervisor \
+  --socket /tmp/rewind-supervisor.sock \
+  --history /tmp/rewind-history.json \
+  --http-listen 127.0.0.1:8787 \
+  --cors-origin http://127.0.0.1:4173
+```
+
 The socket is intentionally mode `0600`; inspect it as the same privileged
 user that owns the runtime (for example, `sudo curl --unix-socket
 /tmp/rewind-supervisor.sock http://localhost/health`). A generated bearer token
@@ -160,8 +172,9 @@ for action requests. Authenticated `status`, `rollback`/`recover`, and
 explicit `commit` (`confirmation: "COMMIT"`) actions are routed through the
 same lifecycle and conflict checks as the CLI. Each accepted or refused action
 is appended to `/tmp/rewind-history.json.actions.jsonl` without tokens or file
-contents. The Control Plane’s browser adapter remains read-only; fixture mode
-remains the safe default for the static demo.
+contents. The Control Plane’s browser adapter can send those same intents when
+the explicit HTTP bridge is enabled; fixture mode remains the safe default for
+the static demo.
 
 Example policy:
 

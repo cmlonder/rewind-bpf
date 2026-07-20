@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,6 +29,11 @@ type Server struct {
 	Actions   ActionFunc
 	AuditPath string
 	AuditMu   *sync.Mutex
+	// RequireAuth protects read endpoints when the handler is exposed over
+	// loopback HTTP. Unix-socket mode keeps the historical read-only behavior
+	// because the socket itself is mode 0600.
+	RequireAuth bool
+	CORSOrigin  string
 }
 
 func (s Server) Handler() http.Handler {
@@ -35,8 +41,18 @@ func (s Server) Handler() http.Handler {
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, Response{OK: true, State: "ready", Message: "local supervisor; authenticated actions"})
 	})
-	mux.HandleFunc("/v1/capabilities", func(w http.ResponseWriter, _ *http.Request) { writeJSON(w, http.StatusOK, platform.Probe()) })
+	mux.HandleFunc("/v1/capabilities", func(w http.ResponseWriter, r *http.Request) {
+		if s.RequireAuth && !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		writeJSON(w, http.StatusOK, platform.Probe())
+	})
 	mux.HandleFunc("/v1/history", func(w http.ResponseWriter, r *http.Request) {
+		if s.RequireAuth && !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
 		if r.Method != http.MethodGet {
 			writeJSON(w, http.StatusMethodNotAllowed, Response{Message: "history is read-only over this endpoint"})
 			return
@@ -87,7 +103,19 @@ func (s Server) Handler() http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, Response{OK: false, Message: "not found"})
 	})
-	return mux
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.TrimSpace(s.CORSOrigin) != "" {
+			w.Header().Set("Access-Control-Allow-Origin", s.CORSOrigin)
+			w.Header().Set("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		mux.ServeHTTP(w, r)
+	})
 }
 
 func (s Server) recordAudit(request Request, response Response, actionErr error) {
@@ -337,6 +365,25 @@ func ValidateUnixSocketPath(path string) error {
 	}
 	if abs == string(filepath.Separator) || filepath.Base(abs) == "." || filepath.Base(abs) == ".." {
 		return fmt.Errorf("unsafe supervisor socket path")
+	}
+	return nil
+}
+
+// ValidateHTTPListenAddress limits the browser bridge to loopback. The
+// supervisor carries an authenticated action endpoint and must never be
+// accidentally exposed on a LAN or public interface.
+func ValidateHTTPListenAddress(address string) error {
+	value := strings.TrimSpace(address)
+	if value == "" {
+		return fmt.Errorf("supervisor HTTP listen address is required")
+	}
+	host, _, err := net.SplitHostPort(value)
+	if err != nil {
+		return fmt.Errorf("parse supervisor HTTP listen address: %w", err)
+	}
+	host = strings.Trim(strings.ToLower(host), "[]")
+	if host != "127.0.0.1" && host != "localhost" && host != "::1" {
+		return fmt.Errorf("supervisor HTTP listener must bind to loopback")
 	}
 	return nil
 }

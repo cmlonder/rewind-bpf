@@ -36,6 +36,25 @@ func TestHandlerHealthAndReadOnlyActionBoundary(t *testing.T) {
 	}
 }
 
+func TestHTTPBridgeRequiresAuthForReadEndpointsAndSetsCORS(t *testing.T) {
+	server := Server{AuthToken: "secret", RequireAuth: true, CORSOrigin: "http://127.0.0.1:4173"}
+	for _, path := range []string{"/v1/capabilities", "/v1/history"} {
+		recorder := httptest.NewRecorder()
+		server.Handler().ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, path, nil))
+		if recorder.Code != http.StatusUnauthorized {
+			t.Fatalf("%s status=%d", path, recorder.Code)
+		}
+		if got := recorder.Header().Get("Access-Control-Allow-Origin"); got != "http://127.0.0.1:4173" {
+			t.Fatalf("%s CORS origin=%q", path, got)
+		}
+	}
+	preflight := httptest.NewRecorder()
+	server.Handler().ServeHTTP(preflight, httptest.NewRequest(http.MethodOptions, "/v1/actions", nil))
+	if preflight.Code != http.StatusNoContent {
+		t.Fatalf("preflight status=%d", preflight.Code)
+	}
+}
+
 func TestAuthenticatedActionWithoutRuntimeHandlerRefuses(t *testing.T) {
 	server := Server{AuthToken: "secret"}
 	recorder := httptest.NewRecorder()
@@ -106,6 +125,19 @@ func TestValidateUnixSocketPath(t *testing.T) {
 	}
 	if err := ValidateUnixSocketPath(filepath.Join(t.TempDir(), "rewind.sock")); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestValidateHTTPListenAddressRequiresLoopback(t *testing.T) {
+	for _, address := range []string{"", ":8787", "0.0.0.0:8787", "192.0.2.10:8787", "127.0.0.1"} {
+		if err := ValidateHTTPListenAddress(address); err == nil {
+			t.Fatalf("address %q should be rejected", address)
+		}
+	}
+	for _, address := range []string{"127.0.0.1:8787", "localhost:8787", "[::1]:8787"} {
+		if err := ValidateHTTPListenAddress(address); err != nil {
+			t.Fatalf("address %q: %v", address, err)
+		}
 	}
 }
 

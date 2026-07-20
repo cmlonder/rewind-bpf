@@ -3,7 +3,7 @@ import { connectSupervisor } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null, supervisor: null };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
@@ -61,9 +61,9 @@ function handleAction(action, element) {
   if (action === "hold-review") { currentRun().state = "succeeded"; return setToast("Run held for review. Conflict-checked acceptance is now available.", "neutral"); }
   if (action === "simulate-credentials") return setToast("Boundary check passed: broker unavailable, raw secret exposure refused.", "neutral");
   if (action === "retention") return setToast("Retention is fixture-backed in this demo; the P4 index prunes by keep-latest policy.", "neutral");
-  if (action === "rollback") return openConfirm({ title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: rollback });
-  if (action === "commit") return openConfirm({ title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: commitRun });
-  if (action === "recover") return openConfirm({ title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => setToast("Recovery completed in fixture mode.", "success") });
+  if (action === "rollback") return openConfirm({ title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: () => runSupervisorAction("rollback", rollback) });
+  if (action === "commit") return openConfirm({ title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: () => runSupervisorAction("commit", commitRun, "COMMIT") });
+  if (action === "recover") return openConfirm({ title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success")) });
   if (action === "export") return setToast("Review bundle prepared in fixture mode.", "success");
   if (action === "copy-policy") return copyPolicy();
   if (action === "simulate-policy") return openSimulation();
@@ -85,12 +85,40 @@ function openSupervisorConnector() {
     const token = data.get("token");
     try {
       const connected = await connectSupervisor(endpoint, token);
+      state.supervisor = connected;
       fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
       fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
+      if (connected.history.length) {
+        fixture.runs = connected.history.map(remoteRun);
+        state.selectedRun = fixture.runs[0].id;
+      }
       if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
       closeModal(); render(); setToast("Supervisor connected in read-only mode.", "success");
     } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
   } });
+}
+
+function remoteRun(item) {
+  const id = item.run_id || item.id || "unknown-run";
+  return {
+    id,
+    shortId: id.slice(-8),
+    state: item.state || "unknown",
+    workspace: item.workspace || "connected workspace",
+    workspacePath: item.workspace || "—",
+    command: "supervisor history",
+    policy: "runtime record",
+    backend: "reported by supervisor",
+    startedAt: item.created_at || new Date().toISOString(),
+    elapsed: "—",
+    upperBytes: item.upper_bytes || 0,
+    upperLabel: `${item.upper_bytes || 0} bytes`,
+    processCount: 0,
+    evidence: { count: 0, bytes: 0, dropped: 0, truncated: false, chainValid: true, recordMatch: true, segments: 1 },
+    resources: { pids: "—", memory: "—", cpu: "—" },
+    events: [{ time: "—", type: "lifecycle", operation: "SUPERVISOR SNAPSHOT", path: id, decision: "allow", risk: "low", detail: "Connect to the event stream for live evidence." }],
+    diff: [],
+  };
 }
 
 function rollback() {
@@ -101,6 +129,17 @@ function rollback() {
   run.processCount = 0;
   run.events.push({ time: "00:01.745", type: "lifecycle", operation: "ROLLBACK", path: "upper/work discarded", decision: "allow", risk: "low", detail: "Lower layer preserved · transaction rewound" });
   setToast("Run rolled back. Lower layer remains intact.", "success");
+}
+
+function runSupervisorAction(action, localFallback, confirmation = "") {
+  if (!state.supervisor) return localFallback();
+  return state.supervisor.action({ action, run_id: currentRun().id, confirmation }).then((response) => {
+    if (response.state) currentRun().state = response.state;
+    setToast(response.message || `${action} completed through the local supervisor.`, "success");
+  }).catch((error) => {
+    setToast(`Supervisor refused ${action}: ${error.message}`, "error");
+    throw error;
+  });
 }
 
 function commitRun() {

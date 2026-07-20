@@ -1,6 +1,6 @@
 # Rewind Control Plane UI Roadmap
 
-Status: Fixture control plane delivered; read-only supervisor bridge available
+Status: Fixture control plane delivered; authenticated loopback supervisor bridge available
 Audience: hackathon jurors, security-minded engineers, and developers running autonomous agents on Linux
 
 ## 1. Product decision

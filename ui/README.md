@@ -24,7 +24,10 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
 
-These actions deliberately stop at the adapter boundary. They demonstrate the control-plane contract without granting the browser root access or pretending that fixture state is live runtime state.
+These actions deliberately stop at the fixture adapter until a supervisor is
+connected. When connected to the explicit loopback HTTP bridge, rollback,
+recovery, and commit confirmations POST authenticated intents to the supervisor;
+the browser still never receives root access or performs privileged work.
 
 ## Demo scope decision
 
@@ -33,7 +36,8 @@ Local authentication is intentionally deferred until after the hackathon demo. T
 ## Adapter boundary
 
 `data/fixture.js` remains the safe demo adapter. `data/supervisor-adapter.js`
-can connect to the local supervisor bridge without changing view components.
-The browser requests health, capabilities, history, and redacted audit data
-only; it must never receive root privileges or raw credentials. Privileged
-actions remain an explicit supervisor/CLI boundary.
+can connect to the optional loopback HTTP bridge (`--http-listen` plus an exact
+`--cors-origin`) and exposes an authenticated action function. The browser
+requests health, capabilities, history, and redacted audit data, then sends only
+validated action intents; it must never receive root privileges or raw
+credentials. Privileged actions remain an explicit supervisor/CLI boundary.

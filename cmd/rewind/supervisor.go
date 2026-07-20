@@ -28,14 +28,24 @@ func handleSupervisor(args []string) {
 	socketPath := flags.String("socket", "", "Unix socket path")
 	historyPath := flags.String("history", "", "durable history JSON path")
 	tokenPath := flags.String("token-file", "", "bearer token file (created with mode 0600 when absent)")
+	httpListen := flags.String("http-listen", "", "optional loopback HTTP bridge address, e.g. 127.0.0.1:8787")
+	corsOrigin := flags.String("cors-origin", "", "optional exact browser origin allowed for the HTTP bridge")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fatal("usage: rewind supervisor --socket PATH --history PATH")
+		fatal("usage: rewind supervisor --socket PATH --history PATH [--http-listen 127.0.0.1:8787 --cors-origin ORIGIN]")
 	}
 	if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
 		fatal(err.Error())
 	}
 	if *historyPath == "" {
 		fatal("supervisor history path is required")
+	}
+	if strings.TrimSpace(*httpListen) != "" {
+		if err := supervisor.ValidateHTTPListenAddress(*httpListen); err != nil {
+			fatal(err.Error())
+		}
+		if strings.TrimSpace(*corsOrigin) == "" {
+			fatal("--cors-origin is required when --http-listen is set")
+		}
 	}
 	if *tokenPath == "" {
 		*tokenPath = *socketPath + ".token"
@@ -60,7 +70,7 @@ func handleSupervisor(args []string) {
 	if err := os.Chmod(*socketPath, 0o600); err != nil {
 		fatal(fmt.Sprintf("protect supervisor socket: %v", err))
 	}
-	server := &http.Server{Handler: supervisor.Server{
+	baseServer := supervisor.Server{
 		History:   history.Open(*historyPath),
 		AuthToken: token,
 		AuditPath: *historyPath + ".actions.jsonl",
@@ -68,11 +78,38 @@ func handleSupervisor(args []string) {
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {
 			return supervisorAction(*historyPath, request)
 		},
-	}}
+	}
+	server := &http.Server{Handler: baseServer.Handler()}
+	var httpServer *http.Server
+	var httpListener net.Listener
+	if strings.TrimSpace(*httpListen) != "" {
+		httpListener, err = net.Listen("tcp", *httpListen)
+		if err != nil {
+			fatal(fmt.Sprintf("listen supervisor HTTP bridge: %v", err))
+		}
+		httpBridge := baseServer
+		httpBridge.RequireAuth = true
+		httpBridge.CORSOrigin = strings.TrimSpace(*corsOrigin)
+		httpServer = &http.Server{Handler: httpBridge.Handler()}
+		go func() {
+			if serveErr := httpServer.Serve(httpListener); serveErr != nil && serveErr != http.ErrServerClosed {
+				fatal(fmt.Sprintf("supervisor HTTP bridge: %v", serveErr))
+			}
+		}()
+	}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	go func() { <-stop; _ = server.Shutdown(context.Background()) }()
+	go func() {
+		<-stop
+		_ = server.Shutdown(context.Background())
+		if httpServer != nil {
+			_ = httpServer.Shutdown(context.Background())
+		}
+	}()
 	fmt.Printf("rewind supervisor listening: %s token=%s\n", *socketPath, *tokenPath)
+	if httpListener != nil {
+		fmt.Printf("rewind supervisor HTTP bridge: %s origin=%s\n", *httpListen, *corsOrigin)
+	}
 	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 		fatal(fmt.Sprintf("supervisor serve: %v", err))
 	}

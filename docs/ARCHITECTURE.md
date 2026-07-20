@@ -683,8 +683,10 @@ conflict-check, and commit code paths as the CLI. Commit additionally requires
 `confirmation: "COMMIT"`. Unknown actions, missing run IDs, missing bearer
 tokens, and incomplete evidence fail closed. Every authenticated action is
 also appended to a separate mode-`0600` redacted JSONL audit file. The browser
-adapter consumes only read endpoints; it never receives root privileges or raw
-credentials.
+adapter can use an optional loopback-only HTTP bridge with an exact CORS origin
+to send the same bearer-authenticated action intents; it never receives root
+privileges or raw credentials. The default Unix-socket path remains unchanged,
+and the HTTP listener rejects non-loopback bind addresses.
 
 ### Verified protected-run smoke (disposable VM)
 
