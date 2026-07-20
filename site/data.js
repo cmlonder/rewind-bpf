@@ -91,6 +91,7 @@ export const siteData = {
     ["09", "Evidence hand-off", "Checksum-indexed tar.gz bundles carry the run record and ordered event logs without copying workspace contents or arbitrary host paths; verification and optional detached signatures support remote review hand-off."],
     ["10", "Release integrity", "Cross-platform artifacts, SHA256SUMS, release metadata, release bundle packaging, and detached Ed25519 signing with optional pinned-key verification."],
     ["11", "Operator trust", "Two-minute one-time action challenges for destructive UI intents plus pinned HTTPS registry verification and signer rotation metadata."],
+    ["12", "Scoped credentials", "Opt-in command and native macOS Keychain/Linux Secret Service providers issue one-shot opaque leases without exposing secret bytes to policy, argv, or evidence."],
   ],
   competitors: [
     { name: "RewindBPF", relation: "This project", model: "OverlayFS transaction + eBPF evidence", cow: "Yes", kernel: "Yes", rollback: "Yes", read: "Yes", agent: "Yes", highlight: true },
