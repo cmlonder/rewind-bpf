@@ -1,6 +1,6 @@
-// Package supervisor defines the future local control-plane boundary. It is a
-// data contract only: transport, authentication, and daemon lifetime remain
-// intentionally out of the privileged runtime until post-demo hardening.
+// Package supervisor defines the authenticated local control-plane boundary.
+// The runtime still owns all filesystem and kernel effects; this package only
+// validates transport-level intents and serializes their responses.
 package supervisor
 
 import "fmt"
@@ -25,5 +25,10 @@ func Validate(request Request) error {
 	if request.Action == "" {
 		return fmt.Errorf("supervisor action is required")
 	}
-	return nil
+	switch request.Action {
+	case "status", "rollback", "recover", "commit":
+		return nil
+	default:
+		return fmt.Errorf("unsupported supervisor action %q", request.Action)
+	}
 }

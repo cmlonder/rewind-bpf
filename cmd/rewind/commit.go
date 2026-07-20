@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/acceptance"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
+	"github.com/rewindbpf/rewind/internal/overlay"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
 
@@ -53,6 +55,12 @@ func handleCommit(args []string) {
 	if err != nil {
 		_ = json.NewEncoder(os.Stdout).Encode(report)
 		fatal(fmt.Sprintf("commit refused: %v", err))
+	}
+	// A review run keeps the merged mount alive. Apply the candidate first,
+	// then unmount and discard the temporary layer before recording committed
+	// state so the destination remains the only durable copy.
+	if err := (overlay.Manager{Backend: record.Plan.OverlayBackend}).Rollback(context.Background(), record.Plan.Layout); err != nil {
+		fatal(fmt.Sprintf("commit cleanup: %v", err))
 	}
 	if err := record.Plan.Run.Transition(lifecycle.Committed); err != nil {
 		fatal(err.Error())

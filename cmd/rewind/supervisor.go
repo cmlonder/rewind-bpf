@@ -59,7 +59,13 @@ func handleSupervisor(args []string) {
 	if err := os.Chmod(*socketPath, 0o600); err != nil {
 		fatal(fmt.Sprintf("protect supervisor socket: %v", err))
 	}
-	server := &http.Server{Handler: supervisor.Server{History: history.Open(*historyPath), AuthToken: token}}
+	server := &http.Server{Handler: supervisor.Server{
+		History:   history.Open(*historyPath),
+		AuthToken: token,
+		Actions: func(request supervisor.Request) (supervisor.Response, error) {
+			return supervisorAction(*historyPath, request)
+		},
+	}}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 	go func() { <-stop; _ = server.Shutdown(context.Background()) }()

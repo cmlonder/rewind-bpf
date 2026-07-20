@@ -44,6 +44,25 @@ func TestAuthenticatedActionWithoutRuntimeHandlerRefuses(t *testing.T) {
 	}
 }
 
+func TestAuthenticatedActionHandlerReceivesValidatedRequest(t *testing.T) {
+	server := Server{
+		AuthToken: "secret",
+		Actions: func(request Request) (Response, error) {
+			if request.Action != "status" || request.RunID != "run_1" {
+				t.Fatalf("request = %+v", request)
+			}
+			return Response{OK: true, State: "succeeded"}, nil
+		},
+	}
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/v1/actions", strings.NewReader(`{"action":"status","run_id":"run_1"}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	server.Handler().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
 func TestValidateUnixSocketPath(t *testing.T) {
 	if err := ValidateUnixSocketPath(""); err == nil {
 		t.Fatal("empty socket path should fail")

@@ -8,7 +8,7 @@ The product strategy is documented in [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_ST
 
 ## Current status
 
-The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, network/credential refusal contracts, conflict-checked `commit --confirm`, durable history, authenticated supervisor transport, release/bootstrap scripts, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining productisation work is a namespace/raw-socket network backend, a real credential provider, authenticated mutation handlers, and native macOS/Windows implementations; unsupported capabilities remain fail-closed.
+The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, network/credential refusal contracts, conflict-checked `commit --confirm`, durable history, an authenticated supervisor transport with lifecycle actions, release/bootstrap scripts, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining productisation work is a namespace/raw-socket network backend, a real credential provider, live follow-mode event streaming, and native macOS/Windows implementations; unsupported capabilities remain fail-closed.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -137,12 +137,18 @@ permissioned Unix socket. Action endpoints intentionally refuse until the
 supervisor has an authenticated authorization layer:
 
 ```sh
-rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json
+sudo rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json
 ```
 
-The Control Plane’s “Connect supervisor” action talks to a read-only HTTP
-adapter when a trusted local bridge exposes that socket; fixture mode remains
-the safe default for the static demo.
+The socket is intentionally mode `0600`; inspect it as the same privileged
+user that owns the runtime (for example, `sudo curl --unix-socket
+/tmp/rewind-supervisor.sock http://localhost/health`). A generated bearer token
+is written to `/tmp/rewind-supervisor.sock.token` (mode `0600`) and is required
+for action requests. Authenticated `status`, `rollback`/`recover`, and
+explicit `commit` (`confirmation: "COMMIT"`) actions are routed through the
+same lifecycle and conflict checks as the CLI. The Control Plane’s browser
+adapter remains read-only; fixture mode remains the safe default for the
+static demo.
 
 Example policy:
 

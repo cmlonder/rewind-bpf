@@ -134,6 +134,15 @@ func handleRun(args []string) {
 	}
 	var networkProxy *netpolicy.Proxy
 	var stopNetworkProxy context.CancelFunc
+	closeNetworkProxy := func() {
+		if stopNetworkProxy == nil {
+			return
+		}
+		stopNetworkProxy()
+		_ = networkProxy.Close()
+		stopNetworkProxy = nil
+		networkProxy = nil
+	}
 	starter := protectedrun.ExecStarter{HelperPath: helper}
 	if plan.Network.Mode == policy.ModeEnforce {
 		networkProxy, err = netpolicy.ListenProxy(plan.Network)
@@ -154,25 +163,25 @@ func handleRun(args []string) {
 	}
 	handle, err := coordinator.Start(context.Background(), &plan, command, *sensorObject)
 	if err != nil {
-		if stopNetworkProxy != nil {
-			stopNetworkProxy()
-			_ = networkProxy.Close()
-		}
+		closeNetworkProxy()
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
 		fatal(err.Error())
 	}
 	if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 		_ = handle.Rollback(context.Background())
+		closeNetworkProxy()
 		fatal(fmt.Sprintf("persist running run; transaction rolled back: %v", err))
 	}
 	if err := persistHistory(*historyPath, plan, *recordPath); err != nil {
 		_ = handle.Rollback(context.Background())
+		closeNetworkProxy()
 		fatal(fmt.Sprintf("persist running history: %v", err))
 	}
 	waitErr := handle.Wait()
-	if stopNetworkProxy != nil {
-		defer func() { stopNetworkProxy(); _ = networkProxy.Close() }()
-	}
+	// The proxy is only needed while the agent is running. Close it before any
+	// post-run persistence or fatal path; fatal exits immediately and does not
+	// execute deferred cleanup.
+	closeNetworkProxy()
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())

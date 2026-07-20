@@ -117,7 +117,7 @@ Native adapters are not allowed to silently downgrade the four promises. Each ru
 
 ### Track E — Durable history and supervisor UX
 
-The current slice includes bounded history, signed policy provenance, a token-authenticated read-only supervisor API, and a browser adapter. Remaining work is authenticated mutation handlers, live follow-mode event streaming, detachable sessions, and registry/provenance distribution.
+The current slice includes bounded history, signed policy provenance, a token-authenticated supervisor API with status/rollback/recover/commit actions, and a browser adapter. Remaining work is live follow-mode event streaming, detachable sessions, and registry/provenance distribution.
 
 ## 7. Platform roadmap
 
