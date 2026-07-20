@@ -145,7 +145,10 @@ func handleRun(args []string) {
 		networkProxy = nil
 	}
 	starter := protectedrun.ExecStarter{HelperPath: helper}
-	if plan.Network.Mode == policy.ModeEnforce {
+	// An explicit proxy backend can observe audit mode as well as enforce mode.
+	// Audit stays zero-overhead when no backend is selected; enforce remains
+	// fail-closed in runplan.Build unless the proxy is explicitly requested.
+	if plan.Network.Mode != policy.ModeOff && *networkBackend == "proxy" {
 		networkProxy, err = netpolicy.ListenProxy(plan.Network)
 		if err != nil {
 			fatal(fmt.Sprintf("start network policy proxy: %v", err))

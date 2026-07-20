@@ -78,3 +78,22 @@ func TestBuildAcceptsExplicitProxyNetworkBackend(t *testing.T) {
 		t.Fatalf("network plan=%+v", plan.Network)
 	}
 }
+
+func TestBuildAcceptsExplicitProxyForAuditMode(t *testing.T) {
+	workspace := t.TempDir()
+	plan, err := Build(Config{
+		Workspace:      workspace,
+		RuntimeRoot:    filepath.Join(t.TempDir(), "run"),
+		NetworkBackend: "proxy",
+		Policy: policy.Policy{Network: policy.NetworkPolicy{
+			Mode:         policy.ModeAudit,
+			AllowDomains: []string{"example.com"},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Network.Mode != policy.ModeAudit || len(plan.Network.AllowDomains) != 1 {
+		t.Fatalf("plan=%+v", plan.Network)
+	}
+}
