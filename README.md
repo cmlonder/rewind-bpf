@@ -114,6 +114,7 @@ sudo rewind diff --record ./runtime/record.json
 rewind export --record ./runtime/record.json --output ./review-bundle.json
 sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
+sudo rewind commit --record ./runtime/record.json --confirm
 ```
 
 Successful runs discard the temporary upper/work layer by default. Add `--on-success review` when you explicitly need to inspect the merged view before choosing export or discard. The agent always sees a merged workspace backed by an OverlayFS lower/upper pair; the protected lower layer is never modified before acceptance. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns. Network policy is compiled for audit/preview, while the default credential broker refuses raw secret exposure until a platform broker is configured. Candidate acceptance is conflict-checked against the immutable base before any future apply step.
