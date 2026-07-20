@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/base64"
 	"flag"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -32,8 +34,9 @@ func handleSupervisor(args []string) {
 	configPath := flags.String("config", "", "local policy/workspace config JSON path")
 	httpListen := flags.String("http-listen", "", "optional loopback HTTP bridge address, e.g. 127.0.0.1:8787")
 	corsOrigin := flags.String("cors-origin", "", "optional exact browser origin allowed for the HTTP bridge")
+	trustedPolicyKeys := flags.String("trusted-policy-keys", "", "optional comma-separated raw Ed25519 public-key files for signed policy imports")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN]")
+		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,...]")
 	}
 	if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
 		fatal(err.Error())
@@ -54,6 +57,10 @@ func handleSupervisor(args []string) {
 	}
 	if strings.TrimSpace(*configPath) == "" {
 		*configPath = *historyPath + ".config.json"
+	}
+	trustedKeys, err := loadTrustedPolicyKeys(*trustedPolicyKeys)
+	if err != nil {
+		fatal(err.Error())
 	}
 	token, err := loadSupervisorToken(*tokenPath)
 	if err != nil {
@@ -76,11 +83,12 @@ func handleSupervisor(args []string) {
 		fatal(fmt.Sprintf("protect supervisor socket: %v", err))
 	}
 	baseServer := supervisor.Server{
-		History:   history.Open(*historyPath),
-		AuthToken: token,
-		Config:    controlplane.Open(*configPath),
-		AuditPath: *historyPath + ".actions.jsonl",
-		AuditMu:   &sync.Mutex{},
+		History:           history.Open(*historyPath),
+		AuthToken:         token,
+		Config:            controlplane.Open(*configPath),
+		TrustedPolicyKeys: trustedKeys,
+		AuditPath:         *historyPath + ".actions.jsonl",
+		AuditMu:           &sync.Mutex{},
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {
 			return supervisorAction(*historyPath, request)
 		},
@@ -119,6 +127,25 @@ func handleSupervisor(args []string) {
 	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 		fatal(fmt.Sprintf("supervisor serve: %v", err))
 	}
+}
+
+func loadTrustedPolicyKeys(raw string) ([]ed25519.PublicKey, error) {
+	var keys []ed25519.PublicKey
+	for _, value := range strings.Split(raw, ",") {
+		path := strings.TrimSpace(value)
+		if path == "" {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Clean(path))
+		if err != nil {
+			return nil, fmt.Errorf("read trusted policy key %s: %w", path, err)
+		}
+		if len(data) != ed25519.PublicKeySize {
+			return nil, fmt.Errorf("trusted policy key %s must contain %d raw bytes", path, ed25519.PublicKeySize)
+		}
+		keys = append(keys, ed25519.PublicKey(append([]byte(nil), data...)))
+	}
+	return keys, nil
 }
 
 func loadSupervisorToken(path string) (string, error) {

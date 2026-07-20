@@ -39,7 +39,7 @@ printf '%s\n' \
 SOCKET="$ROOT/supervisor.sock"
 TOKEN_FILE="$ROOT/supervisor.token"
 HTTP_ADDR="127.0.0.1:18789"
-"$BIN" supervisor --socket "$SOCKET" --history "$ROOT/history.json" --config "$ROOT/config.json" --token-file "$TOKEN_FILE" --http-listen "$HTTP_ADDR" --cors-origin http://127.0.0.1:4173 > "$ROOT/supervisor.log" 2>&1 &
+"$BIN" supervisor --socket "$SOCKET" --history "$ROOT/history.json" --config "$ROOT/config.json" --token-file "$TOKEN_FILE" --trusted-policy-keys "$ROOT/public" --http-listen "$HTTP_ADDR" --cors-origin http://127.0.0.1:4173 > "$ROOT/supervisor.log" 2>&1 &
 SUPERVISOR_PID=$!
 for _ in $(seq 1 50); do
   curl -fsS "http://$HTTP_ADDR/health" >/dev/null 2>&1 && break

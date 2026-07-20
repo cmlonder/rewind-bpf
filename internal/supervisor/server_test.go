@@ -151,6 +151,43 @@ func TestSignedPolicyBundleImportRequiresValidSignature(t *testing.T) {
 	}
 }
 
+func TestSignedPolicyBundleImportHonorsTrustedSignerAllowList(t *testing.T) {
+	dir := t.TempDir()
+	trusted, trustedPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, untrustedPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := policybundle.Sign(policybundle.Bundle{Name: "untrusted-agent", Version: "1.0.0", Policy: policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeAudit}}}, untrustedPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := json.Marshal(signed)
+	server := Server{AuthToken: "secret", Config: controlplane.Open(filepath.Join(dir, "config.json")), TrustedPolicyKeys: []ed25519.PublicKey{trusted}, AuditPath: filepath.Join(dir, "audit.jsonl"), AuditMu: &sync.Mutex{}}
+	request := httptest.NewRequest(http.MethodPost, "/v1/policy-bundles", strings.NewReader(string(body)))
+	request.Header.Set("Authorization", "Bearer secret")
+	refused := httptest.NewRecorder()
+	server.Handler().ServeHTTP(refused, request)
+	if refused.Code != http.StatusConflict || !strings.Contains(refused.Body.String(), "not trusted") {
+		t.Fatalf("status=%d body=%s", refused.Code, refused.Body.String())
+	}
+	trustedBundle, err := policybundle.Sign(policybundle.Bundle{Name: "trusted-agent", Version: "1.0.0", Policy: policy.Policy{Read: policy.ReadPolicy{Mode: policy.ModeAudit}}}, trustedPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ = json.Marshal(trustedBundle)
+	request = httptest.NewRequest(http.MethodPost, "/v1/policy-bundles", strings.NewReader(string(body)))
+	request.Header.Set("Authorization", "Bearer secret")
+	created := httptest.NewRecorder()
+	server.Handler().ServeHTTP(created, request)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s", created.Code, created.Body.String())
+	}
+}
+
 func TestAuthenticatedActionWithoutRuntimeHandlerRefuses(t *testing.T) {
 	server := Server{AuthToken: "secret"}
 	recorder := httptest.NewRecorder()

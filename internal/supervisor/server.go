@@ -2,6 +2,7 @@ package supervisor
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
@@ -34,9 +35,10 @@ type Server struct {
 	// RequireAuth protects read endpoints when the handler is exposed over
 	// loopback HTTP. Unix-socket mode keeps the historical read-only behavior
 	// because the socket itself is mode 0600.
-	RequireAuth bool
-	CORSOrigin  string
-	Config      *controlplane.Store
+	RequireAuth       bool
+	CORSOrigin        string
+	Config            *controlplane.Store
+	TrustedPolicyKeys []ed25519.PublicKey
 }
 
 func (s Server) Handler() http.Handler {
@@ -248,6 +250,9 @@ func (s Server) assignWorkspace(value controlplane.Workspace) error {
 func (s Server) importSignedPolicy(signed policybundle.Signed) error {
 	if s.Config == nil || !s.Config.Enabled() {
 		return fmt.Errorf("control-plane config store is disabled")
+	}
+	if _, err := policybundle.Verify(signed, s.TrustedPolicyKeys...); err != nil {
+		return err
 	}
 	return s.Config.CreateSignedPolicy(signed)
 }

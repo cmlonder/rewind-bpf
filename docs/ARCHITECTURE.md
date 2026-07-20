@@ -696,6 +696,14 @@ workspace assignment writes use a separate mode-`0600` local config store,
 validate names, versions, paths, and policy references, and are recorded in the
 redacted supervisor audit without storing workspace contents.
 
+Signed policy bundle imports use `POST /v1/policy-bundles`. The supervisor
+verifies the Ed25519 envelope before persistence and records the signer key ID
+alongside the package. `--trusted-policy-keys` can provide a comma-separated
+allow-list of raw public-key files; when configured, signatures from any other
+key are refused and audited. Omitting the allow-list is an explicit local-demo
+mode: cryptographic integrity is checked, but organization-level trust is not
+claimed.
+
 ### Verified protected-run smoke (disposable VM)
 
 The first end-to-end FUSE run was verified on 2026-07-18 in the Ubuntu 24.04 ARM64 VM using only generated files. The policy denied `synthetic.env` with `EACCES`, the agent removed `src/` and created `generated.txt` in the merged view, and the eBPF sensor recorded the run. The lower workspace still contained `original-source`. `rewind rollback` then unmounted the FUSE view, discarded the temporary upper/work changes, and transitioned the persisted lifecycle from `succeeded` to `rolled_back`.
