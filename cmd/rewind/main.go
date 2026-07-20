@@ -26,7 +26,8 @@ Usage:
   rewind diff --record PATH
   rewind export --record PATH --output PATH [--format json|patch|git-patch]
   rewind bundle create --record PATH --output PATH
-  rewind bundle verify --input PATH
+  rewind bundle sign --input PATH --private-key PATH --output PATH
+  rewind bundle verify --input PATH [--signature PATH --public-key PATH]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
   rewind platform plan --workspace PATH

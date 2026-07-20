@@ -315,8 +315,10 @@ outside the run runtime root and never includes the workspace, upper layer,
 credentials, or arbitrary absolute paths. This is a local hand-off primitive
 for later object-store integration. `rewind bundle verify --input PATH`
 validates the archive in memory, including path safety, artifact hashes,
-`SHA256SUMS`, and the embedded record/run ID; encryption, remote retention,
-and restore are deliberately not claimed yet.
+`SHA256SUMS`, and the embedded record/run ID. `rewind bundle sign` and the
+optional signature flags on `bundle verify` add detached Ed25519 integrity and
+publisher-key pinning for a remote review hand-off; encryption, remote
+retention, and restore are deliberately not claimed yet.
 
 ## 11. Implementation status
 

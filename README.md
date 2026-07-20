@@ -155,6 +155,9 @@ rewind export --record ./runtime/record.json --output ./review.git.patch --forma
 # Portable evidence archive (record + ordered event logs, no workspace files):
 rewind bundle create --record ./runtime/record.json --output ./run-evidence.tar.gz
 rewind bundle verify --input ./run-evidence.tar.gz
+# Optional detached signature for remote review hand-off:
+rewind bundle sign --input ./run-evidence.tar.gz --private-key /secure/review.key --output ./run-evidence.sig
+rewind bundle verify --input ./run-evidence.tar.gz --signature ./run-evidence.sig --public-key /secure/review.pub
 sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
 sudo rewind commit --record ./runtime/record.json --confirm

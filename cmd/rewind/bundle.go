@@ -1,12 +1,16 @@
 package main
 
 import (
+	"crypto/ed25519"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
 	evidencebundle "github.com/rewindbpf/rewind/internal/bundle"
+	releasecrypto "github.com/rewindbpf/rewind/internal/release"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
 
@@ -18,8 +22,12 @@ func handleBundle(args []string) {
 		handleBundleVerify(args[1:])
 		return
 	}
+	if args[0] == "sign" {
+		handleBundleSign(args[1:])
+		return
+	}
 	if args[0] != "create" {
-		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle verify --input PATH")
+		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle sign --input PATH --private-key PATH --output PATH | rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
 	}
 	flags := flag.NewFlagSet("bundle create", flag.ContinueOnError)
 	recordPath := flags.String("record", "", "run record JSON path")
@@ -51,12 +59,73 @@ func handleBundle(args []string) {
 func handleBundleVerify(args []string) {
 	flags := flag.NewFlagSet("bundle verify", flag.ContinueOnError)
 	inputPath := flags.String("input", "", "evidence .tar.gz path")
+	signaturePath := flags.String("signature", "", "optional detached signature JSON path")
+	publicPath := flags.String("public-key", "", "optional pinned public key path")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" {
-		fatal("usage: rewind bundle verify --input PATH")
+		fatal("usage: rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
 	}
 	metadata, err := evidencebundle.Verify(*inputPath)
 	if err != nil {
 		fatal(fmt.Sprintf("evidence bundle verification failed: %v", err))
 	}
-	fmt.Printf("evidence bundle verified: run_id=%s artifacts=%d state=%s\n", metadata.RunID, len(metadata.Artifacts), metadata.State)
+	trust := "checksum-only"
+	if strings.TrimSpace(*signaturePath) != "" {
+		payload, err := os.ReadFile(filepath.Clean(*inputPath))
+		if err != nil {
+			fatal(fmt.Sprintf("read evidence bundle for signature: %v", err))
+		}
+		signatureData, err := os.ReadFile(filepath.Clean(*signaturePath))
+		if err != nil {
+			fatal(fmt.Sprintf("read evidence bundle signature: %v", err))
+		}
+		var signed releasecrypto.Signature
+		if err := json.Unmarshal(signatureData, &signed); err != nil {
+			fatal(fmt.Sprintf("decode evidence bundle signature: %v", err))
+		}
+		var trusted ed25519.PublicKey
+		if strings.TrimSpace(*publicPath) != "" {
+			trustedData, err := os.ReadFile(filepath.Clean(*publicPath))
+			if err != nil {
+				fatal(fmt.Sprintf("read evidence bundle public key: %v", err))
+			}
+			trusted = ed25519.PublicKey(trustedData)
+		}
+		if len(trusted) > 0 {
+			err = releasecrypto.Verify(payload, signed, trusted)
+			trust = "pinned-signature"
+		} else {
+			err = releasecrypto.Verify(payload, signed)
+			trust = "embedded-signature"
+		}
+		if err != nil {
+			fatal(fmt.Sprintf("evidence bundle signature verification failed: %v", err))
+		}
+	}
+	fmt.Printf("evidence bundle verified: run_id=%s artifacts=%d state=%s trust=%s\n", metadata.RunID, len(metadata.Artifacts), metadata.State, trust)
+}
+
+func handleBundleSign(args []string) {
+	flags := flag.NewFlagSet("bundle sign", flag.ContinueOnError)
+	inputPath := flags.String("input", "", "evidence .tar.gz path")
+	privatePath := flags.String("private-key", "", "private key path")
+	outputPath := flags.String("output", "", "detached signature JSON path")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" || strings.TrimSpace(*privatePath) == "" || strings.TrimSpace(*outputPath) == "" {
+		fatal("usage: rewind bundle sign --input PATH --private-key PATH --output PATH")
+	}
+	payload, err := os.ReadFile(filepath.Clean(*inputPath))
+	if err != nil {
+		fatal(fmt.Sprintf("read evidence bundle: %v", err))
+	}
+	private, err := os.ReadFile(filepath.Clean(*privatePath))
+	if err != nil {
+		fatal(fmt.Sprintf("read evidence bundle private key: %v", err))
+	}
+	signed, err := releasecrypto.Sign(payload, ed25519.PrivateKey(private))
+	if err != nil {
+		fatal(err.Error())
+	}
+	if err := writeReleaseJSON(*outputPath, signed); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("signed evidence bundle: %s key_id=%s\n", *outputPath, signed.KeyID)
 }
