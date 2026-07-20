@@ -138,6 +138,25 @@ func (s Server) Handler() http.Handler {
 		writeJSON(w, http.StatusCreated, Response{OK: true, State: "assigned", Message: value.Name})
 	})
 	mux.HandleFunc("/v1/policy-bundles", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			if !s.authorized(r) {
+				writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+				return
+			}
+			snapshot, err := s.configSnapshot()
+			if err != nil {
+				writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "refused", Message: err.Error()})
+				return
+			}
+			bundles := make([]policybundle.Signed, 0, len(snapshot.Policies))
+			for _, value := range snapshot.Policies {
+				if value.SignedBundle != nil {
+					bundles = append(bundles, *value.SignedBundle)
+				}
+			}
+			writeJSON(w, http.StatusOK, bundles)
+			return
+		}
 		if r.Method != http.MethodPost {
 			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "policy bundles require POST"})
 			return

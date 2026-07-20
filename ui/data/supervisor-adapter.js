@@ -5,13 +5,14 @@ export async function connectSupervisor(baseUrl, token = "") {
   const root = baseUrl.replace(/\/$/, "");
   const headers = { Accept: "application/json" };
   if (token.trim()) headers.Authorization = `Bearer ${token.trim()}`;
-  const [health, capabilities, history, audit, policies, workspaces] = await Promise.all([
+  const [health, capabilities, history, audit, policies, workspaces, policyBundles] = await Promise.all([
     fetch(`${root}/health`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/capabilities`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/history`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/audit?limit=100`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/policies`, { headers }).then(assertResponse).then((response) => response.json()),
     fetch(`${root}/v1/workspaces`, { headers }).then(assertResponse).then((response) => response.json()),
+    fetch(`${root}/v1/policy-bundles`, { headers }).then(assertResponse).then((response) => response.json()),
   ]);
   return {
     health,
@@ -20,6 +21,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     audit: Array.isArray(audit) ? audit : [],
     policies: Array.isArray(policies) ? policies : [],
     workspaces: Array.isArray(workspaces) ? workspaces : [],
+    policyBundles: Array.isArray(policyBundles) ? policyBundles : [],
     token: token.trim(),
     baseUrl: root,
     action: (request) => executeAction(root, token.trim(), request),

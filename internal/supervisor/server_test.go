@@ -133,6 +133,13 @@ func TestSignedPolicyBundleImportRequiresValidSignature(t *testing.T) {
 	if created.Code != http.StatusCreated {
 		t.Fatalf("status=%d body=%s", created.Code, created.Body.String())
 	}
+	listRequest := httptest.NewRequest(http.MethodGet, "/v1/policy-bundles", nil)
+	listRequest.Header.Set("Authorization", "Bearer secret")
+	listed := httptest.NewRecorder()
+	server.Handler().ServeHTTP(listed, listRequest)
+	if listed.Code != http.StatusOK || !strings.Contains(listed.Body.String(), signed.KeyID) {
+		t.Fatalf("list status=%d body=%s", listed.Code, listed.Body.String())
+	}
 	signed.Signature = "tampered"
 	encoded, _ = json.Marshal(signed)
 	request = httptest.NewRequest(http.MethodPost, "/v1/policy-bundles", strings.NewReader(string(encoded)))

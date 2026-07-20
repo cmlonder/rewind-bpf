@@ -673,6 +673,7 @@ POST /v1/policies
 GET  /v1/workspaces
 POST /v1/workspaces
 POST /v1/policy-bundles
+GET  /v1/policy-bundles
 GET  /v1/audit?limit=100
 GET  /v1/events?run_id=...           (snapshot)
 GET  /v1/events?run_id=...&follow=true (tail until terminal/timeout)

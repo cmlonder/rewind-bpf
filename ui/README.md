@@ -42,7 +42,8 @@ Local authentication is intentionally deferred until after the hackathon demo. T
 
 `data/fixture.js` remains the safe demo adapter. `data/supervisor-adapter.js`
 can connect to the optional loopback HTTP bridge (`--http-listen` plus an exact
-`--cors-origin`) and exposes an authenticated action function. The browser
+`--cors-origin`) and exposes authenticated policy bundle inventory and action
+functions. The browser
 requests health, capabilities, history, and redacted audit data, then sends only
 validated action intents; it must never receive root privileges or raw
 credentials. Privileged actions remain an explicit supervisor/CLI boundary.

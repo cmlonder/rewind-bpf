@@ -175,7 +175,9 @@ same lifecycle and conflict checks as the CLI. Each accepted or refused action
 is appended to `/tmp/rewind-history.json.actions.jsonl` without tokens or file
 contents. The Control Plane’s browser adapter can send those same intents and
 persist validated local policy/workspace assignments or import a self-contained
-Ed25519-signed policy bundle when the explicit HTTP bridge is enabled. Pass
+Ed25519-signed policy bundle when the explicit HTTP bridge is enabled. The
+bridge also exposes an authenticated signed-bundle inventory for export and
+review. Pass
 `--trusted-policy-keys` to require an organization signer allow-list; without
 it, the supervisor still verifies the envelope’s embedded key and signature but
 does not claim organization-level trust. Fixture mode remains the safe default
