@@ -23,7 +23,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Control Plane UI | **Shipped / fixture + authenticated bridge** | Responsive operational views, local policy/workspace config store, loopback HTTP supervisor bridge, bearer-authenticated rollback/recover/commit and policy/workspace writes, authenticated SSE evidence follow with reconnect backoff, signed policy bundle import with verification and audit | Trusted remote registry, local action-token UX |
 | Public jury site | **Shipped** | Static modular single-page narrative, honest competitor matrix, roadmap, and measured benchmark ledger | Publish/deploy automation and post-hackathon content updates |
 | Linux release/bootstrap | **Shipped / signed locally** | VM bootstrap, release Make targets, cross-build checks, SHA256SUMS, release metadata, and detached Ed25519 signature/verification with optional pinned public key | Public registry trust, key rotation/revocation, and package repository |
-| macOS native backend | **Not implemented** | Capability probe and fail-closed unavailable backend only | Seatbelt/EndpointSecurity + APFS disposable-volume implementation and destructive tests on disposable storage |
+| macOS native backend | **Prepared / manual gate** | Read-only APFS/Seatbelt/diskutil prerequisite plan, platform CLI, and fail-closed capability report; no destructive operation is enabled | Native Seatbelt/EndpointSecurity + APFS disposable-volume implementation and destructive tests on disposable storage |
 | Windows native backend | **Not implemented** | Cross-build and fail-closed unavailable backend only; WSL2 remains compatibility mode | Native process/filesystem policy + disposable workspace implementation and Windows VM tests |
 | Agent integrations | **Not implemented** | Generic `-- <agent-command>` wrapper | Tested adapters for Codex CLI/OpenHands/Claude Code or a stable adapter SDK |
 | Durable remote retention | **Partial / local bundle** | Bounded local history and keep-latest pruning plus checksum-indexed `rewind bundle create` archives and read-only `rewind bundle verify`, restricted to the runtime root | Object-store/remote evidence bundles, retention policy, encryption, and restore |
@@ -37,9 +37,9 @@ The **Linux demo and product-core feature set is complete enough to enter the ve
 
 Before running the full regression suite, only these implementation items are still in the current Linux scope:
 
-1. Keep the documentation/site status synchronized with the shipped supervisor, commit path, proxy backend, and event rotation.
+1. Keep the documentation/site status synchronized with the shipped supervisor, commit path, proxy backend, event rotation, branch acceptance, and evidence bundles.
 2. Add and maintain contract tests for every `partial` or `unavailable` capability so unsupported paths fail closed.
-3. Run the disposable-VM acceptance matrix and benchmark verification; do not run privileged or destructive tests on the development Mac.
+3. Run the disposable-VM acceptance matrix and `make benchmark-verify`; do not run privileged or destructive tests on the development Mac.
 
 Everything else in the table is a deliberately staged post-demo/productisation item, not a hidden unfinished P0 feature.
 
@@ -79,7 +79,11 @@ Finish broader network namespace enforcement for non-proxy-aware clients, one re
 
 ### P2 — Native macOS
 
-Implement and test Seatbelt/EndpointSecurity plus APFS clone/snapshot or disposable workspace. Report a native capability matrix and refuse any unsupported promise.
+The read-only native prerequisite plan and capability CLI are prepared. The
+remaining gate is manual: validate Seatbelt/EndpointSecurity plus APFS
+clone/snapshot or disposable workspace on disposable storage, then wire the
+enforcing process adapter. Report a native capability matrix and refuse any
+unsupported promise.
 
 ### P3 — Native Windows
 

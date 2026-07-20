@@ -77,6 +77,16 @@ open http://127.0.0.1:4173
 
 The page covers the shipped safety surface, reversible transaction flow, Phase 2 roadmap, competitor capability matrix, and measured B0/B2/B4 evidence. The Markdown ledgers remain canonical.
 
+On macOS, the safe prerequisite probe is read-only:
+
+```bash
+rewind platform plan --workspace /path/to/disposable-apfs-fixture
+```
+
+It reports APFS, `sandbox-exec`, and `diskutil` availability. It does not
+clone, mount, launch, or delete anything. The macOS backend remains refused
+until the disposable-volume manual gate is completed.
+
 ## Control Plane UI
 
 The operational UI prototype lives in [`ui/`](ui/) and is tracked in [`docs/UI_ROADMAP.md`](docs/UI_ROADMAP.md). It is fixture-driven in Phase 1: no eBPF program, mount, process, workspace, or host file is touched. Preview it safely with:
@@ -105,8 +115,10 @@ synthetic acceptance matrix with:
 REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm
 ```
 
-This gate is VM-only and covers rollback/read denial, review/commit,
-destination-drift refusal, proxy allow/deny, and incomplete-evidence refusal.
+This gate is VM-only and covers rollback/read denial, evidence bundle
+create/verify, review/commit, clean-branch acceptance, destination-drift
+refusal, proxy/raw-socket semantics, and incomplete-evidence refusal. Run
+`make benchmark-verify` to validate the checked-in B0/B2/B4 ledger and chart.
 The supervisor boundary can be checked separately with
 `REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm`.
 

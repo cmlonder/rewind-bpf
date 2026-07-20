@@ -216,7 +216,7 @@ The host is development-only. We must not run OverlayFS, eBPF, destructive files
 
 ### 7.2 Direct Ubuntu VM
 
-The kernel MVP runs directly inside an Ubuntu VM managed by UTM on the macOS host. This keeps the Linux kernel, capabilities, mounts, and safety boundary explicit.
+The kernel MVP runs directly inside an Ubuntu VM managed by UTM on the macOS host. This keeps the Linux kernel, capabilities, mounts, and safety boundary explicit. The macOS native track now has a read-only `rewind platform plan --workspace PATH` prerequisite probe, but the enforcing backend remains fail-closed until disposable APFS/Seatbelt validation.
 
 Recommended layout:
 
@@ -751,13 +751,15 @@ On 2026-07-19 the Phase 2 binary passed package tests, capability probing, and a
 
 On 2026-07-20, `REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm` passed in the
 same Ubuntu 24.04 ARM64 VM after rebuilding the Go binary and eBPF object. The
-matrix covered read denial plus recursive deletion/discard, review and explicit
-commit, destination-drift conflict refusal, proxy allow/deny for a local HTTP
-server versus `example.invalid`, and bounded-evidence refusal. The network run
-persisted two `network_connect` decisions (one allow and one deny) in the same
-hash-chained JSONL evidence stream as kernel events. The complete evidence case
-verified with `dropped=0`; the intentionally capped case recorded
-`truncated=true`, `complete=false`, and caused verification to exit non-zero.
+matrix covered read denial plus recursive deletion/discard, evidence bundle
+create/verify, review and explicit commit, clean-branch Git acceptance,
+destination-drift conflict refusal, proxy allow/deny for a local HTTP server
+versus `example.invalid`, raw-socket refusal/audit semantics, and
+bounded-evidence refusal. The network run persisted two `network_connect`
+decisions (one allow and one deny) in the same hash-chained JSONL evidence
+stream as kernel events. The complete evidence case verified with `dropped=0`;
+the intentionally capped case recorded `truncated=true`, `complete=false`,
+and caused verification to exit non-zero.
 The script creates only a generated temporary directory and performs cleanup
 of that exact directory with the privileged unmount path.
 
