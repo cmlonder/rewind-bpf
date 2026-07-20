@@ -164,7 +164,14 @@ function openModal(title, body, { confirm, tone = "orange", onConfirm }) {
   document.body.append(layer);
   document.body.classList.add("modal-open");
   layer.querySelectorAll("[data-modal-cancel]").forEach((element) => element.addEventListener("click", closeModal));
-  layer.querySelector("[data-modal-confirm]").addEventListener("click", () => onConfirm() !== false && closeModal());
+  layer.querySelector("[data-modal-confirm]").addEventListener("click", () => {
+    const result = onConfirm();
+    if (result && typeof result.then === "function") {
+      const confirmButton = layer.querySelector("[data-modal-confirm]");
+      confirmButton.disabled = true;
+      result.then((value) => { if (value !== false) closeModal(); }).catch(() => { confirmButton.disabled = false; });
+    } else if (result !== false) closeModal();
+  });
   layer._onKeyDown = (event) => {
     if (event.key === "Escape") { event.preventDefault(); closeModal(); return; }
     if (event.key !== "Tab") return;
