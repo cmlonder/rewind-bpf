@@ -32,4 +32,7 @@ Local authentication is intentionally deferred until after the hackathon demo. T
 
 ## Adapter boundary
 
-`data/fixture.js` is the Phase 1 adapter. A future `api-adapter.js` can replace it without changing the view components. The planned connected boundary is a local `rewindd` supervisor over a Unix socket or localhost-only API; the browser must never receive root privileges.
+`data/fixture.js` remains the safe demo adapter. `data/supervisor-adapter.js`
+can connect to the read-only local supervisor bridge without changing view
+components. The browser requests health, capabilities, and history only; it
+must never receive root privileges or raw credentials.

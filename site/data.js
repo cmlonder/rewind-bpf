@@ -85,6 +85,8 @@ export const siteData = {
     ["04", "Evidence integrity", "eBPF telemetry, dropped-event accounting, hash chain, bounded logs, rotation, and verification."],
     ["05", "Recovery paths", "SIGKILL, open-descriptor, stale-mount, and already-torn-down run recovery."],
     ["06", "Review surface", "inspect, diff, export, policy explain, policy learn, and standalone evidence verification."],
+    ["07", "Acceptance safety", "Explicit conflict-checked commit, incomplete-evidence refusal, and signed Ed25519 policy envelopes."],
+    ["08", "Control plane contract", "Durable history, a read-only Unix-socket supervisor, and a browser adapter that never receives root access."],
   ],
   competitors: [
     { name: "RewindBPF", relation: "This project", model: "OverlayFS transaction + eBPF evidence", cow: "Yes", kernel: "Yes", rollback: "Yes", read: "Yes", agent: "Yes", highlight: true },

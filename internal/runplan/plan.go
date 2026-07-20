@@ -35,6 +35,7 @@ type Plan struct {
 	OverlayBackend overlay.Backend         `json:"overlay_backend"`
 	CgroupPath     string                  `json:"cgroup_path,omitempty"`
 	Capabilities   capabilities.Report     `json:"capabilities,omitempty"`
+	HistoryPath    string                  `json:"history_path,omitempty"`
 }
 
 // Build validates and composes all pre-execution state. The workspace is used

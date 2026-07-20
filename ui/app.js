@@ -1,4 +1,5 @@
 import { fixture, getRun } from "./data/fixture.js";
+import { connectSupervisor } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
@@ -56,10 +57,12 @@ function selectPolicy(name) {
 
 function handleAction(action, element) {
   if (action === "notifications") return openModal("Notifications", `<div class="notification-list"><div><span class="notification-dot"></span><div><strong>Evidence stream healthy</strong><p>Run <code>${currentRun().shortId}</code> has no dropped or truncated events.</p><small>just now · system</small></div></div><div><span class="notification-dot notification-dot-muted"></span><div><strong>Fixture adapter active</strong><p>Actions are simulated in memory until the supervisor API is connected.</p><small>today · control plane</small></div></div></div>`, { confirm: "Done", onConfirm: closeModal });
-  if (action === "hold-review") return setToast("Review hold selected. The real CLI equivalent is --on-success review.", "neutral");
+  if (action === "connect-supervisor") return openSupervisorConnector();
+  if (action === "hold-review") { currentRun().state = "succeeded"; return setToast("Run held for review. Conflict-checked acceptance is now available.", "neutral"); }
   if (action === "simulate-credentials") return setToast("Boundary check passed: broker unavailable, raw secret exposure refused.", "neutral");
   if (action === "retention") return setToast("Retention is fixture-backed in this demo; the P4 index prunes by keep-latest policy.", "neutral");
   if (action === "rollback") return openConfirm({ title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: rollback });
+  if (action === "commit") return openConfirm({ title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: commitRun });
   if (action === "recover") return openConfirm({ title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => setToast("Recovery completed in fixture mode.", "success") });
   if (action === "export") return setToast("Review bundle prepared in fixture mode.", "success");
   if (action === "copy-policy") return copyPolicy();
@@ -73,6 +76,20 @@ function handleAction(action, element) {
   if (action === "config-change") return openConfigEditor(element.dataset.configKey);
 }
 
+function openSupervisorConnector() {
+  openModal("Connect local supervisor", `<form id="supervisor-form" class="modal-form"><label>Read-only endpoint<input name="endpoint" value="http://127.0.0.1:8787" inputmode="url" pattern="https?://[^ ]+" required /></label><div class="form-note">The browser requests health, capability, and history only. It never receives root access or raw credentials.</div></form>`, { confirm: "Connect", onConfirm: async () => {
+    const form = document.querySelector("#supervisor-form");
+    if (!form?.reportValidity()) return false;
+    const endpoint = new FormData(form).get("endpoint");
+    try {
+      const connected = await connectSupervisor(endpoint);
+      fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
+      fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
+      closeModal(); render(); setToast("Supervisor connected in read-only mode.", "success");
+    } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
+  } });
+}
+
 function rollback() {
   const run = currentRun();
   if (run.state === "rolled_back") return setToast("This run is already rolled back.", "neutral");
@@ -81,6 +98,15 @@ function rollback() {
   run.processCount = 0;
   run.events.push({ time: "00:01.745", type: "lifecycle", operation: "ROLLBACK", path: "upper/work discarded", decision: "allow", risk: "low", detail: "Lower layer preserved · transaction rewound" });
   setToast("Run rolled back. Lower layer remains intact.", "success");
+}
+
+function commitRun() {
+  const run = currentRun();
+  if (run.state !== "succeeded") return setToast("Only a succeeded review run can be accepted.", "neutral");
+  run.state = "committed";
+  run.processCount = 0;
+  run.events.push({ time: "00:02.018", type: "lifecycle", operation: "COMMIT", path: "candidate accepted", decision: "allow", risk: "low", detail: "Destination manifest matched immutable base" });
+  setToast("Changes accepted after conflict check.", "success");
 }
 
 function copyPolicy() {

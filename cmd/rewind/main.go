@@ -26,14 +26,18 @@ Usage:
   rewind diff --record PATH
   rewind export --record PATH --output PATH
   rewind capabilities
+  rewind supervisor --socket PATH --history PATH
   rewind rollback --record PATH
   rewind recover --record PATH
-  rewind commit <run_id>
+  rewind commit --record PATH --confirm
   rewind sensor attach --object PATH --run-id ID --pid PID   (VM-only telemetry smoke test)
   rewind helper [--plan-file PATH] -- <agent-command>       (internal child helper)
   rewind policy check <policy.yaml>
   rewind policy explain <policy.yaml> <path>
   rewind policy learn --events PATH --output PATH [--max-paths N]
+  rewind policy keygen --private PATH --public PATH
+  rewind policy sign <policy.yaml> --name NAME --version VERSION --private-key PATH --output PATH
+  rewind policy verify <bundle.json> --public-key PATH
   rewind fixture create <directory>
   rewind manifest create <directory> [manifest.json]
   rewind manifest verify <directory> <manifest.json>
@@ -81,8 +85,10 @@ func main() {
 		handleExport(os.Args[2:])
 	case "capabilities":
 		handleCapabilities(os.Args[2:])
+	case "supervisor":
+		handleSupervisor(os.Args[2:])
 	case "commit":
-		fmt.Printf("rewind: command %q is planned; kernel and daemon integration are not enabled yet\n", os.Args[1])
+		handleCommit(os.Args[2:])
 	default:
 		fmt.Fprintf(os.Stderr, "rewind: unknown command %q\n\n%s", os.Args[1], usage)
 		os.Exit(2)
@@ -190,6 +196,12 @@ func handlePolicy(args []string) {
 		}
 	case "learn":
 		handlePolicyLearn(args[1:])
+	case "keygen":
+		handlePolicyKeygen(args[1:])
+	case "sign":
+		handlePolicySign(args[1:])
+	case "verify":
+		handlePolicyBundleVerify(args[1:])
 	default:
 		fatal("unknown policy command")
 	}

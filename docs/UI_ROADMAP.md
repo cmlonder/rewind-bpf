@@ -332,7 +332,7 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 - responsive navigation, focus-visible controls, reduced-motion support, and modal Escape handling.
 - keyboard focus trapping/restoration, mobile navigation that preserves all destinations, notification feedback, empty-search states, and constrained form validation.
 
-The remaining connected work is supervisor integration: live SSE/polling, signed policy packages, wiring the conflict checker to a real apply path, and end-to-end reconnect/recovery behavior. P4 now has a bounded history contract and fixture-backed retention view. Local authentication/authorization is explicitly a post-demo hardening item; the hackathon UI remains fixture-only and never receives root access.
+The remaining connected work is supervisor integration: live SSE/polling, wiring the conflict checker to a real apply path, and end-to-end reconnect/recovery behavior. P4 now has a bounded history contract, signed policy provenance, a read-only Unix-socket server, a browser adapter, and a fixture-backed retention view. Local authentication/authorization is explicitly a post-demo hardening item; the hackathon UI remains fixture-safe and never receives root access.
 
 The UI is being kept platform-neutral. It must show the active backend and capability matrix explicitly: Linux OverlayFS/FUSE + Landlock/eBPF, macOS Seatbelt/EndpointSecurity + APFS/disposable workspace, or Windows native process/filesystem policy + disposable workspace. A platform adapter that cannot provide one of the four product promises must render degraded/refused state rather than silently presenting Linux-level guarantees.
 
@@ -372,7 +372,7 @@ Add remote package registry, organization profiles, role-based approval, signed/
 - A terminal emulator with root privileges.
 - A command deny-list editor pretending to be a transaction boundary.
 - A green “safe” badge that hides dropped or truncated evidence.
-- A commit button before conflict-safe merge semantics exist.
+- A commit button before conflict-safe merge semantics exist. The button is enabled only for a succeeded review run and requires an impact summary plus explicit confirmation.
 - A second, divergent policy source that disagrees with the CLI/runtime.
 
 ## 14. First code slice

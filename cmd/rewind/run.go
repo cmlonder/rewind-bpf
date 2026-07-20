@@ -22,6 +22,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/ebpfload"
 	"github.com/rewindbpf/rewind/internal/evidence"
 	"github.com/rewindbpf/rewind/internal/export"
+	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/overlay"
@@ -46,6 +47,7 @@ func handleRun(args []string) {
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
+	historyPath := flags.String("history", "", "optional durable run history JSON path")
 	if err := flags.Parse(args); err != nil {
 		fatal(err.Error())
 	}
@@ -92,6 +94,7 @@ func handleRun(args []string) {
 		fatal(fmt.Sprintf("protected-run capability check: %v", err))
 	}
 	plan.Capabilities = capabilityReport
+	plan.HistoryPath = *historyPath
 	// Prepare the dedicated runtime tree before the first journal write. The
 	// agent must be able to traverse the eventual merged mount; creating the
 	// parent through runstore alone would leave it mode 0700 when invoked via
@@ -119,6 +122,9 @@ func handleRun(args []string) {
 	if err := persistRecord(*recordPath, plan, eventsPath); err != nil {
 		fatal(fmt.Sprintf("persist prepared run: %v", err))
 	}
+	if err := persistHistory(*historyPath, plan, *recordPath); err != nil {
+		fatal(fmt.Sprintf("persist run history: %v", err))
+	}
 	helper, err := os.Executable()
 	if err != nil {
 		fatal(fmt.Sprintf("resolve rewind helper: %v", err))
@@ -138,10 +144,15 @@ func handleRun(args []string) {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist running run; transaction rolled back: %v", err))
 	}
+	if err := persistHistory(*historyPath, plan, *recordPath); err != nil {
+		_ = handle.Rollback(context.Background())
+		fatal(fmt.Sprintf("persist running history: %v", err))
+	}
 	waitErr := handle.Wait()
 	if waitErr != nil {
 		rollbackErr := handle.Rollback(context.Background())
 		_ = persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState())
+		_ = persistHistory(*historyPath, plan, *recordPath)
 		fatal(errors.Join(waitErr, rollbackErr).Error())
 	}
 	if *onSuccess == "discard" {
@@ -152,6 +163,9 @@ func handleRun(args []string) {
 		if err := persistRecordState(*recordPath, plan, eventsPath, telemetry.EvidenceState()); err != nil {
 			fatal(fmt.Sprintf("persist discarded run: %v", err))
 		}
+		if err := persistHistory(*historyPath, plan, *recordPath); err != nil {
+			fatal(fmt.Sprintf("persist discarded history: %v", err))
+		}
 		fmt.Printf("run completed and discarded: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
 		return
 	}
@@ -159,8 +173,19 @@ func handleRun(args []string) {
 		_ = handle.Rollback(context.Background())
 		fatal(fmt.Sprintf("persist successful run; transaction rolled back: %v", err))
 	}
+	if err := persistHistory(*historyPath, plan, *recordPath); err != nil {
+		_ = handle.Rollback(context.Background())
+		fatal(fmt.Sprintf("persist review history: %v", err))
+	}
 	fmt.Printf("run ready for review: run_id=%s state=%s record=%s\n", plan.Run.ID, plan.Run.State, *recordPath)
 	fmt.Printf("discard with: rewind rollback --record %s\n", *recordPath)
+}
+
+func persistHistory(path string, plan runplan.Plan, recordPath string) error {
+	if strings.TrimSpace(path) == "" {
+		return nil
+	}
+	return history.Open(path).Upsert(history.Entry{RunID: plan.Run.ID, State: string(plan.Run.State), Workspace: plan.Layout.Lower, RecordPath: recordPath, UpdatedAt: plan.Run.UpdatedAt, CreatedAt: plan.Run.CreatedAt})
 }
 
 func validateOnSuccess(value string) error {
@@ -209,6 +234,9 @@ func handleRollback(args []string) {
 	if err := persistRecordState(*recordPath, record.Plan, record.EventsPath, evidenceState{dropped: record.Events.Dropped, truncated: record.Events.Truncated}); err != nil {
 		fatal(err.Error())
 	}
+	if err := persistHistory(record.Plan.HistoryPath, record.Plan, *recordPath); err != nil {
+		fatal(fmt.Sprintf("persist rollback history: %v", err))
+	}
 	fmt.Printf("run rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
 }
 
@@ -234,6 +262,9 @@ func handleRecover(args []string) {
 	}
 	if err := persistRecordState(*recordPath, record.Plan, record.EventsPath, evidenceState{dropped: record.Events.Dropped, truncated: record.Events.Truncated}); err != nil {
 		fatal(err.Error())
+	}
+	if err := persistHistory(record.Plan.HistoryPath, record.Plan, *recordPath); err != nil {
+		fatal(fmt.Sprintf("persist recovery history: %v", err))
 	}
 	fmt.Printf("run recovered and rolled back: run_id=%s record=%s\n", record.Plan.Run.ID, *recordPath)
 }

@@ -36,9 +36,9 @@ export const fixture = {
     },
   ],
   policies: [
-    { name: "strict-agent", version: "1.3.0", state: "assigned", description: "High-safety profile for autonomous coding agents", reads: "enforce", writes: "rollback", network: "audit", assigned: 2, updated: "12 min ago" },
-    { name: "developer-safe", version: "0.8.2", state: "available", description: "Fast iteration with sensitive-read audit", reads: "audit", writes: "rollback", network: "off", assigned: 1, updated: "Yesterday" },
-    { name: "hackathon-demo", version: "0.4.0", state: "available", description: "Small, explainable profile for the live jury flow", reads: "enforce", writes: "rollback", network: "audit", assigned: 1, updated: "Jul 18" },
+    { name: "strict-agent", version: "1.3.0", state: "assigned", signed: true, description: "High-safety profile for autonomous coding agents", reads: "enforce", writes: "rollback", network: "audit", assigned: 2, updated: "12 min ago" },
+    { name: "developer-safe", version: "0.8.2", state: "available", signed: true, description: "Fast iteration with sensitive-read audit", reads: "audit", writes: "rollback", network: "off", assigned: 1, updated: "Yesterday" },
+    { name: "hackathon-demo", version: "0.4.0", state: "available", signed: true, description: "Small, explainable profile for the live jury flow", reads: "enforce", writes: "rollback", network: "audit", assigned: 1, updated: "Jul 18" },
   ],
   workspaces: [
     { name: "payments-api", path: "/workspaces/payments-api", policy: "strict-agent@1.3.0", status: "protected", lastRun: "08e0ef80", agent: "agent --task refactor-auth", network: "audit" },

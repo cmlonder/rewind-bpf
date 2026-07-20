@@ -8,7 +8,7 @@ The product strategy is documented in [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_ST
 
 ## Current status
 
-The MVP is complete for its explicitly documented disposable-VM boundary. Phase 2 P0 hardening is now in progress: cgroup-v2 run scopes with optional resource limits, capability reporting, atomic prepared-run journaling, idempotent recovery, invoker-owned metadata, event evidence digests, a sensor start gate, dropped-event accounting, sequence/hash-chained event records, parent-crash recovery, a read-only merged-view diff command, a conflict-safe review export, and a review-only `policy learn` workflow are implemented and VM-smoke-tested. Stage 6 protected-run integration and Stage 7 benchmark controls remain validated: safe synthetic fixtures, SHA-256 manifests, run IDs, glob policy parsing, a protected-run state machine, a shared eBPF event contract, a userspace ring-buffer decoder/reader, scoped telemetry with descendant-PID tracking, a manifest-to-kernel read-rule compiler, a Landlock allowlist planner, process-level read denial, OverlayFS mount/rollback, a fail-closed coordinator, a policy-aware helper, and the user-facing `rewind run/status/events/rollback` flow are available. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining Phase 2 work is broader crash-edge coverage, multi-file log rotation/backpressure, network/credential policy planes, conflict-checked commit, and release rehearsal.
+The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, network/credential refusal contracts, conflict-checked `commit --confirm`, durable history, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining productisation work is a connected supervisor transport, live event streaming, network enforcement/credential provider implementations, release packaging, and native macOS/Windows backends; unsupported capabilities remain fail-closed.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage.
 
@@ -102,7 +102,8 @@ The primary workflow runs inside the disposable Linux VM:
 
 ```bash
 sudo rewind run --workspace ./project --runtime-root ./runtime \
-  --policy ./policy.yaml --record ./runtime/record.json -- agent-command
+  --policy ./policy.yaml --record ./runtime/record.json \
+  --history ./runtime/history.json -- agent-command
 sudo rewind status --record ./runtime/record.json
 rewind inspect --record ./runtime/record.json
 sudo rewind events --record ./runtime/record.json
@@ -116,6 +117,31 @@ sudo rewind recover --record ./runtime/record.json
 ```
 
 Successful runs discard the temporary upper/work layer by default. Add `--on-success review` when you explicitly need to inspect the merged view before choosing export or discard. The agent always sees a merged workspace backed by an OverlayFS lower/upper pair; the protected lower layer is never modified before acceptance. `export` writes a review-only JSON bundle containing before/after manifests and changes; it never merges into the workspace. Read policies can be disabled, audited, or enforced with user-defined glob patterns. Network policy is compiled for audit/preview, while the default credential broker refuses raw secret exposure until a platform broker is configured. Candidate acceptance is conflict-checked against the immutable base before any future apply step.
+
+Signed policy provenance is available without putting secrets in the package:
+
+```sh
+rewind policy keygen --private /path/to/policy-private.key --public /path/to/policy-public.key
+rewind policy sign policy.yaml --name strict-agent --version 1.0.0 \
+  --private-key /path/to/policy-private.key --output strict-agent.bundle.json
+rewind policy verify strict-agent.bundle.json --public-key /path/to/policy-public.key
+```
+
+Signatures authenticate package contents; they do not bypass runtime capability checks or operator confirmation.
+
+### Local supervisor (read-only control plane)
+
+The Linux VM can expose health, capability, and durable-history data over a
+permissioned Unix socket. Action endpoints intentionally refuse until the
+supervisor has an authenticated authorization layer:
+
+```sh
+rewind supervisor --socket /tmp/rewind-supervisor.sock --history /tmp/rewind-history.json
+```
+
+The Control Plane’s “Connect supervisor” action talks to a read-only HTTP
+adapter when a trusted local bridge exposes that socket; fixture mode remains
+the safe default for the static demo.
 
 Example policy:
 
@@ -161,7 +187,7 @@ make test
 ./bin/rewind policy learn --events /tmp/rewind-events.jsonl --output /tmp/rewind-policy-suggestion.yaml
 ```
 
-The `run`, `status`, `events`, `verify`, `evidence verify`, `diff`, `export`, and `rollback` commands are wired for the disposable Linux VM. `policy learn` produces an audit-mode, review-only allowlist suggestion and skips secret-like, virtual, and broad paths. `evidence verify` and the separately buildable `rewind-evidence` binary are read-only verification paths; neither loads eBPF or mounts filesystems. `commit` remains intentionally disabled until conflict-checked merge semantics are implemented and verified.
+The `run`, `status`, `events`, `verify`, `evidence verify`, `diff`, `export`, `rollback`, and explicit `commit --confirm` commands are wired for the disposable Linux VM. Commit compares the immutable base, current destination, and reviewed merged candidate; same-path drift, incomplete evidence, unsafe paths, and unsupported symlinks refuse the apply. `policy learn` produces an audit-mode, review-only allowlist suggestion and skips secret-like, virtual, and broad paths. Signed policy package commands (`policy keygen`, `policy sign`, and `policy verify`) provide provenance without bypassing runtime capability checks. `evidence verify` and the separately buildable `rewind-evidence` binary are read-only verification paths; neither loads eBPF or mounts filesystems.
 
 VM-only run shape:
 
