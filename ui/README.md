@@ -34,7 +34,8 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
 - Open notifications, inspect audit placeholders, and see explicit empty-search feedback.
 - Use the Trust & Actions screen to understand one-time action-token challenges,
   edit a pinned HTTPS registry profile, verify signer rotation, and preview a
-  signed policy fetch without exposing bearer tokens or private keys.
+  signed policy fetch without exposing bearer tokens or private keys. A connected
+  supervisor also renders the server-proxied registry package inventory.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
 
 These actions deliberately stop at the fixture adapter until a supervisor is

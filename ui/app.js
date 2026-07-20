@@ -164,6 +164,7 @@ function applySupervisorSnapshot(connected) {
   state.supervisor = connected;
   fixture.credentialStatus = connected.credentialStatus || { available: false, state: "unavailable" };
   fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
+  fixture.registry.packages = connected.registryEntries || [];
   fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
   if (connected.history.length) {
     fixture.runs = connected.history.map(remoteRun);
