@@ -130,6 +130,8 @@ rewind export --record ./runtime/record.json --output ./review-bundle.json
 rewind export --record ./runtime/record.json --output ./review.patch --format patch
 # Full-fidelity Git diff (requires git in the VM):
 rewind export --record ./runtime/record.json --output ./review.git.patch --format git-patch
+# Portable evidence archive (record + ordered event logs, no workspace files):
+rewind bundle create --record ./runtime/record.json --output ./run-evidence.tar.gz
 sudo rewind rollback --record ./runtime/record.json
 sudo rewind recover --record ./runtime/record.json
 sudo rewind commit --record ./runtime/record.json --confirm

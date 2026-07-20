@@ -306,6 +306,16 @@ signature from an unexpected signer. This is an integrity and local
 provenance mechanism, not a public registry: key distribution, rotation,
 revocation, and package repository policy remain outside the current runtime.
 
+### Evidence bundle retention
+
+`rewind bundle create --record PATH --output PATH` writes an atomic gzip-tar
+archive containing the run record, ordered JSONL event logs, `bundle.json`,
+and a names-only `SHA256SUMS`. The command refuses event or record paths
+outside the run runtime root and never includes the workspace, upper layer,
+credentials, or arbitrary absolute paths. This is a local hand-off primitive
+for later object-store integration; encryption, remote retention, and restore
+are deliberately not claimed yet.
+
 ## 11. Implementation status
 
 | Stage | Status | Evidence |

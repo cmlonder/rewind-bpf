@@ -26,7 +26,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | macOS native backend | **Not implemented** | Capability probe and fail-closed unavailable backend only | Seatbelt/EndpointSecurity + APFS disposable-volume implementation and destructive tests on disposable storage |
 | Windows native backend | **Not implemented** | Cross-build and fail-closed unavailable backend only; WSL2 remains compatibility mode | Native process/filesystem policy + disposable workspace implementation and Windows VM tests |
 | Agent integrations | **Not implemented** | Generic `-- <agent-command>` wrapper | Tested adapters for Codex CLI/OpenHands/Claude Code or a stable adapter SDK |
-| Durable remote retention | **Partial / local only** | Bounded local history and keep-latest pruning | Object-store/remote evidence bundles, retention policy, encryption, and restore |
+| Durable remote retention | **Partial / local bundle** | Bounded local history and keep-latest pruning plus checksum-indexed `rewind bundle create` archives restricted to the runtime root | Object-store/remote evidence bundles, retention policy, encryption, and restore |
 | Detachable/ghost sessions | **Not implemented** | Event follow and history are available after a run; no persistent session owner | Persistent run handles, reconnect, takeover, and session lease expiry |
 | Content-aware PII protection | **Not implemented** | Path-pattern protection only | Classifier/redactor with deterministic policy and leakage benchmarks |
 | Multi-agent/checkpoint graph | **Not implemented** | One transaction per run | Child transactions, dependency-aware merge, and multiple rewind points |

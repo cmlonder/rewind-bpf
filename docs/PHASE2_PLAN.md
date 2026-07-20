@@ -340,7 +340,7 @@ flowchart LR
 
 - Expand the shipped supervisor with detachable sessions and authenticated run handles suitable for CI; action audit is now persisted locally as redacted JSONL.
 - Add CI mode: every agent task runs in a disposable workspace; output is a patch/artifact rather than an implicit host merge.
-- Add remote/object-store evidence bundles, retention policies, and public release trust distribution. Local detached release signatures and pinned-key verification are shipped; registry rotation/revocation is not.
+- Add remote/object-store evidence bundles, retention policies, and public release trust distribution. Local checksum-indexed `rewind bundle create` archives, detached release signatures, and pinned-key verification are shipped; remote encryption, registry rotation, and revocation are not.
 - Add network namespace/proxy policy as a separate plane; make credentials injectable without placing raw secrets in the agent filesystem.
 - Evaluate seccomp filters for syscall-surface reduction. Use seccomp user notification only for narrow, reviewable operations; the kernel documentation warns about notification TOCTOU and blocking semantics, so it is not a default file-write interceptor. See the [kernel seccomp documentation](https://docs.kernel.org/userspace-api/seccomp_filter.html).
 
