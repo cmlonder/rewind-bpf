@@ -2,7 +2,7 @@ BIN_DIR := bin
 BIN := $(BIN_DIR)/rewind
 EVIDENCE_BIN := $(BIN_DIR)/rewind-evidence
 
-.PHONY: build test fmt clean release release-manifest release-sign benchmark-verify bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm mac-safe-smoke jury-demo-vm
+.PHONY: build test fmt clean release release-manifest release-sign release-bundle publish-site benchmark-verify bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm mac-safe-smoke jury-demo-vm
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -31,6 +31,12 @@ release-sign: release-manifest
 	test -n "$(REWIND_RELEASE_PRIVATE_KEY)" || (echo "REWIND_RELEASE_PRIVATE_KEY is required" >&2; exit 2)
 	go run ./cmd/rewind release sign --input $(BIN_DIR)/SHA256SUMS --private-key "$(REWIND_RELEASE_PRIVATE_KEY)" --output $(BIN_DIR)/SHA256SUMS.sig
 	./scripts/mark_release_signed.sh $(BIN_DIR)/release-metadata.txt SHA256SUMS.sig
+
+release-bundle: release-manifest
+	./scripts/release_bundle.sh $(BIN_DIR)
+
+publish-site:
+	./scripts/publish_site.sh site
 
 benchmark-verify:
 	./scripts/benchmark_verify.sh benchmarks

@@ -15,7 +15,7 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Process and resource scope | **Shipped / Linux** | cgroup-v2 scope, descendant drain gate, PID/memory/CPU limits, fail-closed cleanup | Windows Job Object and macOS native process scope |
 | eBPF evidence | **Shipped / Linux** | CO-RE trace sensor, start gate, sequence numbers, hash chain, dropped-event accounting, bounded cap, ordered rotation, standalone verifier | Kernel-side backpressure policy and remote signed evidence storage |
 | Crash and stale-run recovery | **Shipped / Linux** | Parent death, open descriptors, stale FUSE mount, child drain, idempotent rollback/recover | Power-loss/startup matrix across filesystems |
-| Network policy | **Partial / fail-closed** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs deny raw/packet sockets; explicit `deny` and Linux `namespace` backends refuse non-proxy-aware egress; `rewind network plan` emits a reviewed veth/NAT/ipset/iptables sequence, accepts broker-resolved IPv4 addresses, and has injectable VM-safe tests | Move the reviewed sequence into a real namespace broker, own DNS/IP-set refresh and namespace peer movement, and run privileged VM egress tests |
+| Network policy | **Partial / fail-closed** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs deny raw/packet sockets; explicit `deny` backend refuses non-proxy-aware egress; namespace backend resolves domains, moves a veth peer into the child namespace at the start gate, installs NAT/IPSet/iptables rules, and cleans them on every lifecycle path; `rewind network plan` remains reviewable and injectable VM tests cover the command sequence | Run privileged VM egress acceptance with real DNS/allow/deny destinations, then add resolver refresh and operational rollback evidence |
 | Credential safety | **Partial / broker MVP** | Capability-only references, default refusal, an opt-in external command provider with short-lived one-shot leases, expiry/revoke, no secret in lease JSON/argv/workspace, and an authenticated supervisor `POST /v1/credential-leases` metadata endpoint | Native keychain/secret-manager adapters, scoped injection protocol, and leakage tests against real providers |
 | Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, full-fidelity Git patch export, manifest conflict checks, and clean-branch `rewind branch apply`; `rewind commit --confirm`; supervisor commit requires confirmation | Remote review workflow and richer provider adapters |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, optional supervisor public-key allow-list enforcement, and a fail-closed HTTPS registry client with retry, size bound, and pinned-key verification | Registry server durability, revocation, and organization trust distribution |
@@ -53,6 +53,8 @@ and eBPF object. The gate covered:
 - review plus explicit conflict-checked commit;
 - destination drift refusal with no partial apply;
 - proxy allow/deny for a local HTTP endpoint and `example.invalid`; and
+- strict deny/no-route namespace isolation plus real allow-listed namespace
+  egress through a temporary veth/IPSet/NAT chain; and
 - bounded-event evidence marked incomplete and rejected by verification.
 
 The network case also persisted one `allow` and one `deny` `network_connect`
@@ -86,8 +88,8 @@ Run unit, static, UI, and disposable-VM integration tests; verify rollback, read
 The local fail-closed network boundary, signed evidence hand-off, release signing,
 authenticated supervisor, connected Control Plane mutation, isolated Linux network
 namespace backend, and opt-in command-provider credential lease endpoint are
-shipped. The remaining P1 gates are allow-listed namespace/cgroup egress, a real
-platform credential provider, and remote review/object storage with retention,
+shipped. The remaining P1 gates are operational namespace/cgroup egress refresh
+and long-running leak tests, a real platform credential provider, and remote review/object storage with retention,
 encryption, and trust rotation.
 
 ### P2 — Native macOS

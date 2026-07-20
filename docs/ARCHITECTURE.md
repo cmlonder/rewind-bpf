@@ -138,7 +138,7 @@ The daemon is expected to run with narrowly scoped Linux capabilities inside the
 
 The kernel data plane observes target process/cgroup activity and emits compact events through a ring buffer. It does not create snapshots after the fact. Candidate observation points include `execve`, `openat/openat2`, `unlinkat`, `renameat2`, `write`, `pwrite`, `truncate`, and `ftruncate`.
 
-For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; `network.mode: audit` can use the same explicit backend to persist observed decisions without denying. Each proxy decision is appended to the run evidence chain. Proxy enforce runs additionally install a narrow seccomp filter that denies AF_PACKET and AF_INET/AF_INET6 `SOCK_RAW` creation while leaving normal TCP/UDP sockets available to the proxy. The explicit `deny` backend extends seccomp to refuse Internet socket creation and connect attempts; the `namespace` backend enters a new Linux network namespace without configuring interfaces or routes. Both are fail-closed no-egress boundaries for non-proxy-aware clients, not allow-listed egress. The eBPF `socket` tracepoint records the attempted family class where the syscall reaches the hook; seccomp-only refusals remain process-outcome evidence. Allow-listed namespace/cgroup egress remains a separate deployment backend.
+For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, seccomp, cgroup BPF). Tracepoints alone are telemetry, not a complete deny mechanism. The current runtime supports `network.mode: enforce` through an explicit loopback HTTP/HTTPS proxy backend for proxy-aware clients; `network.mode: audit` can use the same explicit backend to persist observed decisions without denying. Each proxy decision is appended to the run evidence chain. Proxy enforce runs additionally install a narrow seccomp filter that denies AF_PACKET and AF_INET/AF_INET6 `SOCK_RAW` creation while leaving normal TCP/UDP sockets available to the proxy. The explicit `deny` backend extends seccomp to refuse Internet socket creation and connect attempts. The `namespace` backend enters a new Linux network namespace, waits at the start gate, moves a veth peer into the child PID namespace, resolves configured domains to IPv4 addresses, allows only those addresses plus configured DNS resolvers through an ipset-backed iptables chain, and cleans up the owned veth/NAT rules after the run. The eBPF `socket` tracepoint records the attempted family class where the syscall reaches the hook; seccomp-only refusals remain process-outcome evidence. The namespace installer is root-gated and remains a privileged VM acceptance path.
 
 #### OverlayFS transaction
 
@@ -780,16 +780,20 @@ On 2026-07-19 the Phase 2 binary passed package tests, capability probing, and a
 ### Linux acceptance matrix (disposable VM)
 
 On 2026-07-20, `REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm` passed in the
-same Ubuntu 24.04 ARM64 VM after rebuilding the Go binary and eBPF object. The
-matrix covered read denial plus recursive deletion/discard, evidence bundle
-create/verify, review and explicit commit, clean-branch Git acceptance,
-destination-drift conflict refusal, proxy allow/deny for a local HTTP server
-versus `example.invalid`, raw-socket refusal/audit semantics, and
-bounded-evidence refusal. The network run persisted two `network_connect`
-decisions (one allow and one deny) in the same hash-chained JSONL evidence
-stream as kernel events. The complete evidence case verified with `dropped=0`;
-the intentionally capped case recorded `truncated=true`, `complete=false`,
-and caused verification to exit non-zero.
+same Ubuntu 24.04 ARM64 VM after rebuilding the Go binary and eBPF object and
+installing the VM-only `ipset`, `iptables`, `iproute2`, and `util-linux`
+prerequisites. The matrix covered read denial plus recursive deletion/discard,
+evidence bundle create/verify, review and explicit commit, clean-branch Git
+acceptance, destination-drift conflict refusal, proxy allow/deny for a local
+HTTP server versus `example.invalid`, raw-socket refusal/audit semantics,
+strict deny and no-route namespace isolation, real namespace allow-listed
+egress through a temporary veth/IPSet/NAT chain, cleanup after the child
+namespace exited, and bounded-evidence refusal. The network run persisted two
+`network_connect` decisions (one allow and one deny) in the same hash-chained
+JSONL evidence stream as kernel events. The complete evidence case verified
+with `dropped=0`; the intentionally capped case recorded `truncated=true`,
+`complete=false`, and caused verification to exit non-zero. The final output
+was `ACCEPTANCE_MATRIX=PASS` with zero remaining test mounts.
 The script creates only a generated temporary directory and performs cleanup
 of that exact directory with the privileged unmount path.
 
@@ -824,9 +828,11 @@ bpftool feature probe kernel | grep -A3 -B2 'program types' | grep -i lsm
 The runtime now exposes six bounded productisation seams without silently
 claiming unsupported enforcement:
 
-- `internal/netns` emits and tests a veth/IP/iptables allowlist plan. The
-  privileged `Install` method is injectable and root-gated; it is not called
-  by ordinary runs until a disposable namespace broker owns the lifecycle.
+- `internal/netns` emits and tests a veth/IP/iptables allowlist plan and owns
+  the start-gate broker lifecycle. The broker resolves domains and resolver
+  addresses before install, moves the peer into the child namespace, and
+  cleans only its own chain, ipset, NAT rule, and veth. Real command execution
+  remains restricted to the privileged VM acceptance gate.
 - `internal/platform` emits portable macOS Seatbelt/EndpointSecurity/APFS and
   Windows minifilter/Job Object/VHDX contracts. `rewind platform contract` is
   a read-only report and both native contracts remain `ready: false` until
@@ -857,10 +863,10 @@ without coupling the Linux transaction core to one provider.
 The UTM Ubuntu 24.04 ARM64 smoke was rerun on 2026-07-20 after this pass. The
 new ARM binary emitted the namespace command plan, Codex lifecycle contract,
 and macOS fail-closed native contract. The privileged checkpoint/PII run
-passed (`CHECKPOINT_PII_VM_PASS`) and the namespace backend refused an
-allow-domain policy before launch (`NAMESPACE_ALLOWLIST_FAIL_CLOSED_PASS`). No
-host network namespace was mutated; the installer remains uncalled by the
-smoke script.
+passed (`CHECKPOINT_PII_VM_PASS`) and the namespace command-plan smoke passed
+(`NAMESPACE_ALLOWLIST_FAIL_CLOSED_PASS`). The full broker installer remains a
+separate VM acceptance step because it mutates only the disposable VM's host
+network namespace.
 
 The same VM then started the supervisor with `--session-backend sqlite`,
 performed authenticated lease list and acquire requests over its Unix socket,

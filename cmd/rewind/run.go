@@ -28,6 +28,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
+	"github.com/rewindbpf/rewind/internal/netns"
 	"github.com/rewindbpf/rewind/internal/netpolicy"
 	"github.com/rewindbpf/rewind/internal/overlay"
 	"github.com/rewindbpf/rewind/internal/pii"
@@ -137,6 +138,22 @@ func handleRun(args []string) {
 	if err := plan.Layout.Prepare(); err != nil {
 		fatal(fmt.Sprintf("prepare runtime layout: %v", err))
 	}
+	var networkBoundary protectedrun.NetworkBoundary
+	if plan.Network.NetworkNS && len(plan.Network.AllowDomains) > 0 {
+		resolved, err := netns.ResolveDomains(context.Background(), plan.Network.AllowDomains)
+		if err != nil {
+			fatal(fmt.Sprintf("resolve namespace allowlist: %v", err))
+		}
+		resolvers, err := netns.ResolveNameservers()
+		if err != nil {
+			fatal(fmt.Sprintf("resolve namespace DNS servers: %v", err))
+		}
+		allowlist, err := netns.BuildAllowlistPlanWithIPsAndResolvers(plan.Network.AllowDomains, resolved, resolvers)
+		if err != nil {
+			fatal(fmt.Sprintf("build namespace allowlist: %v", err))
+		}
+		networkBoundary = &netns.Broker{Plan: allowlist, Runner: netns.OSCommandRunner{}, RequireRoot: true}
+	}
 	scope, err := cgroup.NewAtWithLimits("/sys/fs/cgroup", plan.Run.ID, cgroup.Limits{
 		PIDsMax:   plan.Resources.PIDsMax,
 		MemoryMax: plan.Resources.MemoryMax,
@@ -200,6 +217,7 @@ func handleRun(args []string) {
 		Starter: starter,
 		Sensor:  telemetry,
 		Scope:   &scope,
+		Network: networkBoundary,
 	}
 	handle, err := coordinator.Start(context.Background(), &plan, launch.Command, *sensorObject)
 	if err != nil {

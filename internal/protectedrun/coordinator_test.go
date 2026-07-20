@@ -54,6 +54,21 @@ type fakeSensor struct {
 	closed bool
 }
 
+type fakeNetwork struct {
+	prepared []uint32
+	cleaned  int
+}
+
+func (n *fakeNetwork) Prepare(_ context.Context, pid uint32) error {
+	n.prepared = append(n.prepared, pid)
+	return nil
+}
+
+func (n *fakeNetwork) Cleanup(context.Context) error {
+	n.cleaned++
+	return nil
+}
+
 func (s *fakeSensor) Attach(context.Context, string, string, uint32) (io.Closer, error) {
 	return closerFunc(func() error {
 		s.closed = true
@@ -128,6 +143,35 @@ func TestWaitWithRunsBeforeSensorClose(t *testing.T) {
 	}
 	if !started || !sensor.closed {
 		t.Fatalf("beforeClose=%v sensorClosed=%v", started, sensor.closed)
+	}
+}
+
+func TestNetworkBoundaryFollowsStartGateLifecycle(t *testing.T) {
+	boundary := &fakeNetwork{}
+	coordinator := Coordinator{
+		Overlay: &fakeOverlay{},
+		Starter: &fakeStarter{process: &fakeProcess{pid: 99}},
+		Network: boundary,
+	}
+	plan := testPlan(t)
+	handle, err := coordinator.Start(context.Background(), plan, []string{"synthetic-agent"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(boundary.prepared) != 1 || boundary.prepared[0] != 99 {
+		t.Fatalf("prepared=%v", boundary.prepared)
+	}
+	if err := handle.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	if boundary.cleaned != 1 {
+		t.Fatalf("cleaned=%d want 1", boundary.cleaned)
+	}
+	if err := handle.Rollback(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if boundary.cleaned != 1 {
+		t.Fatalf("cleanup repeated after wait: %d", boundary.cleaned)
 	}
 }
 

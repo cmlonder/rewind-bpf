@@ -13,7 +13,7 @@ if [[ ! -r /etc/os-release ]] || ! grep -q 'ID=ubuntu' /etc/os-release; then
 fi
 
 sudo apt-get update
-sudo apt-get install -y clang llvm libbpf-dev bpftool bpftrace fuse-overlayfs golang-go jq fio linux-headers-$(uname -r)
+sudo apt-get install -y clang llvm libbpf-dev bpftool bpftrace fuse-overlayfs golang-go jq fio ipset iptables iproute2 util-linux linux-headers-$(uname -r)
 
 echo "bootstrap complete"
 echo "next: make build && (cd ebpf && make vmlinux compile)"

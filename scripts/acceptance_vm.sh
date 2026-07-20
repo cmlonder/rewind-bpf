@@ -31,10 +31,17 @@ fi
 ROOT="$(mktemp -d /home/vagrant/rewind-accept.XXXXXX)"
 SERVER_PID=""
 cleanup() {
-  if [[ -n "$SERVER_PID" ]]; then
-    kill "$SERVER_PID" 2>/dev/null || true
-  fi
-  sudo rm -rf "$ROOT"
+	if [[ -n "$SERVER_PID" ]]; then
+		kill "$SERVER_PID" 2>/dev/null || true
+	fi
+	if [[ -d "$ROOT" ]]; then
+		while IFS= read -r mountpoint; do
+			[[ -n "$mountpoint" ]] || continue
+			sudo fusermount3 -u "$mountpoint" 2>/dev/null || sudo umount -l "$mountpoint" 2>/dev/null || true
+		done < <(mount | awk -v root="$ROOT" '$3 ~ "^" root "/" && $5 ~ /fuse/ {print $3}')
+		sudo pkill -f "fuse-overlayfs.*$ROOT" 2>/dev/null || true
+	fi
+	sudo rm -rf "$ROOT"
 }
 trap cleanup EXIT
 
@@ -173,7 +180,8 @@ mkdir -p "$ROOT/network-deny/workspace"
 make_policy "$ROOT/network-deny/policy.yaml" off enforce
 sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/network-deny/workspace" "$ROOT/network-deny/runtime" "$ROOT/network-deny/policy.yaml" "$ROOT/network-deny/runtime/record.json") --network-backend deny --on-success review -- \
   /bin/sh -c '/usr/bin/python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)" && printf "internet-allowed\\n" > net.status || printf "internet-denied\\n" > net.status; /usr/bin/python3 -c "import socket; socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)" && printf "unix-allowed\\n" >> net.status'
-test "$(cat "$ROOT/network-deny/runtime/merged/net.status")" = $'internet-denied\nunix-allowed'
+grep -qx 'internet-denied' "$ROOT/network-deny/runtime/merged/net.status"
+grep -qx 'unix-allowed' <(sed -n '2p' "$ROOT/network-deny/runtime/merged/net.status")
 sudo "$BIN" rollback --record "$ROOT/network-deny/runtime/record.json"
 # The strict deny backend is enforced by seccomp before the syscall reaches
 # the telemetry hook; the process outcome is the authoritative evidence here.
@@ -186,9 +194,35 @@ mkdir -p "$ROOT/network-namespace/workspace"
 make_policy "$ROOT/network-namespace/policy.yaml" off enforce
 sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/network-namespace/workspace" "$ROOT/network-namespace/runtime" "$ROOT/network-namespace/policy.yaml" "$ROOT/network-namespace/runtime/record.json") --network-backend namespace --on-success review -- \
   /bin/sh -c '/usr/bin/python3 -c "import socket; s=socket.socket(socket.AF_INET, socket.SOCK_STREAM); s.settimeout(0.2); s.connect((\"127.0.0.1\", 9))" && printf "network-connected\\n" > net.status || printf "network-isolated\\n" > net.status; /usr/bin/python3 -c "import socket; socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)" && printf "unix-allowed\\n" >> net.status'
-test "$(cat "$ROOT/network-namespace/runtime/merged/net.status")" = $'network-isolated\nunix-allowed'
+grep -qx 'network-isolated' "$ROOT/network-namespace/runtime/merged/net.status"
+grep -qx 'unix-allowed' <(sed -n '2p' "$ROOT/network-namespace/runtime/merged/net.status")
 sudo "$BIN" rollback --record "$ROOT/network-namespace/runtime/record.json"
 echo "network namespace isolation: PASS"
+
+# 4d. Allow-listed namespace egress. The local hostname is mapped to the
+# broker gateway so the test is deterministic and does not depend on public
+# Internet availability. A second destination is intentionally outside the
+# resolved IP set and must fail closed.
+mkdir -p "$ROOT/network-namespace-allow/workspace" "$ROOT/network-namespace-allow/server"
+printf 'namespace-allowlist-fixture\n' > "$ROOT/network-namespace-allow/server/index.html"
+make_policy "$ROOT/network-namespace-allow/policy.yaml" off enforce
+printf '10.231.0.1 rewind.local\n' | sudo tee -a /etc/hosts >/dev/null
+python3 -m http.server 18081 --bind 0.0.0.0 --directory "$ROOT/network-namespace-allow/server" > "$ROOT/network-namespace-allow/http.log" 2>&1 &
+SERVER_PID=$!
+cleanup_namespace_hosts() {
+  sudo sed -i '/[[:space:]]rewind\.local$/d' /etc/hosts || true
+}
+trap 'cleanup_namespace_hosts; cleanup' EXIT
+printf '%s\n' '  allow_domains:' '    - rewind.local' >> "$ROOT/network-namespace-allow/policy.yaml"
+sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/network-namespace-allow/workspace" "$ROOT/network-namespace-allow/runtime" "$ROOT/network-namespace-allow/policy.yaml" "$ROOT/network-namespace-allow/runtime/record.json") --network-backend namespace --on-success review -- \
+  /bin/sh -c 'env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY /usr/bin/curl --noproxy "*" -sS --connect-timeout 2 -o allowed.txt -w "%{http_code}\n" http://rewind.local:18081/ > allowed.status || true; env -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY /usr/bin/curl --noproxy "*" -sS --connect-timeout 1 -o denied.txt -w "%{http_code}\n" http://198.18.0.1:18081/ > denied.status || true'
+test "$(cat "$ROOT/network-namespace-allow/runtime/merged/allowed.status")" = 200
+test "$(cat "$ROOT/network-namespace-allow/runtime/merged/denied.status")" = 000
+test "$(cat "$ROOT/network-namespace-allow/runtime/merged/allowed.txt")" = namespace-allowlist-fixture
+sudo "$BIN" rollback --record "$ROOT/network-namespace-allow/runtime/record.json"
+kill "$SERVER_PID" 2>/dev/null || true
+SERVER_PID=""
+echo "namespace allowlist egress: PASS"
 
 # 5. Bounded evidence must fail verification rather than look complete.
 mkdir -p "$ROOT/evidence/workspace"

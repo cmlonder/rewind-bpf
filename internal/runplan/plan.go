@@ -78,7 +78,7 @@ func Build(config Config) (Plan, error) {
 	if networkPlan.Mode == policy.ModeEnforce && config.NetworkBackend != netpolicy.BackendProxy && config.NetworkBackend != netpolicy.BackendDeny && config.NetworkBackend != netpolicy.BackendNS {
 		return Plan{}, fmt.Errorf("build run plan: network enforce requires --network-backend proxy, deny, or namespace")
 	}
-	if (config.NetworkBackend == netpolicy.BackendDeny || config.NetworkBackend == netpolicy.BackendNS) && len(networkPlan.AllowDomains) > 0 {
+	if config.NetworkBackend == netpolicy.BackendDeny && len(networkPlan.AllowDomains) > 0 {
 		return Plan{}, fmt.Errorf("build run plan: %s network backend cannot provide allow_domains; use proxy backend", config.NetworkBackend)
 	}
 	// Keep the defense decision in the inert plan that is persisted before

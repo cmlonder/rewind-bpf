@@ -39,7 +39,7 @@ Usage:
   rewind capabilities
   rewind platform plan --workspace PATH
   rewind platform contract --platform darwin|windows --workspace PATH
-  rewind network plan --domains HOST[,HOST...]
+  rewind network plan --domains HOST[,HOST...] [--resolve]
   rewind release keygen --private PATH --public PATH
   rewind release sign --input PATH --private-key PATH --output PATH
   rewind release verify --input PATH --signature PATH [--public-key PATH]

@@ -48,11 +48,20 @@ type ProcessScope interface {
 	Path() string
 }
 
+// NetworkBoundary is prepared after the helper has entered its network
+// namespace but before the start gate is released. Cleanup is owned by the
+// handle so failures cannot leave a host veth/firewall rule behind.
+type NetworkBoundary interface {
+	Prepare(context.Context, uint32) error
+	Cleanup(context.Context) error
+}
+
 type Coordinator struct {
 	Overlay Overlay
 	Starter Starter
 	Sensor  Sensor
 	Scope   ProcessScope
+	Network NetworkBoundary
 }
 
 type Handle struct {
@@ -61,6 +70,7 @@ type Handle struct {
 	process     Process
 	sensor      io.Closer
 	scope       ProcessScope
+	network     NetworkBoundary
 	waited      bool
 }
 
@@ -138,6 +148,12 @@ func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []st
 			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: add agent to process scope: %w", err))
 		}
 	}
+	if c.Network != nil {
+		if err := c.Network.Prepare(ctx, process.PID()); err != nil {
+			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: prepare network boundary: %w", err))
+		}
+		handle.network = c.Network
+	}
 	if strings.TrimSpace(sensorObject) != "" {
 		if c.Sensor == nil {
 			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: telemetry sensor is required when an object is configured"))
@@ -177,6 +193,11 @@ func (h *Handle) wait(beforeSensorClose func() error) error {
 	}
 	err := h.process.Wait()
 	h.waited = true
+	var networkErr error
+	if h.network != nil {
+		networkErr = h.network.Cleanup(context.Background())
+		h.network = nil
+	}
 	var beforeCloseErr error
 	if beforeSensorClose != nil {
 		beforeCloseErr = beforeSensorClose()
@@ -187,16 +208,16 @@ func (h *Handle) wait(beforeSensorClose func() error) error {
 		if transitionErr := h.plan.Run.Transition(lifecycle.Failed); transitionErr != nil {
 			err = errors.Join(err, transitionErr)
 		}
-		return errors.Join(err, beforeCloseErr, closeErr, scopeErr)
+		return errors.Join(err, networkErr, beforeCloseErr, closeErr, scopeErr)
 	}
 	if scopeErr != nil {
 		_ = h.plan.Run.Transition(lifecycle.Failed)
-		return errors.Join(scopeErr, beforeCloseErr, closeErr)
+		return errors.Join(scopeErr, networkErr, beforeCloseErr, closeErr)
 	}
 	if transitionErr := h.plan.Run.Transition(lifecycle.Succeeded); transitionErr != nil {
 		return errors.Join(transitionErr, beforeCloseErr, closeErr)
 	}
-	return errors.Join(beforeCloseErr, closeErr)
+	return errors.Join(networkErr, beforeCloseErr, closeErr)
 }
 
 func (h *Handle) Rollback(ctx context.Context) error {
@@ -209,6 +230,12 @@ func (h *Handle) Rollback(ctx context.Context) error {
 			errs = append(errs, fmt.Errorf("kill agent: %w", err))
 		}
 		h.waited = true
+	}
+	if h.network != nil {
+		if err := h.network.Cleanup(ctx); err != nil {
+			errs = append(errs, fmt.Errorf("cleanup network boundary: %w", err))
+		}
+		h.network = nil
 	}
 	if err := h.closeSensor(); err != nil {
 		errs = append(errs, err)

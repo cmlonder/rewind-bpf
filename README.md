@@ -8,13 +8,13 @@ The product strategy is documented in [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_ST
 
 ## Current status
 
-The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, narrow raw/packet-socket denial in enforce mode, fail-closed `deny` and isolated `namespace` network backends for non-proxy-aware clients, an opt-in short-lived external credential-provider broker, conflict-checked `commit --confirm`, durable history, signed evidence hand-off, an authenticated supervisor transport with lifecycle actions and follow-mode events, release/bootstrap scripts, checkpoint lifecycle wiring, bounded post-run PII scanning, an S3-compatible HTTPS retention adapter with digest/retry, a remote session lease protocol, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. Remaining deployment work is privileged allow-listed namespace egress, native keychain adapters, provider-specific SDK hooks, SQLite/distributed session deployment, and native macOS/Windows enforcement; unsupported capabilities remain fail-closed.
+The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, narrow raw/packet-socket denial in enforce mode, fail-closed `deny` and isolated `namespace` network backends for non-proxy-aware clients, an opt-in short-lived external credential-provider broker, conflict-checked `commit --confirm`, durable history, signed evidence hand-off, an authenticated supervisor transport with lifecycle actions and follow-mode events, release/bootstrap scripts, checkpoint lifecycle wiring, bounded post-run PII scanning, an S3-compatible HTTPS retention adapter with digest/retry, a remote session lease protocol, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. The namespace backend now owns a reviewed veth/IPSet/iptables broker lifecycle; privileged VM egress evidence is still required before production claims. Native macOS/Windows enforcement remains fail-closed until signed platform helpers and disposable acceptance environments exist.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage. The six hardening boundaries now have portable contracts and safe tests, but a contract is not production enforcement.
 
 The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
 
-Release builds are cross-compiled with `make release`; `make release-manifest` adds `bin/SHA256SUMS` and `bin/release-metadata.txt`. For a detached Ed25519 signature, generate a key outside the repository and run `REWIND_RELEASE_PRIVATE_KEY=/secure/path/release.key make release-sign`; this writes `bin/SHA256SUMS.sig` and records the signing status without copying the private key. Verify with `rewind release verify --input bin/SHA256SUMS --signature bin/SHA256SUMS.sig --public-key /secure/path/release.pub`. An embedded public key proves integrity, while a pinned key proves publisher identity; public registry trust, rotation, and revocation remain deployment responsibilities.
+Release builds are cross-compiled with `make release`; `make release-manifest` adds `bin/SHA256SUMS` and `bin/release-metadata.txt`. In the Linux VM, `REWIND_EBPF_OBJECT=ebpf/rewind_trace.bpf.o make release-bundle` packages all binaries, the compiled eBPF object, an example policy, and a bundle checksum file. For a detached Ed25519 signature, generate a key outside the repository and run `REWIND_RELEASE_PRIVATE_KEY=/secure/path/release.key make release-sign`; this writes `bin/SHA256SUMS.sig` and records the signing status without copying the private key. Verify with `rewind release verify --input bin/SHA256SUMS --signature bin/SHA256SUMS.sig --public-key /secure/path/release.pub`. An embedded public key proves integrity, while a pinned key proves publisher identity; public registry trust, rotation, and revocation remain deployment responsibilities.
 
 ## Competitive landscape
 
@@ -77,6 +77,10 @@ open http://127.0.0.1:4173
 
 The page covers the shipped safety surface, reversible transaction flow, Phase 2 roadmap, competitor capability matrix, and measured B0/B2/B4 evidence. The Markdown ledgers remain canonical.
 
+Publish to an explicit local directory or S3-compatible bucket with
+`REWIND_SITE_DEST=/path/or/s3://bucket make publish-site`; the script refuses
+to guess a destination or silently publish without an explicit target.
+
 On macOS, the safe prerequisite probe is read-only:
 
 ```bash
@@ -128,7 +132,8 @@ REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm
 
 This gate is VM-only and covers rollback/read denial, evidence bundle
 create/verify, review/commit, clean-branch acceptance, destination-drift
-refusal, proxy/raw-socket semantics, and incomplete-evidence refusal. Run
+refusal, proxy/raw-socket semantics, strict namespace isolation, real
+allow-listed veth/IPSet/NAT egress, and incomplete-evidence refusal. Run
 `make benchmark-verify` to validate the checked-in B0/B2/B4 ledger and chart.
 The supervisor boundary can be checked separately with
 `REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm`.
@@ -159,7 +164,7 @@ rewind pii scan --path ./project --output ./runtime/pii-findings.json
 rewind pii scan --path ./project/config.env --redact-output ./runtime/config.env.redacted
 rewind agent list
 rewind agent contract codex
-rewind network plan --domains api.example.com,registry.example.com
+rewind network plan --domains api.example.com,registry.example.com --resolve
 rewind platform contract --platform darwin --workspace /path/to/disposable-apfs-fixture
 sudo rewind status --record ./runtime/record.json
 rewind inspect --record ./runtime/record.json
@@ -353,7 +358,7 @@ rewind run \
 
 The command must run inside the disposable Ubuntu VM. It checks capabilities, creates one cgroup-v2 scope, creates a `fuse-overlayfs` mount, gates agent `exec` until telemetry is attached, and starts the agent through the policy-aware helper. With `--on-success review`, the merged view stays available for inspection; without it, successful completion automatically discards upper/work. The record includes event count, byte count, SHA-256 digest, and a kernel-side dropped-event count; any dropped event marks evidence incomplete. The FUSE backend is the default because this VM's 6.8 kernel does not expose OverlayFS copy-up checks to an unprivileged agent reliably. Use `--overlay-backend kernel` only after a separate VM capability check. Do not run this on the personal Mac or against a real home directory.
 
-For bounded telemetry retention, set `REWIND_EVENT_MAX_BYTES` to a positive total byte count inside the VM. The runtime continues draining kernel events after the cap, marks the run evidence `truncated=true`, and makes `verify` fail closed; it never presents a capped stream as complete. To rotate a long stream without truncation, set `REWIND_EVENT_ROTATE_BYTES`; the record stores the ordered `events.jsonl`, `events-000001.jsonl`, ... paths and the verifier hashes them as one chain. Explicit backpressure policy remains future work. If `resources` is present, the run writes the requested cgroup-v2 limits before the agent is released; a missing controller file fails closed. `network.mode: enforce` requires the explicit `--network-backend proxy`, `--network-backend deny`, or `--network-backend namespace` backend; audit mode can opt into the proxy to persist observations. The loopback proxy enforces domain policy for HTTP/HTTPS proxy-aware clients and injects proxy variables only into the agent process; proxy enforce runs deny raw/packet socket creation. The `deny` backend additionally refuses IPv4/IPv6/packet socket creation and connect attempts, leaving only local Unix-domain IPC. The `namespace` backend enters a new Linux network namespace with no configured interfaces or routes; it is the kernel boundary for non-proxy-aware clients when no egress is desired. Neither fail-closed backend provides allow-listed egress.
+For bounded telemetry retention, set `REWIND_EVENT_MAX_BYTES` to a positive total byte count inside the VM. The runtime continues draining kernel events after the cap, marks the run evidence `truncated=true`, and makes `verify` fail closed; it never presents a capped stream as complete. To rotate a long stream without truncation, set `REWIND_EVENT_ROTATE_BYTES`; the record stores the ordered `events.jsonl`, `events-000001.jsonl`, ... paths and the verifier hashes them as one chain. Explicit backpressure policy remains future work. If `resources` is present, the run writes the requested cgroup-v2 limits before the agent is released; a missing controller file fails closed. `network.mode: enforce` requires the explicit `--network-backend proxy`, `--network-backend deny`, or `--network-backend namespace` backend; audit mode can opt into the proxy to persist observations. The loopback proxy enforces domain policy for HTTP/HTTPS proxy-aware clients and injects proxy variables only into the agent process; proxy enforce runs deny raw/packet socket creation. The `deny` backend additionally refuses IPv4/IPv6/packet socket creation and connect attempts, leaving only local Unix-domain IPC. The `namespace` backend enters a new Linux network namespace, resolves configured domains to IPv4 addresses before launch, moves a veth peer into the child namespace at the start gate, and installs a destination IP set with NAT and a default reject rule. DNS resolver addresses are added to the same set so lookups work without turning hostname policy into an unrestricted socket allow. The privileged veth/iptables path is Linux-VM-only and fails closed when the broker cannot prepare or clean up.
 
 When the run is launched with `sudo`, inspect and roll it back with `sudo` as well because the current MVP writes the `0600` run record and telemetry log as root:
 

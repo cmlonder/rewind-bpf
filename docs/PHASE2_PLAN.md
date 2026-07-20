@@ -34,7 +34,7 @@ P0 scope excludes durable snapshot history, detachable sessions, registry featur
 
 The first product-core slice adds three explicit, portable contracts:
 
-- `internal/netpolicy` compiles allowlisted domains and provides a loopback HTTP/HTTPS proxy backend for proxy-aware clients. The explicit `deny` and Linux `namespace` backends fail closed for non-proxy-aware clients; allow-listed namespace egress remains a deployment track.
+- `internal/netpolicy` compiles allowlisted domains and provides a loopback HTTP/HTTPS proxy backend for proxy-aware clients. The explicit `deny` backend fails closed for non-proxy-aware clients; the Linux `namespace` backend now resolves domains, moves a veth peer at the start gate, installs IPSet/iptables NAT rules, and cleans them on every lifecycle path. Privileged VM egress evidence remains the acceptance gate.
 - `internal/credentials` exposes capability references, an opt-in command provider, and short-lived leases. Raw values have no representation in policy, lease JSON, argv, or workspace files; native keychains remain platform-specific.
 - `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before `rewind commit --confirm` applies regular-file and directory changes.
 
@@ -72,7 +72,7 @@ This is deliberately narrower than “protect the whole operating system” or �
 4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
 5. Conflict-aware `commit --confirm` is now implemented for regular files/directories. It refuses incomplete evidence, destination drift, unsafe paths, and symlink/other entries; JSON export, text-file unified patches, and full-fidelity Git patches are review artifacts, while `rewind branch apply` adds a clean-checkout, Git-preflighted branch adapter with explicit optional commit.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
-7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients, a strict seccomp deny backend, and a Linux network-namespace backend with no configured routes. Enforced proxy runs deny AF_PACKET and raw AF_INET/AF_INET6 socket creation through seccomp; namespace and deny modes refuse non-proxy-aware egress instead of silently degrading. Allow-listed egress still requires a separate namespace/cgroup broker.
+7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients, a strict seccomp deny backend, and a Linux network-namespace broker. Enforced proxy runs deny AF_PACKET and raw AF_INET/AF_INET6 socket creation through seccomp; namespace runs resolve configured domains and DNS resolvers, move a veth peer into the child namespace at the start gate, enforce an IPSet-backed destination allowlist with NAT/default reject, and clean up on success, failure, or rollback. The real command sequence remains a privileged disposable-VM acceptance gate.
 
 ### Phase 2 implementation progress
 
