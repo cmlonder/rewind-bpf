@@ -28,6 +28,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     sessions: Array.isArray(sessions) ? sessions : [],
     token: token.trim(),
     baseUrl: root,
+    challenge: (request) => issueActionChallenge(root, token.trim(), request),
     action: (request) => executeAction(root, token.trim(), request),
     createPolicy: (value) => createResource(root, token.trim(), "policies", value),
     assignWorkspace: (value) => createResource(root, token.trim(), "workspaces", value),
@@ -36,6 +37,18 @@ export async function connectSupervisor(baseUrl, token = "") {
     pruneHistory: (keep) => pruneHistory(root, token.trim(), keep),
     session: (value) => sessionAction(root, token.trim(), value),
   };
+}
+
+export async function issueActionChallenge(baseUrl, token, request) {
+  const root = baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}/v1/action-challenges`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify(request),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
 }
 
 export async function issueCredentialLease(baseUrl, token, value) {

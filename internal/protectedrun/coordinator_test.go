@@ -57,6 +57,8 @@ type fakeSensor struct {
 type fakeNetwork struct {
 	prepared []uint32
 	cleaned  int
+	started  chan struct{}
+	stopped  chan struct{}
 }
 
 func (n *fakeNetwork) Prepare(_ context.Context, pid uint32) error {
@@ -67,6 +69,17 @@ func (n *fakeNetwork) Prepare(_ context.Context, pid uint32) error {
 func (n *fakeNetwork) Cleanup(context.Context) error {
 	n.cleaned++
 	return nil
+}
+
+func (n *fakeNetwork) StartRefresh(context.Context) func() {
+	if n.started != nil {
+		close(n.started)
+	}
+	return func() {
+		if n.stopped != nil {
+			close(n.stopped)
+		}
+	}
 }
 
 func (s *fakeSensor) Attach(context.Context, string, string, uint32) (io.Closer, error) {
@@ -172,6 +185,33 @@ func TestNetworkBoundaryFollowsStartGateLifecycle(t *testing.T) {
 	}
 	if boundary.cleaned != 1 {
 		t.Fatalf("cleanup repeated after wait: %d", boundary.cleaned)
+	}
+}
+
+func TestNetworkRefreshStopsBeforeCleanup(t *testing.T) {
+	boundary := &fakeNetwork{started: make(chan struct{}), stopped: make(chan struct{})}
+	coordinator := Coordinator{
+		Overlay: &fakeOverlay{},
+		Starter: &fakeStarter{process: &fakeProcess{pid: 100}},
+		Network: boundary,
+	}
+	plan := testPlan(t)
+	handle, err := coordinator.Start(context.Background(), plan, []string{"synthetic-agent"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-boundary.started:
+	default:
+		t.Fatal("refresh loop was not started")
+	}
+	if err := handle.Wait(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-boundary.stopped:
+	default:
+		t.Fatal("refresh loop was not stopped")
 	}
 }
 

@@ -53,6 +53,7 @@ func handleRun(args []string) {
 	runtimeRoots := flags.String("runtime-roots", "", "comma-separated system roots needed by the agent")
 	overlayBackend := flags.String("overlay-backend", string(overlay.BackendFuse), "overlay backend: fuse or kernel")
 	networkBackend := flags.String("network-backend", "", "network backend for enforce mode: proxy, deny, or namespace")
+	networkRefresh := flags.Duration("network-refresh-interval", 0, "optional namespace DNS/IPSet refresh interval (0 disables refresh)")
 	agentAdapter := flags.String("agent-adapter", "generic", "agent adapter: generic, codex, openhands, or claude-code")
 	onSuccess := flags.String("on-success", "discard", "successful-run outcome: discard (default) or review")
 	historyPath := flags.String("history", "", "optional durable run history JSON path")
@@ -152,7 +153,10 @@ func handleRun(args []string) {
 		if err != nil {
 			fatal(fmt.Sprintf("build namespace allowlist: %v", err))
 		}
-		networkBoundary = &netns.Broker{Plan: allowlist, Runner: netns.OSCommandRunner{}, RequireRoot: true}
+		if *networkRefresh < 0 {
+			fatal("network refresh interval cannot be negative")
+		}
+		networkBoundary = &netns.Broker{Plan: allowlist, Runner: netns.OSCommandRunner{}, RequireRoot: true, RefreshInterval: *networkRefresh}
 	}
 	scope, err := cgroup.NewAtWithLimits("/sys/fs/cgroup", plan.Run.ID, cgroup.Limits{
 		PIDsMax:   plan.Resources.PIDsMax,

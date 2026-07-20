@@ -44,10 +44,15 @@ type Server struct {
 	CredentialBroker  credentials.Broker
 	Sessions          session.LeaseStore
 	SessionPath       string
+	ActionChallenges  *actionChallengeStore
 }
 
 func (s Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	challenges := s.ActionChallenges
+	if challenges == nil {
+		challenges = &actionChallengeStore{}
+	}
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, Response{OK: true, State: "ready", Message: "local supervisor; authenticated actions"})
 	})
@@ -298,6 +303,31 @@ func (s Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("/v1/audit", s.auditLog)
 	mux.HandleFunc("/v1/events", s.events)
+	mux.HandleFunc("/v1/action-challenges", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "action challenges require POST"})
+			return
+		}
+		var request ActionChallengeRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&request); err != nil {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "invalid action challenge request"})
+			return
+		}
+		if err := Validate(Request{Action: request.Action, RunID: request.RunID}); err != nil || (request.Action != "rollback" && request.Action != "recover" && request.Action != "commit") {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "challenge requires rollback, recover, or commit"})
+			return
+		}
+		challenge, err := challenges.issue(request.Action, request.RunID, time.Now())
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, Response{OK: false, State: "refused", Message: err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusCreated, challenge)
+	})
 	mux.HandleFunc("/v1/actions", func(w http.ResponseWriter, r *http.Request) {
 		if !s.authorized(r) {
 			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
@@ -315,6 +345,14 @@ func (s Server) Handler() http.Handler {
 		if err := Validate(request); err != nil {
 			writeJSON(w, http.StatusBadRequest, Response{OK: false, Message: err.Error()})
 			return
+		}
+		if request.Action != "status" {
+			if err := challenges.consume(request.ActionToken, request.Action, request.RunID, time.Now()); err != nil {
+				response := Response{OK: false, State: "refused", Message: err.Error()}
+				s.recordAudit(Request{Action: request.Action, RunID: request.RunID}, response, err)
+				writeJSON(w, http.StatusConflict, response)
+				return
+			}
 		}
 		if s.Actions == nil {
 			response := Response{OK: false, State: "refused", Message: "runtime action handler is not connected"}

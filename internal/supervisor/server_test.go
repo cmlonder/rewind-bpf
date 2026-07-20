@@ -4,6 +4,7 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -309,6 +310,39 @@ func TestAuthenticatedActionHandlerReceivesValidatedRequest(t *testing.T) {
 	}
 	if !strings.Contains(string(audit), `"action":"status"`) || !strings.Contains(string(audit), `"run_id":"run_1"`) {
 		t.Fatalf("audit=%s", audit)
+	}
+}
+
+func TestMutatingActionRequiresOneTimeServerChallenge(t *testing.T) {
+	server := Server{AuthToken: "secret", Actions: func(request Request) (Response, error) {
+		return Response{OK: true, State: request.Action}, nil
+	}}
+	handler := server.Handler()
+	challengeRequest := httptest.NewRequest(http.MethodPost, "/v1/action-challenges", strings.NewReader(`{"action":"rollback","run_id":"run-1"}`))
+	challengeRequest.Header.Set("Authorization", "Bearer secret")
+	challengeResponse := httptest.NewRecorder()
+	handler.ServeHTTP(challengeResponse, challengeRequest)
+	if challengeResponse.Code != http.StatusCreated {
+		t.Fatalf("challenge status=%d body=%s", challengeResponse.Code, challengeResponse.Body.String())
+	}
+	var challenge ActionChallengeResponse
+	if err := json.Unmarshal(challengeResponse.Body.Bytes(), &challenge); err != nil || challenge.Token == "" {
+		t.Fatalf("challenge=%+v err=%v", challenge, err)
+	}
+
+	request := func(token string) *httptest.ResponseRecorder {
+		body := fmt.Sprintf(`{"action":"rollback","run_id":"run-1","action_token":%q}`, token)
+		req := httptest.NewRequest(http.MethodPost, "/v1/actions", strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer secret")
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, req)
+		return response
+	}
+	if response := request(challenge.Token); response.Code != http.StatusOK {
+		t.Fatalf("first action status=%d body=%s", response.Code, response.Body.String())
+	}
+	if response := request(challenge.Token); response.Code != http.StatusConflict {
+		t.Fatalf("replay status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 

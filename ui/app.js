@@ -73,9 +73,9 @@ function handleAction(action, element) {
   if (action === "simulate-credentials") return openCredentialLeaseCheck();
   if (action === "retention") return openRetentionEditor();
   if (action === "session") return openSessionEditor();
-  if (action === "rollback") return openActionTokenConfirm({ action: "rollback", title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: () => runSupervisorAction("rollback", rollback) });
-  if (action === "commit") return openActionTokenConfirm({ action: "commit", title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: () => runSupervisorAction("commit", commitRun, "COMMIT") });
-  if (action === "recover") return openActionTokenConfirm({ action: "recover", title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: () => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success")) });
+  if (action === "rollback") return openActionTokenConfirm({ action: "rollback", title: "Rollback this run?", kicker: "DESTRUCTIVE TO UPPER LAYER", body: "This discards the temporary upper/work layer while preserving the original lower layer and evidence record.", confirm: "Rollback run", tone: "orange", onConfirm: (token) => runSupervisorAction("rollback", rollback, "", token) });
+  if (action === "commit") return openActionTokenConfirm({ action: "commit", title: "Accept reviewed changes?", kicker: "CONFLICT-CHECKED APPLY", body: "Rewind will compare the immutable base with the current destination first. Same-path drift refuses the apply; only the reviewed candidate is written.", confirm: "Accept changes", tone: "sage", onConfirm: (token) => runSupervisorAction("commit", commitRun, "COMMIT", token) });
+  if (action === "recover") return openActionTokenConfirm({ action: "recover", title: "Recover stale run?", kicker: "PROCESS DRAIN", body: "The supervisor will drain descendants, remove the temporary mount, and preserve the lower workspace.", confirm: "Recover run", tone: "orange", onConfirm: (token) => runSupervisorAction("recover", () => setToast("Recovery completed in fixture mode.", "success"), "", token) });
   if (action === "export") return setToast("Review bundle prepared in fixture mode.", "success");
   if (action === "copy-policy") return copyPolicy();
   if (action === "export-policy-bundle") return exportPolicyBundle();
@@ -285,9 +285,9 @@ function rollback() {
   setToast("Run rolled back. Lower layer remains intact.", "success");
 }
 
-function runSupervisorAction(action, localFallback, confirmation = "") {
+function runSupervisorAction(action, localFallback, confirmation = "", actionToken = "") {
   if (!state.supervisor) return localFallback();
-  return state.supervisor.action({ action, run_id: currentRun().id, confirmation }).then((response) => {
+  return state.supervisor.action({ action, run_id: currentRun().id, confirmation, action_token: actionToken }).then((response) => {
     if (response.state) currentRun().state = response.state;
     setToast(response.message || `${action} completed through the local supervisor.`, "success");
   }).catch((error) => {
@@ -428,8 +428,9 @@ function issueActionToken(action, runId = currentRun()?.id || "fixture") {
 }
 
 function openActionTokenConfirm({ action, title, kicker, body, confirm, tone = "orange", onConfirm }) {
-  const token = issueActionToken(action);
-  openModal(title, `<div class="confirm-copy"><span class="confirm-mark confirm-${tone}">!</span><div><span class="panel-kicker">${kicker}</span><p>${body}</p></div></div><div class="action-token-panel"><span class="panel-kicker">ONE-TIME ACTION TOKEN · EXPIRES IN 2 MIN</span><code>${token}</code><label for="action-token-input">Type the token to authorize this browser intent</label><input id="action-token-input" name="action_token" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="${token}" /></div>`, { confirm, tone, onConfirm: () => {
+  const runId = currentRun()?.id || "fixture";
+  const localToken = issueActionToken(action, runId);
+  const render = (token, serverBound) => openModal(title, `<div class="confirm-copy"><span class="confirm-mark confirm-${tone}">!</span><div><span class="panel-kicker">${kicker}</span><p>${body}</p></div></div><div class="action-token-panel"><span class="panel-kicker">ONE-TIME ACTION TOKEN · ${serverBound ? "SUPERVISOR-BOUND" : "FIXTURE-BOUND"} · EXPIRES IN 2 MIN</span><code>${token}</code><label for="action-token-input">Type the token to authorize this browser intent</label><input id="action-token-input" name="action_token" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="${token}" /></div>`, { confirm, tone, onConfirm: () => {
     const input = document.querySelector("#action-token-input");
     const record = state.actionTokens.get(token);
     if (!record || record.expiresAt < Date.now() || input?.value.trim().toUpperCase() !== token) {
@@ -438,8 +439,21 @@ function openActionTokenConfirm({ action, title, kicker, body, confirm, tone = "
       return false;
     }
     state.actionTokens.delete(token);
-    return onConfirm();
+    return onConfirm(serverBound ? token : "");
   } });
+  if (state.supervisor?.challenge) {
+    state.supervisor.challenge({ action, run_id: runId }).then((challenge) => {
+      const token = String(challenge.token || "").trim();
+      if (!token) throw new Error("supervisor returned an empty action challenge");
+      state.actionTokens.set(token, { action, runId, expiresAt: new Date(challenge.expires_at).getTime() || Date.now() + 120000 });
+      render(token, true);
+    }).catch((error) => {
+      render(localToken, false);
+      setToast(`Supervisor challenge unavailable; fixture token shown: ${error.message}`, "neutral");
+    });
+    return;
+  }
+  render(localToken, false);
 }
 
 function openTrustSettings() {

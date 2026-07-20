@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 // Boundary is the lifecycle hook used by protectedrun. Prepare runs while
@@ -29,7 +31,10 @@ type Broker struct {
 	RequireRoot        bool
 	ResolveDomains     func(context.Context, []string) (map[string][]net.IP, error)
 	ResolveNameservers func() ([]net.IP, error)
+	RefreshInterval    time.Duration
 	previousForwarding string
+	refreshMu          sync.Mutex
+	refreshCancel      context.CancelFunc
 }
 
 func (b *Broker) Prepare(ctx context.Context, pid uint32) error {
@@ -143,6 +148,48 @@ func (b *Broker) Refresh(ctx context.Context) error {
 	b.Plan.ResolvedIPs = resolvedIPs
 	b.Plan.ResolverIPs = resolverIPs
 	return nil
+}
+
+// StartRefresh starts an optional, bounded DNS/IPSet refresh loop. The loop is
+// deliberately opt-in: a zero interval preserves the low-overhead default and
+// avoids background work for static allowlists. Refresh failures are fail-open
+// with respect to the last-known-good set (Refresh performs resolution before
+// any mutation); callers can inspect the broker's audit hook when they need to
+// surface resolver health.
+func (b *Broker) StartRefresh(parent context.Context) func() {
+	if b == nil || b.RefreshInterval <= 0 {
+		return func() {}
+	}
+	b.refreshMu.Lock()
+	if b.refreshCancel != nil {
+		cancel := b.refreshCancel
+		b.refreshMu.Unlock()
+		return cancel
+	}
+	ctx, cancel := context.WithCancel(parent)
+	b.refreshCancel = cancel
+	interval := b.RefreshInterval
+	b.refreshMu.Unlock()
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				_ = b.Refresh(ctx)
+			}
+		}
+	}()
+	return func() {
+		b.refreshMu.Lock()
+		if b.refreshCancel != nil {
+			b.refreshCancel()
+			b.refreshCancel = nil
+		}
+		b.refreshMu.Unlock()
+	}
 }
 
 func (b *Broker) requireRoot() bool {

@@ -734,6 +734,7 @@ POST /v1/history/prune {keep}
 GET  /v1/audit?limit=100
 GET  /v1/events?run_id=...           (snapshot)
 GET  /v1/events?run_id=...&follow=true (tail until terminal/timeout)
+POST /v1/action-challenges {action, run_id} (bearer required; one-time, 2 min)
 POST /v1/actions  {status|rollback|recover|commit}
 ```
 
@@ -742,9 +743,12 @@ the persisted JSONL journals. Follow mode replays complete lines, tails the
 active journal, and closes when the run reaches a terminal state, disconnects,
 or reaches its idle safety timeout. Action requests resolve a run through the
 durable history index and call the same rollback, recovery, evidence,
-conflict-check, and commit code paths as the CLI. Commit additionally requires
+conflict-check, and commit code paths as the CLI. Mutating actions additionally
+require the short-lived challenge token returned by `/v1/action-challenges`; the
+supervisor consumes it once and matches both action and run ID, so replay and
+cross-run reuse fail closed. Commit additionally requires
 `confirmation: "COMMIT"`. Unknown actions, missing run IDs, missing bearer
-tokens, and incomplete evidence fail closed. Every authenticated action is
+tokens, missing/expired challenge tokens, and incomplete evidence fail closed. Every authenticated action is
 also appended to a separate mode-`0600` redacted JSONL audit file. The browser
 adapter can use an optional loopback-only HTTP bridge with an exact CORS origin
 to send the same bearer-authenticated action intents; it never receives root

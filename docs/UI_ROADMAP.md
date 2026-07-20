@@ -336,8 +336,10 @@ The dependency-free `ui/` prototype now covers the Phase 1 control room and the 
 The trusted policy distribution UX is now present in the control plane. It shows
 the pinned HTTPS endpoint, current/previous Ed25519 signer IDs, verification
 checks, staged rotation, and a fixture-safe fetch/import flow. Destructive
-browser intents use an in-memory two-minute one-time action token before an
-authenticated supervisor request; this token is intentionally separate from
+browser intents use a two-minute one-time action token before an authenticated
+supervisor request. In fixture mode the token is browser-bound; when connected,
+the supervisor issues and consumes the token server-side and refuses replay or
+action/run mismatches. This token is intentionally separate from
 the bearer credential and is not a replacement for server authorization.
 
 P4 now has a bounded

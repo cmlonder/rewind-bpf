@@ -3,7 +3,10 @@
 // validates transport-level intents and serializes their responses.
 package supervisor
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type CredentialLeaseRequest struct {
 	Ref    string   `json:"ref"`
@@ -27,6 +30,19 @@ type Request struct {
 	Workspace    string `json:"workspace,omitempty"`
 	Policy       string `json:"policy,omitempty"`
 	Confirmation string `json:"confirmation,omitempty"`
+	ActionToken  string `json:"action_token,omitempty"`
+}
+
+type ActionChallengeRequest struct {
+	Action string `json:"action"`
+	RunID  string `json:"run_id,omitempty"`
+}
+
+type ActionChallengeResponse struct {
+	Token     string    `json:"token"`
+	Action    string    `json:"action"`
+	RunID     string    `json:"run_id,omitempty"`
+	ExpiresAt time.Time `json:"expires_at"`
 }
 
 type Response struct {

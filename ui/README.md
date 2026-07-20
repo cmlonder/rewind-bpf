@@ -45,8 +45,10 @@ confirmations POST authenticated intents, and the run detail view follows its
 authenticated SSE evidence stream. Credential lease responses contain only an
 opaque ID/scope/expiry marker, and the browser still never receives root access
 or performs privileged work. Destructive browser intents additionally require
-an in-memory, two-minute, one-time action token; the token is a human intent
-challenge, not a replacement for supervisor bearer authentication.
+a two-minute, one-time action token. In fixture mode it is browser-bound; on a
+connected supervisor the token is issued and consumed server-side, with replay
+and action/run mismatches refused. It is a human-intent challenge, not a
+replacement for supervisor bearer authentication.
 
 ## Demo scope decision
 

@@ -56,6 +56,10 @@ type NetworkBoundary interface {
 	Cleanup(context.Context) error
 }
 
+type NetworkRefresher interface {
+	StartRefresh(context.Context) func()
+}
+
 type Coordinator struct {
 	Overlay Overlay
 	Starter Starter
@@ -71,6 +75,7 @@ type Handle struct {
 	sensor      io.Closer
 	scope       ProcessScope
 	network     NetworkBoundary
+	stopRefresh func()
 	waited      bool
 }
 
@@ -153,6 +158,9 @@ func (c Coordinator) Start(ctx context.Context, plan *runplan.Plan, command []st
 			return handle.failAndRollback(ctx, fmt.Errorf("start protected run: prepare network boundary: %w", err))
 		}
 		handle.network = c.Network
+		if refresher, ok := c.Network.(NetworkRefresher); ok {
+			handle.stopRefresh = refresher.StartRefresh(context.Background())
+		}
 	}
 	if strings.TrimSpace(sensorObject) != "" {
 		if c.Sensor == nil {
@@ -195,6 +203,7 @@ func (h *Handle) wait(beforeSensorClose func() error) error {
 	h.waited = true
 	var networkErr error
 	if h.network != nil {
+		h.stopNetworkRefresh()
 		networkErr = h.network.Cleanup(context.Background())
 		h.network = nil
 	}
@@ -232,6 +241,7 @@ func (h *Handle) Rollback(ctx context.Context) error {
 		h.waited = true
 	}
 	if h.network != nil {
+		h.stopNetworkRefresh()
 		if err := h.network.Cleanup(ctx); err != nil {
 			errs = append(errs, fmt.Errorf("cleanup network boundary: %w", err))
 		}
@@ -271,6 +281,7 @@ func (h *Handle) failAndRollback(ctx context.Context, cause error) (*Handle, err
 	if err := h.closeSensor(); err != nil {
 		cause = errors.Join(cause, err)
 	}
+	h.stopNetworkRefresh()
 	if h.scope != nil {
 		if err := h.scope.Terminate(); err != nil {
 			cause = errors.Join(cause, fmt.Errorf("terminate process scope: %w", err))
@@ -293,6 +304,14 @@ func (h *Handle) failAndRollback(ctx context.Context, cause error) (*Handle, err
 		}
 	}
 	return h, cause
+}
+
+func (h *Handle) stopNetworkRefresh() {
+	if h == nil || h.stopRefresh == nil {
+		return
+	}
+	h.stopRefresh()
+	h.stopRefresh = nil
 }
 
 func (h *Handle) closeScope() error {
