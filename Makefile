@@ -2,7 +2,7 @@ BIN_DIR := bin
 BIN := $(BIN_DIR)/rewind
 EVIDENCE_BIN := $(BIN_DIR)/rewind-evidence
 
-.PHONY: build test fmt clean release bootstrap
+.PHONY: build test fmt clean release bootstrap acceptance-vm
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -26,3 +26,6 @@ release:
 
 bootstrap:
 	./scripts/bootstrap_vm.sh
+
+acceptance-vm:
+	./scripts/acceptance_vm.sh

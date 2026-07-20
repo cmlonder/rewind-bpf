@@ -96,6 +96,16 @@ The approved integration-test boundary is a disposable Ubuntu VM where RewindBPF
 macOS host → disposable Ubuntu VM → RewindBPF directly
 ```
 
+After building the binary and eBPF object inside that VM, run the repeatable
+synthetic acceptance matrix with:
+
+```bash
+REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm
+```
+
+This gate is VM-only and covers rollback/read denial, review/commit,
+destination-drift refusal, proxy allow/deny, and incomplete-evidence refusal.
+
 ## User workflow
 
 The primary workflow runs inside the disposable Linux VM:

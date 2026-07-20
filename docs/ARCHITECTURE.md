@@ -694,6 +694,18 @@ The first end-to-end FUSE run was verified on 2026-07-18 in the Ubuntu 24.04 ARM
 
 On 2026-07-19 the Phase 2 binary passed package tests, capability probing, and a FUSE protected run in the Ubuntu 24.04 ARM64 VM. The capability report identified OverlayFS, FUSE OverlayFS, BTF, Landlock, cgroup-v2, and seccomp; BPF-LSM was absent. The run record persisted the cgroup path, backend, capability report, and event evidence. The helper waited on a start gate until the eBPF sensor was attached, eliminating the short-command attach race: the synthetic shell run recorded 77 events (14,428 bytes) with `dropped=0` and a complete SHA-256 digest. Record and event logs were owned by `vagrant:vagrant` after `sudo` execution. A second destructive synthetic run recorded 39 events (7,334 bytes), also with `dropped=0`, and rolled back. A background child-process test caused the cgroup drain gate to fail closed; recovery removed the child, cgroup, mount, and temporary upper/work state. Parent-`SIGKILL` and open-descriptor crash smokes both recovered stale runs and preserved the lower marker. A reduced-ring stress run dropped 37 events, retained `dropped=37` and `complete=false` through rollback, and caused `verify` to exit 2. A privileged rollback preserved `original-source` in the lower workspace. A bounded-log smoke with `REWIND_EVENT_MAX_BYTES=512` persisted one event, marked `truncated=true`, made `verify` exit 2, and still rolled back the lower marker. A resource-policy smoke applied `pids.max=128`, `memory.max=268435456`, and `cpu.max=50000 100000` before release, completed, and rolled back successfully. The separately built `/tmp/rewind-evidence` verifier returned exit 0 for a complete resource-run record and exit 2 for a truncated record without mounting or loading eBPF. The unmount still correctly requires `sudo` because the parent mount is privileged.
 
+### Linux acceptance matrix (disposable VM)
+
+On 2026-07-20, `REWIND_VM_CONFIRM=VM_ONLY make acceptance-vm` passed in the
+same Ubuntu 24.04 ARM64 VM after rebuilding the Go binary and eBPF object. The
+matrix covered read denial plus recursive deletion/discard, review and explicit
+commit, destination-drift conflict refusal, proxy allow/deny for a local HTTP
+server versus `example.invalid`, and bounded-evidence refusal. The complete
+evidence case verified with `dropped=0`; the intentionally capped case recorded
+`truncated=true`, `complete=false`, and caused verification to exit non-zero.
+The script creates only a generated temporary directory and performs cleanup
+of that exact directory with the privileged unmount path.
+
 ### Optional BPF-LSM backend
 
 `ebpf/rewind_read_enforcer.bpf.c` is a separate kernel module from the tracepoint sensor. Its `lsm/file_open` hook:
