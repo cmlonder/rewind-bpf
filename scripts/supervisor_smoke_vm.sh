@@ -77,6 +77,12 @@ if echo "$LEASE" | grep -q 'vm-secret-token'; then
   echo "credential lease unexpectedly exposed provider output" >&2
   exit 1
 fi
+SESSION="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/sessions -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"action":"acquire","run_id":"'"$RUN_ID"'","owner":"browser-a","ttl_seconds":60}')"
+echo "$SESSION" | jq -e '.run_id == "'"$RUN_ID"'" and .owner == "browser-a" and .expires_at != null' >/dev/null
+TAKEOVER="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/sessions -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"action":"takeover","run_id":"'"$RUN_ID"'","owner":"browser-b","ttl_seconds":60}')"
+echo "$TAKEOVER" | jq -e '.owner == "browser-b"' >/dev/null
+PRUNE="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/history/prune -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"keep":1}')"
+echo "$PRUNE" | grep -q '"ok":true'
 COMMIT="$(sudo curl --unix-socket "$SOCKET" -sS http://localhost/v1/actions -X POST -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"action":"commit","run_id":"'"$RUN_ID"'","confirmation":"COMMIT"}')"
 echo "$COMMIT" | grep -q '"ok":true'
 test "$(cat "$ROOT/workspace/marker.txt")" = accepted-by-supervisor

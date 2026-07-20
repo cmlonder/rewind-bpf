@@ -21,6 +21,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/credentials"
 	"github.com/rewindbpf/rewind/internal/history"
+	"github.com/rewindbpf/rewind/internal/session"
 	"github.com/rewindbpf/rewind/internal/supervisor"
 )
 
@@ -102,6 +103,8 @@ func handleSupervisor(args []string) {
 		Config:            controlplane.Open(*configPath),
 		TrustedPolicyKeys: trustedKeys,
 		CredentialBroker:  credentialBroker,
+		Sessions:          session.Open(*historyPath + ".sessions.json"),
+		SessionPath:       *historyPath + ".sessions.json",
 		AuditPath:         *historyPath + ".actions.jsonl",
 		AuditMu:           &sync.Mutex{},
 		Actions: func(request supervisor.Request) (supervisor.Response, error) {

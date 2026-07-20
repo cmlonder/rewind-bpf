@@ -23,6 +23,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/platform"
 	"github.com/rewindbpf/rewind/internal/policybundle"
 	"github.com/rewindbpf/rewind/internal/runstore"
+	"github.com/rewindbpf/rewind/internal/session"
 )
 
 type ActionFunc func(Request) (Response, error)
@@ -41,6 +42,8 @@ type Server struct {
 	Config            *controlplane.Store
 	TrustedPolicyKeys []ed25519.PublicKey
 	CredentialBroker  credentials.Broker
+	Sessions          session.Store
+	SessionPath       string
 }
 
 func (s Server) Handler() http.Handler {
@@ -70,6 +73,71 @@ func (s Server) Handler() http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, entries)
+	})
+	mux.HandleFunc("/v1/history/prune", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "history pruning requires POST"})
+			return
+		}
+		var request HistoryPruneRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 8<<10)).Decode(&request); err != nil || request.Keep < 0 {
+			response := Response{OK: false, State: "refused", Message: "keep must be a non-negative integer"}
+			s.recordAudit(Request{Action: "history_prune"}, response, nil)
+			writeJSON(w, http.StatusBadRequest, response)
+			return
+		}
+		removed, err := s.History.PruneKeepLatest(request.Keep)
+		if err != nil {
+			response := Response{OK: false, State: "refused", Message: err.Error()}
+			s.recordAudit(Request{Action: "history_prune"}, response, err)
+			writeJSON(w, http.StatusConflict, response)
+			return
+		}
+		response := Response{OK: true, State: "pruned", Message: fmt.Sprintf("removed=%d keep=%d", removed, request.Keep)}
+		s.recordAudit(Request{Action: "history_prune"}, response, nil)
+		writeJSON(w, http.StatusOK, response)
+	})
+	mux.HandleFunc("/v1/sessions", func(w http.ResponseWriter, r *http.Request) {
+		if !s.authorized(r) {
+			writeJSON(w, http.StatusUnauthorized, Response{OK: false, State: "refused", Message: "bearer authentication required"})
+			return
+		}
+		if s.SessionPath == "" {
+			writeJSON(w, http.StatusNotImplemented, Response{OK: false, State: "refused", Message: "session leases are unavailable"})
+			return
+		}
+		if r.Method == http.MethodGet {
+			leases, err := s.Sessions.List()
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, Response{OK: false, State: "refused", Message: err.Error()})
+				return
+			}
+			writeJSON(w, http.StatusOK, leases)
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "sessions require GET or POST"})
+			return
+		}
+		var request SessionRequest
+		if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&request); err != nil {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "invalid session request"})
+			return
+		}
+		lease, err := s.Sessions.Apply(session.Request{Action: request.Action, RunID: request.RunID, Owner: request.Owner, TTL: request.TTL}, time.Now())
+		if err != nil {
+			response := Response{OK: false, State: "refused", Message: err.Error()}
+			s.recordAudit(Request{Action: "session_" + request.Action, RunID: request.RunID}, response, err)
+			writeJSON(w, http.StatusConflict, response)
+			return
+		}
+		response := Response{OK: true, State: request.Action, Message: lease.ID}
+		s.recordAudit(Request{Action: "session_" + request.Action, RunID: request.RunID}, response, nil)
+		writeJSON(w, http.StatusOK, lease)
 	})
 	mux.HandleFunc("/v1/policies", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {

@@ -12,7 +12,9 @@ import (
 	"strings"
 )
 
-const maxPublishBytes = 128 << 20
+// The limit includes encrypted JSON envelopes, which carry base64 overhead
+// around the plaintext archive.
+const maxPublishBytes = 192 << 20
 
 // Publish sends an already-created evidence archive to an explicit review
 // endpoint. The runtime never publishes automatically: this boundary is an
@@ -55,7 +57,11 @@ func Publish(ctx context.Context, archivePath, endpoint, bearer, detachedSignatu
 	if err != nil {
 		return "", fmt.Errorf("publish bundle: create request: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/gzip")
+	contentType := "application/gzip"
+	if strings.HasSuffix(strings.ToLower(archivePath), ".json") || strings.HasSuffix(strings.ToLower(archivePath), ".enc") {
+		contentType = "application/json"
+	}
+	req.Header.Set("Content-Type", contentType)
 	req.Header.Set("X-Rewind-Bundle-SHA256", hex.EncodeToString(digest[:]))
 	if strings.TrimSpace(detachedSignature) != "" {
 		req.Header.Set("X-Rewind-Bundle-Signature", detachedSignature)

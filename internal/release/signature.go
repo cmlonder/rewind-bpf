@@ -86,6 +86,26 @@ func Verify(payload []byte, signed Signature, trusted ...ed25519.PublicKey) erro
 	return nil
 }
 
+// VerifyAny accepts a rotating trust set. An empty set preserves the embedded
+// signer check; a non-empty set succeeds when any configured key matches.
+func VerifyAny(payload []byte, signed Signature, trusted []ed25519.PublicKey) error {
+	if len(trusted) == 0 {
+		return Verify(payload, signed)
+	}
+	var last error
+	for _, key := range trusted {
+		if err := Verify(payload, signed, key); err == nil {
+			return nil
+		} else {
+			last = err
+		}
+	}
+	if last == nil {
+		last = fmt.Errorf("release signer is not trusted")
+	}
+	return last
+}
+
 func KeyID(public ed25519.PublicKey) string {
 	digest := sha256.Sum256(public)
 	return hex.EncodeToString(digest[:8])

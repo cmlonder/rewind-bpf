@@ -26,8 +26,10 @@ Usage:
   rewind diff --record PATH
   rewind export --record PATH --output PATH [--format json|patch|git-patch]
   rewind bundle create --record PATH --output PATH
+  rewind bundle encrypt --input PATH --output PATH --key-file PATH
+  rewind bundle decrypt --input PATH --output PATH --key-file PATH
   rewind bundle sign --input PATH --private-key PATH --output PATH
-  rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --token-file PATH --allow-insecure-localhost]
+  rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --trusted-public-keys PATH,... --token-file PATH --encrypted --allow-insecure-localhost]
   rewind bundle verify --input PATH [--signature PATH --public-key PATH]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
@@ -36,6 +38,7 @@ Usage:
   rewind release sign --input PATH --private-key PATH --output PATH
   rewind release verify --input PATH --signature PATH [--public-key PATH]
   rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
+  rewind history prune --path PATH --keep N
   rewind rollback --record PATH
   rewind recover --record PATH
   rewind commit --record PATH --confirm
@@ -104,6 +107,8 @@ func main() {
 		handleRelease(os.Args[2:])
 	case "supervisor":
 		handleSupervisor(os.Args[2:])
+	case "history":
+		handleHistory(os.Args[2:])
 	case "commit":
 		handleCommit(os.Args[2:])
 	default:

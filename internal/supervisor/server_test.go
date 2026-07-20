@@ -11,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/credentials"
@@ -18,6 +19,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policybundle"
 	"github.com/rewindbpf/rewind/internal/runstore"
+	"github.com/rewindbpf/rewind/internal/session"
 )
 
 type testCredentialBroker struct{}
@@ -121,6 +123,48 @@ func TestConfigEndpointsRequireAuthAndPersistValidatedChanges(t *testing.T) {
 	server.Handler().ServeHTTP(response, read)
 	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "payments-api") {
 		t.Fatalf("workspace response status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestHistoryPruneEndpointRequiresAuthAndKeepsNewestEntries(t *testing.T) {
+	dir := t.TempDir()
+	store := history.Open(filepath.Join(dir, "history.json"))
+	for _, id := range []string{"old", "new"} {
+		if err := store.Upsert(history.Entry{RunID: id, State: "succeeded", UpdatedAt: time.Now().Add(map[string]time.Duration{"old": -time.Hour, "new": time.Hour}[id])}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	server := Server{AuthToken: "secret", History: store}
+	request := httptest.NewRequest(http.MethodPost, "/v1/history/prune", strings.NewReader(`{"keep":1}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "removed=1") {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	entries, err := store.List()
+	if err != nil || len(entries) != 1 || entries[0].RunID != "new" {
+		t.Fatalf("entries=%+v err=%v", entries, err)
+	}
+}
+
+func TestSessionEndpointSupportsReconnectAndTakeover(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sessions.json")
+	server := Server{AuthToken: "secret", SessionPath: path, Sessions: session.Open(path)}
+	request := httptest.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(`{"action":"acquire","run_id":"run-1","owner":"browser-a","ttl_seconds":60}`))
+	request.Header.Set("Authorization", "Bearer secret")
+	recorder := httptest.NewRecorder()
+	server.Handler().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), `"owner":"browser-a"`) {
+		t.Fatalf("acquire status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	takeover := httptest.NewRequest(http.MethodPost, "/v1/sessions", strings.NewReader(`{"action":"takeover","run_id":"run-1","owner":"browser-b","ttl_seconds":60}`))
+	takeover.Header.Set("Authorization", "Bearer secret")
+	taken := httptest.NewRecorder()
+	server.Handler().ServeHTTP(taken, takeover)
+	if taken.Code != http.StatusOK || !strings.Contains(taken.Body.String(), `"owner":"browser-b"`) {
+		t.Fatalf("takeover status=%d body=%s", taken.Code, taken.Body.String())
 	}
 }
 

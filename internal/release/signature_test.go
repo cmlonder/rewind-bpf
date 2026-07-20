@@ -49,6 +49,24 @@ func TestVerifyRejectsTampering(t *testing.T) {
 	}
 }
 
+func TestVerifyAnySupportsTrustRotation(t *testing.T) {
+	firstPublic, firstPrivate, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondPublic, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signed, err := Sign([]byte("payload"), firstPrivate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyAny([]byte("payload"), signed, []ed25519.PublicKey{secondPublic, firstPublic}); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestSignRejectsInvalidPrivateKey(t *testing.T) {
 	if _, err := Sign(nil, make(ed25519.PrivateKey, ed25519.PrivateKeySize-1)); err == nil {
 		t.Fatal("expected invalid key refusal")

@@ -51,6 +51,23 @@ func TestPublishPostsArchiveDigestSignatureAndBearer(t *testing.T) {
 	}
 }
 
+func TestPublishUsesJSONContentTypeForEncryptedEnvelope(t *testing.T) {
+	path := t.TempDir() + "/evidence.enc.json"
+	if err := os.WriteFile(path, []byte(`{"version":1}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Content-Type"); got != "application/json" {
+			t.Errorf("content-type=%q", got)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer server.Close()
+	if _, err := Publish(context.Background(), path, server.URL, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func writeArchiveFixture(t *testing.T, data []byte) string {
 	t.Helper()
 	path := t.TempDir() + "/evidence.tar.gz"

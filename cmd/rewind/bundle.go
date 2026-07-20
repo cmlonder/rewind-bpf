@@ -27,12 +27,20 @@ func handleBundle(args []string) {
 		handleBundleSign(args[1:])
 		return
 	}
+	if args[0] == "encrypt" {
+		handleBundleEncrypt(args[1:])
+		return
+	}
+	if args[0] == "decrypt" {
+		handleBundleDecrypt(args[1:])
+		return
+	}
 	if args[0] == "publish" {
 		handleBundlePublish(args[1:])
 		return
 	}
 	if args[0] != "create" {
-		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle sign --input PATH --private-key PATH --output PATH | rewind bundle publish --input PATH --endpoint URL --signature PATH | rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
+		fatal("usage: rewind bundle create --record PATH --output PATH | rewind bundle encrypt --input PATH --output PATH --key-file PATH | rewind bundle decrypt --input PATH --output PATH --key-file PATH | rewind bundle sign --input PATH --private-key PATH --output PATH | rewind bundle publish --input PATH --endpoint URL --signature PATH | rewind bundle verify --input PATH [--signature PATH --public-key PATH]")
 	}
 	flags := flag.NewFlagSet("bundle create", flag.ContinueOnError)
 	recordPath := flags.String("record", "", "run record JSON path")
@@ -67,13 +75,17 @@ func handleBundlePublish(args []string) {
 	endpoint := flags.String("endpoint", "", "HTTPS review endpoint")
 	signaturePath := flags.String("signature", "", "detached signature JSON path")
 	publicPath := flags.String("public-key", "", "optional pinned public key path")
+	trustedPaths := flags.String("trusted-public-keys", "", "optional comma-separated public key paths for trust rotation")
 	tokenPath := flags.String("token-file", "", "optional bearer token file")
+	encrypted := flags.Bool("encrypted", false, "publish an encrypted envelope instead of a plaintext evidence archive")
 	allowInsecure := flags.Bool("allow-insecure-localhost", false, "allow HTTP only for localhost test endpoints")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" || strings.TrimSpace(*endpoint) == "" || strings.TrimSpace(*signaturePath) == "" {
-		fatal("usage: rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --token-file PATH --allow-insecure-localhost]")
+		fatal("usage: rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --trusted-public-keys PATH,... --token-file PATH --encrypted --allow-insecure-localhost]")
 	}
-	if _, err := evidencebundle.Verify(*inputPath); err != nil {
-		fatal(fmt.Sprintf("evidence bundle verification failed: %v", err))
+	if !*encrypted {
+		if _, err := evidencebundle.Verify(*inputPath); err != nil {
+			fatal(fmt.Sprintf("evidence bundle verification failed: %v", err))
+		}
 	}
 	payload, err := os.ReadFile(filepath.Clean(*inputPath))
 	if err != nil {
@@ -87,19 +99,16 @@ func handleBundlePublish(args []string) {
 	if err := json.Unmarshal(signatureData, &signed); err != nil {
 		fatal(fmt.Sprintf("decode evidence bundle signature: %v", err))
 	}
-	var trusted ed25519.PublicKey
+	var trustedKeys []ed25519.PublicKey
 	if strings.TrimSpace(*publicPath) != "" {
-		trustedData, err := os.ReadFile(filepath.Clean(*publicPath))
-		if err != nil {
-			fatal(fmt.Sprintf("read evidence bundle public key: %v", err))
+		trustedKeys = append(trustedKeys, readPublicKey(*publicPath, "evidence bundle")...)
+	}
+	for _, path := range strings.Split(*trustedPaths, ",") {
+		if strings.TrimSpace(path) != "" {
+			trustedKeys = append(trustedKeys, readPublicKey(path, "evidence bundle")...)
 		}
-		trusted = ed25519.PublicKey(trustedData)
 	}
-	if len(trusted) > 0 {
-		err = releasecrypto.Verify(payload, signed, trusted)
-	} else {
-		err = releasecrypto.Verify(payload, signed)
-	}
+	err = releasecrypto.VerifyAny(payload, signed, trustedKeys)
 	if err != nil {
 		fatal(fmt.Sprintf("evidence bundle signature verification failed: %v", err))
 	}
@@ -164,6 +173,58 @@ func handleBundleVerify(args []string) {
 		}
 	}
 	fmt.Printf("evidence bundle verified: run_id=%s artifacts=%d state=%s trust=%s\n", metadata.RunID, len(metadata.Artifacts), metadata.State, trust)
+}
+
+func handleBundleEncrypt(args []string) {
+	flags := flag.NewFlagSet("bundle encrypt", flag.ContinueOnError)
+	inputPath := flags.String("input", "", "plaintext evidence archive path")
+	outputPath := flags.String("output", "", "encrypted envelope output path")
+	keyPath := flags.String("key-file", "", "raw 32-byte AES key path")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" || strings.TrimSpace(*outputPath) == "" || strings.TrimSpace(*keyPath) == "" {
+		fatal("usage: rewind bundle encrypt --input PATH --output PATH --key-file PATH")
+	}
+	key := readBundleKey(*keyPath)
+	envelope, err := evidencebundle.EncryptFile(*inputPath, *outputPath, key)
+	if err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("encrypted evidence bundle: %s plaintext_sha256=%s\n", *outputPath, envelope.PlaintextSHA)
+}
+
+func handleBundleDecrypt(args []string) {
+	flags := flag.NewFlagSet("bundle decrypt", flag.ContinueOnError)
+	inputPath := flags.String("input", "", "encrypted envelope path")
+	outputPath := flags.String("output", "", "plaintext evidence archive output path")
+	keyPath := flags.String("key-file", "", "raw 32-byte AES key path")
+	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*inputPath) == "" || strings.TrimSpace(*outputPath) == "" || strings.TrimSpace(*keyPath) == "" {
+		fatal("usage: rewind bundle decrypt --input PATH --output PATH --key-file PATH")
+	}
+	if err := evidencebundle.DecryptFile(*inputPath, *outputPath, readBundleKey(*keyPath)); err != nil {
+		fatal(err.Error())
+	}
+	fmt.Printf("decrypted evidence bundle: %s\n", *outputPath)
+}
+
+func readBundleKey(path string) []byte {
+	key, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		fatal(fmt.Sprintf("read bundle encryption key: %v", err))
+	}
+	if len(key) != 32 {
+		fatal("bundle encryption key must contain exactly 32 raw bytes")
+	}
+	return key
+}
+
+func readPublicKey(path, label string) []ed25519.PublicKey {
+	data, err := os.ReadFile(filepath.Clean(strings.TrimSpace(path)))
+	if err != nil {
+		fatal(fmt.Sprintf("read %s public key: %v", label, err))
+	}
+	if len(data) != ed25519.PublicKeySize {
+		fatal(fmt.Sprintf("%s public key must contain %d raw bytes", label, ed25519.PublicKeySize))
+	}
+	return []ed25519.PublicKey{ed25519.PublicKey(data)}
 }
 
 func handleBundleSign(args []string) {

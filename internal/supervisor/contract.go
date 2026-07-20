@@ -10,6 +10,17 @@ type CredentialLeaseRequest struct {
 	Scopes []string `json:"scopes,omitempty"`
 }
 
+type HistoryPruneRequest struct {
+	Keep int `json:"keep"`
+}
+
+type SessionRequest struct {
+	Action string `json:"action"`
+	RunID  string `json:"run_id"`
+	Owner  string `json:"owner"`
+	TTL    int    `json:"ttl_seconds,omitempty"`
+}
+
 type Request struct {
 	Action       string `json:"action"`
 	RunID        string `json:"run_id,omitempty"`
