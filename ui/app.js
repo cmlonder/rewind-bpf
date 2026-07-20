@@ -3,14 +3,14 @@ import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null, supervisor: null, eventAbort: null };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, reconnectAttempts: 0, connection: "fixture" };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
 function currentRun() { return getRun(state.selectedRun); }
 
 function render() {
-  app.innerHTML = AppShell({ view: state.view, run: currentRun(), fixture });
+  app.innerHTML = AppShell({ view: state.view, run: currentRun(), fixture, connection: state.connection });
   bindInteractions();
   if (state.toast) showToast(state.toast.message, state.toast.tone);
 }
@@ -86,20 +86,26 @@ function openSupervisorConnector() {
     const token = data.get("token");
     try {
       const connected = await connectSupervisor(endpoint, token);
-      state.supervisor = connected;
-      fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
-      fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
-      if (connected.history.length) {
-        fixture.runs = connected.history.map(remoteRun);
-        state.selectedRun = fixture.runs[0].id;
-      }
-      if (connected.policies.length) fixture.policies = connected.policies.map(remotePolicy);
-      if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
-      if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
+      applySupervisorSnapshot(connected);
+      state.connection = "connected";
+      state.reconnectAttempts = 0;
       followConnectedEvents();
       closeModal(); render(); setToast("Supervisor connected: live evidence and authenticated actions enabled.", "success");
     } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
   } });
+}
+
+function applySupervisorSnapshot(connected) {
+  state.supervisor = connected;
+  fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
+  fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
+  if (connected.history.length) {
+    fixture.runs = connected.history.map(remoteRun);
+    state.selectedRun = fixture.runs[0].id;
+  }
+  if (connected.policies.length) fixture.policies = connected.policies.map(remotePolicy);
+  if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
+  if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
 }
 
 function followConnectedEvents() {
@@ -122,8 +128,32 @@ function followConnectedEvents() {
     run.evidence.count += 1;
     render();
   }, controller.signal).catch((error) => {
-    if (error.name !== "AbortError") setToast(`Event stream disconnected: ${error.message}`, "error");
+    if (error.name !== "AbortError") scheduleSupervisorReconnect(error);
   });
+}
+
+function scheduleSupervisorReconnect(error) {
+  if (!state.supervisor || state.reconnectTimer) return;
+  state.connection = "reconnecting";
+  fixture.environment = `Supervisor reconnecting · attempt ${state.reconnectAttempts + 1}`;
+  render();
+  const delay = Math.min(10000, 1000 * (2 ** state.reconnectAttempts));
+  state.reconnectAttempts += 1;
+  state.reconnectTimer = window.setTimeout(async () => {
+    state.reconnectTimer = null;
+    try {
+      const connected = await connectSupervisor(state.supervisor.baseUrl, state.supervisor.token);
+      applySupervisorSnapshot(connected);
+      state.connection = "connected";
+      state.reconnectAttempts = 0;
+      render();
+      setToast("Supervisor connection restored; evidence stream resumed.", "success");
+      followConnectedEvents();
+    } catch (reconnectError) {
+      scheduleSupervisorReconnect(reconnectError);
+    }
+  }, delay);
+  if (error) setToast(`Supervisor stream paused: ${error.message}. Retrying…`, "error");
 }
 
 function remoteRun(item) {

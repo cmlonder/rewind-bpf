@@ -41,6 +41,10 @@ code, pre { font-family: var(--mono); font-variant-ligatures: none; }
 .top-actions { display: flex; align-items: center; gap: 13px; margin-left: auto; }
 .fixture-badge { display: flex; align-items: center; gap: 7px; max-width: 310px; padding: 7px 10px; color: var(--orange-dark); border: 1px solid oklch(67% .17 54 / .3); background: oklch(67% .17 54 / .08); font: 10px var(--mono); }
 .fixture-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--orange); }
+.fixture-badge.connection-connected { color: var(--sage); border-color: oklch(58% .12 150 / .32); background: oklch(58% .12 150 / .09); }
+.fixture-badge.connection-connected i { background: var(--sage); }
+.fixture-badge.connection-reconnecting { color: var(--amber); border-color: oklch(72% .15 80 / .35); background: oklch(72% .15 80 / .1); }
+.fixture-badge.connection-reconnecting i { background: var(--amber); animation: pulse 1.2s ease-in-out infinite; }
 .icon-button, .avatar { display: grid; place-items: center; position: relative; width: 35px; height: 35px; border: 1px solid var(--line); color: var(--ink-soft); background: var(--surface); font-size: 17px; transition: border-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--ease-out); }
 .icon-button:hover, .avatar:hover { color: var(--orange-dark); border-color: var(--orange); transform: translateY(-1px); }
 .icon-button b { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%; background: var(--orange); }
