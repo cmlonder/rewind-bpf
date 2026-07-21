@@ -108,6 +108,8 @@ execution boundary around it.
 | Windows | Cross-build and fail-closed contract | Signed minifilter/VHDX enforcement is not complete |
 
 The detailed status is in [`docs/PLATFORM_STATUS.md`](docs/PLATFORM_STATUS.md).
+The complete English demo script and dashboard menu guide is in
+[`docs/DEMO_AND_DASHBOARD_GUIDE.md`](docs/DEMO_AND_DASHBOARD_GUIDE.md).
 
 ## Quick start on macOS
 
