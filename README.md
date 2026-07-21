@@ -1,77 +1,121 @@
 # RewindBPF
 
-**RewindBPF is a reversible safety runtime for AI agents.** It lets an agent
-work inside a disposable filesystem transaction, blocks configured sensitive
-reads, records what happened, and gives an operator an explicit **rollback** or
-conflict-checked **commit**.
+RewindBPF is a safety boundary for AI agents that can change files. It starts
+the agent in a disposable filesystem transaction, applies read/write policy,
+records the run, and lets a person review, roll back, or commit the result.
 
-The reference implementation runs in a disposable Ubuntu VM. A safe macOS
-native transaction path and a fail-closed Windows contract are included; they
-are not advertised as Linux-equivalent enforcement.
+The enforcement implementation is Linux-first. The full Linux path runs in an
+isolated Ubuntu VM. macOS also has a local native transaction path, so the
+product demo can be recorded on a Mac without UTM. That Mac demo proves the
+local supervisor, UI, read policy, staged writes, diff, rollback, and commit
+flow; it does not prove Linux eBPF or OverlayFS enforcement. Windows currently
+has a fail-closed platform contract.
 
-## The problem
+## Why this exists
 
-An agent can delete a source tree, overwrite a configuration file, or read a
-secret before a human can intervene. Command deny-lists are brittle, and a
-full pre-run copy is expensive.
+An agent can remove a source directory, overwrite a configuration file, or try
+to read a secret before anyone notices. A list of blocked shell commands is
+easy to bypass, and copying an entire project before every run is expensive.
 
-## The idea
+Rewind changes the boundary instead. The original workspace is kept as a lower
+layer. The agent sees a merged view, but its writes go to a disposable upper
+layer. A review can then end in one of two explicit outcomes:
 
-Rewind prepares the write boundary **before** the agent starts:
+```mermaid
+flowchart LR
+    W["Real workspace<br/>unchanged lower layer"]
+    P["Policy<br/>read / write / network"]
+    R["Rewind runtime<br/>OverlayFS or FUSE<br/>Landlock + evidence"]
+    A["Agent command<br/>sees merged view"]
+    U["Disposable upper layer<br/>agent writes"]
+    V["Review in Control Plane<br/>timeline + diff"]
+    B["Rollback<br/>discard upper layer"]
+    C["Commit<br/>conflict check, then apply"]
 
-```text
-real workspace (lower, unchanged)
-             ↓
-agent sees a merged view  →  writes land in a disposable upper layer
-             ↓
-        review → rollback  |  explicit, conflict-checked commit
+    W --> R
+    P --> R
+    R --> A
+    A --> U
+    U --> V
+    V --> B
+    V --> C
+    B -.-> W
+    C --> W
+
+    classDef source fill:#e8f0ff,stroke:#356ae6,color:#14213d
+    classDef runtime fill:#eaf8f0,stroke:#2d8a57,color:#123b25
+    classDef decision fill:#fff4df,stroke:#b87516,color:#4a2d08
+    class W,P source
+    class R,A,U runtime
+    class V,B,C decision
 ```
 
-- **Copy-on-write filesystem:** OverlayFS/FUSE keeps the original lower layer
-  untouched while the agent works.
-- **Read policy:** Landlock enforces user-defined deny patterns such as
-  `**/*.env`, `**/*.pem`, or a project-specific PII path.
-- **Evidence:** eBPF tracepoints and lifecycle records produce an ordered,
-  hash-chained event stream. Incomplete evidence fails closed at verification.
-- **Process and network scope:** cgroup-v2 and explicit proxy/deny/namespace
-  backends constrain the Linux reference run.
-- **Operator control:** review the diff, then discard the upper layer or apply
-  only a conflict-checked candidate.
+Sensitive reads are controlled separately with user-defined patterns. For
+example, a policy can deny `**/*.env`, `**/*.pem`, or a project-specific PII
+path without treating `.env` as a special hard-coded file.
 
-Rewind is a **CLI + local supervisor + Control Plane UI**, not an MCP server or
-an agent SDK plugin. The agent command remains the operator's command; Rewind
-supplies the boundary around it.
+## What is implemented
 
-## What is ready
+- OverlayFS/FUSE copy-on-write workspace isolation
+- Landlock read enforcement for configured paths and patterns
+- eBPF filesystem telemetry on the Linux reference path
+- cgroup-v2 process scoping and policy-backed network backends
+- ordered lifecycle records, manifests, diffs, and evidence checks
+- rollback, crash recovery, and conflict-checked commit
+- a local supervisor and Control Plane UI for runs, policy, events, and diffs
+- benchmark scripts for throughput, latency, storage, telemetry, and lifecycle
 
-| Surface | Status | Honest boundary |
-|---|---|---|
-| Linux reference runtime | Ready in disposable Ubuntu VM | Privileged OverlayFS/eBPF tests are VM-only |
-| Rollback and recovery | Ready | Reverses the protected filesystem transaction, not external side effects |
-| Sensitive-read policy | Ready on Linux | Pattern/PII enforcement is policy-scoped |
-| Evidence and supervisor | Ready | Authenticated local control plane; no distributed control plane claim |
-| macOS native path | Safe staged lifecycle | EndpointSecurity, network, and resource helper gates remain |
-| Windows native path | Fail-closed contract and cross-build | Signed minifilter/VHDX acceptance remains |
-| Control Plane UI and public site | Ready | Connected UI requires a local supervisor; fixture mode is non-mutating |
+This is a CLI, supervisor, and UI. It is not an MCP server or an agent SDK
+plugin. The agent command is still the operator's command; Rewind supplies the
+execution boundary around it.
 
-See the canonical status ledger in
-[`docs/FEATURE_BACKLOG.md`](docs/FEATURE_BACKLOG.md) and the platform matrix in
-[`docs/PLATFORM_STATUS.md`](docs/PLATFORM_STATUS.md).
+## Current platform status
 
-## Quick start
+| Platform | Use it for | Boundary |
+| --- | --- | --- |
+| Ubuntu 24.04 VM | Reference enforcement and jury demo | Privileged OverlayFS/eBPF tests are VM-only |
+| macOS | Safe native staged transaction and local UI | Native helper and EndpointSecurity gates are not claimed as complete |
+| Windows | Cross-build and fail-closed contract | Signed minifilter/VHDX enforcement is not complete |
 
-### Safe macOS local experience
+The detailed status is in [`docs/PLATFORM_STATUS.md`](docs/PLATFORM_STATUS.md).
 
-Use a disposable workspace. This starts the local supervisor, opens the UI, and
-launches a protected interactive shell:
+## Quick start on macOS
+
+Use a disposable workspace. This is the simplest end-to-end demo on a Mac. It
+starts a loopback-only supervisor, opens the Control Plane, and launches a
+protected shell:
 
 ```bash
 go run ./cmd/rewind dashboard start --workspace "$PWD"
 ```
 
-When the shell exits, the dashboard stays open so you can inspect the diff and
-choose **Rollback** or **Commit**. Independent terminals are not retroactively
-monitored. The safe native smoke tests use temporary fixtures only:
+When the shell exits, inspect the diff in the UI and choose **Rollback** or
+**Commit**. A terminal started outside this shell is not retroactively covered.
+
+For a safe demo fixture:
+
+```bash
+ROOT="$(mktemp -d /Users/Shared/rewind-demo.XXXXXX)"
+mkdir -p "$ROOT/workspace/src"
+printf 'original-source\n' > "$ROOT/workspace/src/marker.txt"
+printf 'synthetic-secret=do-not-read\n' > "$ROOT/workspace/.env"
+go run ./cmd/rewind dashboard start --workspace "$ROOT/workspace"
+```
+
+Inside the protected shell, run a deliberately destructive command:
+
+```bash
+rm -rf src
+printf 'created-by-agent\n' > generated.txt
+cat .env
+```
+
+The expected result is that `src/` disappears only from the staged view,
+`.env` is denied, and `generated.txt` appears as a candidate. Use the UI to
+review the timeline and diff, then roll back. The original marker should still
+be present in the workspace and `generated.txt` should be gone.
+
+The host checks use temporary fixtures and do not mount a real project:
 
 ```bash
 make mac-safe-smoke
@@ -79,46 +123,34 @@ make mac-native-smoke
 make mac-crash-smoke
 ```
 
-### Linux jury path
+## Linux reference demo
 
-Run this inside the disposable Ubuntu UTM VM, never on a personal host:
+Do this inside the disposable Ubuntu UTM VM, not on a personal host:
 
 ```bash
 cd /home/vagrant/RewindBPF
-REWIND_VM_CONFIRM=VM_ONLY make final-vm
-```
-
-For the short deterministic presentation:
-
-```bash
 REWIND_DEMO_CONFIRM=VM_ONLY make jury-demo-vm
 ```
 
-Expected marker:
+The expected success marker is:
 
 ```text
 JURY_DEMO_VM_PASS
 ```
 
-The complete rehearsal and recording script are in
-[`docs/HACKATHON_TEST_AND_DEMO_PLAN.md`](docs/HACKATHON_TEST_AND_DEMO_PLAN.md).
-
-### Safe repository checks
+The longer acceptance run is:
 
 ```bash
-go test ./...
-go vet ./...
-make ui-smoke
-make site-smoke
-make benchmark-verify
-make public-audit
+REWIND_VM_CONFIRM=VM_ONLY make final-vm
 ```
 
-`make hackathon-preflight` runs the complete non-privileged host checklist and
-creates a local evidence bundle. It does not mount filesystems, load eBPF,
-change firewall state, or touch a real workspace.
+The complete recording plan is in
+[`docs/HACKATHON_TEST_AND_DEMO_PLAN.md`](docs/HACKATHON_TEST_AND_DEMO_PLAN.md).
 
-## Example policy
+## Policy example
+
+Policies are ordinary YAML files. Patterns are user-defined; `.env` is just one
+common example.
 
 ```yaml
 read:
@@ -146,13 +178,12 @@ resources:
   cpu_max: "50000 100000"
 ```
 
-The complete non-secret example is
-[`policies/example.yaml`](policies/example.yaml). Patterns are user-defined;
-`.env` is only one example.
+See [`policies/example.yaml`](policies/example.yaml) for the complete
+non-secret example.
 
 ## CLI lifecycle
 
-Inside the Linux VM, the core flow is:
+Inside the Linux VM, a protected run looks like this:
 
 ```bash
 rewind run \
@@ -168,128 +199,110 @@ rewind status   --record ./runtime/record.json
 rewind diff     --record ./runtime/record.json
 rewind events   --record ./runtime/record.json
 rewind rollback --record ./runtime/record.json
-# or, after review and a clean manifest comparison:
-rewind commit   --record ./runtime/record.json --confirm
+
+# Only after reviewing the candidate:
+rewind commit --record ./runtime/record.json --confirm
 ```
 
-Successful runs discard the temporary upper layer by default. `review` keeps it
-available until the operator chooses. A changed destination, unsupported path,
-or incomplete evidence refuses commit rather than partially applying changes.
+`review` keeps the transaction available. Rollback discards it. Commit checks
+that the destination has not changed since the run; if it has, Rewind refuses
+to overwrite it. External database writes, cloud calls, devices, and other
+side effects outside the protected filesystem are not reversible.
 
-## UI and public site
+## Control Plane and public site
 
-The local Control Plane lives in [`ui/`](ui/). It provides run history,
-timeline/events, filesystem diff, policy/workspace configuration, system
-boundaries, evidence state, rollback/recover/commit actions, and trusted-policy
-metadata. Fixture mode is deliberately non-mutating; connected mode talks only
-to the authenticated local supervisor.
+The local UI is in [`ui/`](ui/). It shows run history, timeline/events,
+filesystem diffs, policy and workspace settings, evidence state, and lifecycle
+actions. Connected mode talks to the local authenticated supervisor. Fixture
+mode is non-mutating.
 
 ```bash
 python3 -m http.server 4174 --directory ui
 open http://127.0.0.1:4174
 ```
 
-The jury-facing site lives in [`site/`](site/) and is dependency-free:
+The dependency-free jury site is in [`site/`](site/):
 
 ```bash
 python3 -m http.server 4173 --directory site
 open http://127.0.0.1:4173
 ```
 
-GitHub Pages is configured through
-[`.github/workflows/pages.yml`](.github/workflows/pages.yml); choose **GitHub
-Actions** as the Pages source. The workflow publishes `site/`, not the repo
-root.
+### Screenshots for the project page
 
-## Benchmarks and evidence
+The Mac demo is the clearest way to show the product. Capture these from the
+connected UI using only the synthetic fixture above; do not include real paths,
+secrets, or personal workspace names:
 
-The benchmark ledger compares native and protected controls (B0/B2/B4/B5),
-including throughput, latency, storage amplification, lifecycle time, and
-telemetry bytes. It is intentionally not presented as “zero overhead.”
+- [ ] `docs/screenshots/dashboard-review.png` — run overview with **Review** state
+- [ ] `docs/screenshots/timeline-policy-deny.png` — timeline showing the denied `.env` read
+- [ ] `docs/screenshots/diff-rollback.png` — staged deletion and generated file before rollback
+- [ ] `docs/screenshots/rollback-complete.png` — rollback result with the original marker restored
+- [ ] `docs/screenshots/commit-conflict.png` — optional conflict refusal screen
+- [ ] `docs/screenshots/policy-settings.png` — optional user-defined read/write policy
+
+Add the strongest three or four images to the Devpost gallery. The README does
+not require screenshots to run the project; they are presentation evidence for
+the UI and demo flow.
+
+## Checks and benchmarks
+
+Run these on a normal development machine:
 
 ```bash
-python3 benchmarks/normalize_results.py
-python3 benchmarks/plot_results.py
+go test ./...
+go vet ./...
+make ui-smoke
+make site-smoke
 make benchmark-verify
+make public-audit
 ```
 
-Start with [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md), then read the
-protocol in [`benchmarks/PHASE2_PROTOCOL.md`](benchmarks/PHASE2_PROTOCOL.md).
-Raw VM runtime data and generated release/evidence directories stay ignored.
+`make hackathon-preflight` runs the non-privileged checklist and creates a
+local evidence bundle. It does not mount filesystems, load eBPF, change
+firewall state, or touch a real workspace.
 
-## Competitive position
+The benchmark ledger compares native and protected B0/B2/B4/B5 scenarios. It
+reports measured throughput, latency, storage amplification, lifecycle time,
+and telemetry bytes. We do not describe the result as “zero overhead.” Start
+with [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md).
 
-RewindBPF is not claiming to be the first kernel-security project or the broadest
-developer sandbox. `nono` is stronger as a general-purpose sandbox; Tetragon
-and KubeArmor are stronger adjacent enforcement/observability systems; AgentFS
-and DeltaBox overlap with filesystem/history or checkpoint research.
+## Repository guide
 
-Our narrower distinction is the pre-created write transaction plus explicit
-acceptance: the agent can use normal filesystem operations, the lower layer
-stays untouched, sensitive reads are policy-controlled, and rollback is a
-discard operation rather than a best-effort reconstruction.
-
-The full comparison is in
-[`benchmarks/COMPETITOR_MATRIX.md`](benchmarks/COMPETITOR_MATRIX.md) and the
-product strategy is in [`docs/PRODUCT_STRATEGY.md`](docs/PRODUCT_STRATEGY.md).
-
-## Safety boundary
-
-Do not run privileged or destructive tests on a personal Mac or real project.
-Use the disposable Ubuntu VM for OverlayFS, eBPF, cgroup, Landlock, and network
-namespace acceptance. macOS smoke tests use temporary `/Users/Shared` fixtures.
-Never bind-mount a real home directory, `.env`, SSH key, credential, or customer
-data.
-
-Rewind does **not** undo database writes, cloud API calls, network side effects,
-device changes, or arbitrary kernel effects. A successful process exit is not an
-automatic safety approval; review remains explicit.
-
-## Development
-
-Requirements:
-
-- Go 1.22+
-- Linux VM for privileged integration
-- `fuse-overlayfs`, Landlock or BPF LSM, and BPF/BTF support in that VM
-
-Common commands:
-
-```bash
-make build
-make test
-make hackathon-preflight
-make final-vm                 # disposable Ubuntu VM only
-```
-
-The repository layout and implementation invariants are documented in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). The roadmap and verification
-status are in [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) and
-[`docs/PHASE2_PLAN.md`](docs/PHASE2_PLAN.md).
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — implementation boundaries
+- [`docs/FEATURE_BACKLOG.md`](docs/FEATURE_BACKLOG.md) — current feature status
+- [`docs/PLATFORM_STATUS.md`](docs/PLATFORM_STATUS.md) — platform claims
+- [`docs/DEVPOST_SUBMISSION.md`](docs/DEVPOST_SUBMISSION.md) — submission copy
+- [`docs/HACKATHON_TEST_AND_DEMO_PLAN.md`](docs/HACKATHON_TEST_AND_DEMO_PLAN.md) —
+  judge setup and recording plan
+- [`benchmarks/COMPETITOR_MATRIX.md`](benchmarks/COMPETITOR_MATRIX.md) —
+  comparison with adjacent tools
 
 ## Codex and GPT-5.6
 
-RewindBPF was built and iterated in Codex with GPT-5.6. Codex helped decompose
-the runtime, implement the policy/rollback lifecycle, harden crash/evidence
-paths, build the UI/site, and create the benchmark and VM gates. GPT-5.6 was a
-build-time implementation and review partner; the shipped runtime remains
-agent- and model-agnostic.
+This project was built and iterated in Codex with GPT-5.6 as a build-time
+implementation and review partner. Codex helped break the runtime into small
+modules, implement and debug the lifecycle, test failure paths, build the UI
+and site, and prepare the benchmark and VM gates. The shipped runtime does not
+depend on a specific model and can protect any command launched through the
+same boundary.
 
 Primary Devpost `/feedback` Session ID:
 `019f6f87-53d3-7c11-be4d-6d07217d62ea`
 
-See [`docs/DEVPOST_SUBMISSION.md`](docs/DEVPOST_SUBMISSION.md) for the
-submission copy, supported-platform test path, and video script.
+## Safety note
 
-## Public repository hygiene
+Do not run privileged or destructive tests on a personal Mac or a real
+project. Use the disposable Ubuntu VM for OverlayFS, eBPF, cgroup, Landlock,
+and network namespace acceptance. Use temporary `/Users/Shared` fixtures for
+macOS smoke tests. Never bind-mount a home directory, credential, SSH key, or
+customer data.
 
-Before pushing changes:
+Before publishing changes, run:
 
 ```bash
 make public-audit
 git diff --check
 ```
 
-The audit and publication boundary are documented in
-[`docs/PUBLIC_REPO_CHECKLIST.md`](docs/PUBLIC_REPO_CHECKLIST.md). Vulnerability
-reporting guidance is in [`SECURITY.md`](SECURITY.md).
+Security reporting guidance is in [`SECURITY.md`](SECURITY.md).

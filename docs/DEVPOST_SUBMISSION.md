@@ -9,13 +9,13 @@ This document is the copy-ready checklist for the Devpost entry. It intentionall
 
 ## Product position
 
-RewindBPF is a Linux-first, agent-agnostic safety runtime. It starts an agent inside a disposable filesystem transaction, applies user-defined read/write/network policy, records kernel and lifecycle evidence, and lets an operator review, commit, or discard the result. The reference demo runs in a disposable Ubuntu 24.04 VM; the repository also includes a safe macOS native transaction path and fail-closed Windows contracts.
+RewindBPF is a Linux-first, agent-agnostic safety runtime. It starts an agent inside a disposable filesystem transaction, applies user-defined read/write/network policy, records lifecycle evidence, and lets an operator review, commit, or discard the result. The product demo can run locally on macOS through the native transaction path and Control Plane UI. The Linux reference path adds OverlayFS, Landlock, cgroup, and eBPF enforcement inside a disposable Ubuntu 24.04 VM; Windows remains a fail-closed contract.
 
 This is a developer tool, not an MCP server or an agent SDK plugin. The agent command remains the operator's command. RewindBPF supplies the execution boundary around it. A future MCP/SDK adapter can call the same CLI and supervisor contracts, but adding one is not required for this submission and would not improve the core jury demo at the deadline.
 
 ## Copy-ready project description
 
-AI agents are good at changing files and bad at understanding the blast radius of a destructive command. RewindBPF gives an agent a reversible work session instead of direct access to the real project: OverlayFS/FUSE keeps writes in a disposable upper layer, Landlock and policy rules deny configured sensitive reads, cgroup-v2 scopes descendants, and an eBPF sensor records filesystem activity and evidence completeness. The operator can inspect a manifest and timeline, reject the run in one rollback, or accept it through an explicit conflict-checked commit. The demo uses a synthetic project in an Ubuntu VM: the agent deletes `src/`, attempts to read a synthetic `.env`, creates output, and then the original source is restored without touching the lower layer.
+AI agents are good at changing files and bad at understanding the blast radius of a destructive command. RewindBPF gives an agent a reversible work session instead of direct access to the real project: copy-on-write keeps writes in a disposable layer, policy rules deny configured sensitive reads, and the supervisor records the run. The operator can inspect a manifest and timeline, reject the run in one rollback, or accept it through an explicit conflict-checked commit. The recorded Mac demo uses a synthetic project: the agent deletes `src/`, attempts to read a synthetic `.env`, creates output, and the original source is restored without touching the real workspace. The Ubuntu VM scenario demonstrates the additional Linux enforcement layers.
 
 The central claim is deliberately narrower than “zero overhead”: copy-on-write avoids a full pre-run copy, while the benchmark ledger reports the measured B0/B2/B4/B5 throughput, latency, storage, telemetry, and lifecycle costs. The system is honest about its boundary: it does not undo external databases, cloud APIs, devices, or arbitrary kernel side effects.
 
@@ -42,7 +42,7 @@ To obtain the required ID, run `/status` in the Codex thread where most of the c
 | macOS | Safe native APFS/Seatbelt staged transaction and UI bridge | `make mac-native-smoke`, `make mac-crash-smoke`, then `go run ./cmd/rewind dashboard start --workspace /Users/Shared/<fixture>` |
 | Windows | Cross-built, fail-closed native contract; signed minifilter/VHDX gate remains | Inspect `docs/platform/windows.md` and `scripts/windows_acceptance.ps1`; do not claim Linux-equivalent enforcement |
 
-The fastest judge experience is the deterministic Linux VM jury scenario. The host-side checks are non-destructive and do not require a real project, real secrets, or a host filesystem mount.
+The fastest judge experience is the local macOS dashboard flow using a disposable fixture. The Linux VM jury scenario is the enforcement reference. Both paths use synthetic data and do not require a real project, real secrets, or a host filesystem mount.
 
 ## Installation and test instructions
 
@@ -61,6 +61,20 @@ go run ./cmd/rewind dashboard start --workspace "$PWD"
 ```
 
 This starts a loopback-only supervisor and UI, creates a safe default policy, opens the browser, and launches a protected shell. The UI receives a short-lived connection token through the local URL fragment; the token is removed from the address bar after connection. Use only a disposable workspace for destructive commands.
+
+### Local macOS product demo
+
+```bash
+ROOT="$(mktemp -d /Users/Shared/rewind-demo.XXXXXX)"
+mkdir -p "$ROOT/workspace/src"
+printf 'original-source\n' > "$ROOT/workspace/src/marker.txt"
+printf 'synthetic-secret=do-not-read\n' > "$ROOT/workspace/.env"
+go run ./cmd/rewind dashboard start --workspace "$ROOT/workspace"
+```
+
+Run the destructive synthetic command in the protected shell, inspect the UI
+timeline and diff, then roll back. Keep the screenshot and recording free of
+real paths and secret values.
 
 ### Privileged Linux demo
 
