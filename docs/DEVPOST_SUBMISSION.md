@@ -21,14 +21,43 @@ The central claim is deliberately narrower than “zero overhead”: copy-on-wri
 
 ## How Codex and GPT-5.6 contributed
 
-RewindBPF was built and iterated in Codex using GPT-5.6 as a primary implementation and review partner. Codex accelerated the work in four concrete places:
+I built and iterated RewindBPF in Codex with GPT-5.6 as a hands-on implementation
+and review partner. The model was involved in the normal engineering loop, not
+just in writing the first draft.
 
-1. It decomposed the runtime into testable Go modules (policy, Landlock, OverlayFS/FUSE, eBPF loading, telemetry, lifecycle, evidence, supervisor, retention, and platform contracts) instead of one monolithic runner.
-2. It helped implement and debug the protected-run lifecycle, including descendant cleanup, crash recovery, incomplete-evidence fail-closed behavior, destination-drift commit refusal, and the authenticated supervisor bridge.
-3. It generated and iterated the Control Plane UI, public site, benchmark normalization/charts, release scripts, and deterministic VM acceptance gates.
-4. It was used to challenge product claims against nono, Tetragon, KubeArmor, AgentFS, and DeltaBox, which led to the current narrower and evidence-backed positioning.
+We used it to shape the product boundary first: what belongs in the MVP, what
+should remain a Linux reference claim, how Rewind differs from command filters,
+runtime enforcers, and filesystem sandboxes, and where the “near-zero
+overhead” statement needed to be narrowed to measured copy-on-write costs.
 
-GPT-5.6 is used during development and verification, not as a hidden runtime dependency: RewindBPF remains model-agnostic and can protect a Codex, OpenHands, Claude, or arbitrary command through the same operator-owned launch boundary. This distinction is intentional; the safety invariant must not depend on a particular model vendor.
+It then helped turn that boundary into separate, readable modules rather than a
+single runner. The code now has independent policy, manifest/diff, Landlock,
+OverlayFS/FUSE, eBPF loading, telemetry, lifecycle, evidence, supervisor,
+retention, network, platform, and UI-facing control-plane packages. We used the
+same loop to add tests around policy precedence, rollback, crash recovery,
+descendant cleanup, incomplete evidence, destination drift, action tokens, and
+conflict-checked commit.
+
+The Linux implementation was developed and debugged against the ARM64 Ubuntu
+VM over SSH. GPT-5.6 helped diagnose the eBPF build environment, architecture
+include paths, OverlayFS limitations in the VM, Landlock behavior, event-stream
+gaps, and benchmark collection. The resulting checks were run as real Go tests,
+VM smoke tests, and fio/perf measurements; they were not treated as generated
+claims. We also used it to inspect the captured event journals and correct a
+dashboard bug where policy-hidden `.env` files were incorrectly shown as
+deletions.
+
+The same collaboration produced the macOS APFS-clone + Seatbelt transaction
+path, the local supervisor bridge, the Control Plane UI, the public project
+site, the English documentation, benchmark tables and charts, release checks,
+and the Devpost submission text. I made the final scope decisions, ran the
+commands and manual tests, and kept destructive testing inside disposable
+fixtures and the Ubuntu VM.
+
+GPT-5.6 is a build-time tool here, not a hidden runtime dependency. RewindBPF
+does not call a model to make a safety decision and does not require a specific
+vendor. The shipped boundary can protect Codex, OpenHands, Claude, or any
+other command launched through the same operator-owned contract.
 
 **Primary Codex `/feedback` Session ID:** `019f6f87-53d3-7c11-be4d-6d07217d62ea`
 

@@ -310,12 +310,16 @@ with [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md).
 
 ## Codex and GPT-5.6
 
-This project was built and iterated in Codex with GPT-5.6 as a build-time
-implementation and review partner. Codex helped break the runtime into small
-modules, implement and debug the lifecycle, test failure paths, build the UI
-and site, and prepare the benchmark and VM gates. The shipped runtime does not
-depend on a specific model and can protect any command launched through the
-same boundary.
+This project was built and iterated in Codex with GPT-5.6 as a hands-on
+implementation and review partner. We used it to shape the product boundary,
+split the runtime into testable policy/filesystem/lifecycle/evidence modules,
+debug the ARM64 Ubuntu eBPF and OverlayFS path over SSH, build the macOS native
+transaction and Control Plane UI, inspect benchmark/event evidence, and refine
+the public documentation and release checks. It also helped identify and fix a
+dashboard false positive where a policy-hidden `.env` file looked like a
+deletion. The final scope, commands, manual tests, and acceptance decisions
+remained human-owned. GPT-5.6 is not a runtime dependency: RewindBPF remains
+model-agnostic and can protect any command launched through the same boundary.
 
 Primary Devpost `/feedback` Session ID:
 `019f6f87-53d3-7c11-be4d-6d07217d62ea`
