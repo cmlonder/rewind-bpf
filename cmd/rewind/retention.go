@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -46,15 +45,12 @@ func retentionGet(args []string) {
 	key := flags.String("key", "", "object key")
 	output := flags.String("output", "", "local output path")
 	token := flags.String("token", "", "optional bearer token")
+	digest := flags.String("sha256", "", "expected SHA-256 digest; restore is refused on mismatch")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 || strings.TrimSpace(*endpoint) == "" || strings.TrimSpace(*key) == "" || strings.TrimSpace(*output) == "" {
-		fatal("usage: rewind retention get --endpoint URL --key KEY --output PATH [--token TOKEN]")
+		fatal("usage: rewind retention get --endpoint URL --key KEY --output PATH [--token TOKEN --sha256 HEX]")
 	}
-	data, err := (retention.Client{Endpoint: *endpoint, Bearer: *token}).Get(context.Background(), *key)
-	if err != nil {
-		fatal(err.Error())
-	}
-	if err := os.WriteFile(filepath.Clean(*output), data, 0o600); err != nil {
-		fatal(fmt.Sprintf("retention get: write output: %v", err))
+	if err := (retention.Client{Endpoint: *endpoint, Bearer: *token}).GetFile(context.Background(), *key, filepath.Clean(*output), *digest); err != nil {
+		fatal(fmt.Sprintf("retention get: restore output: %v", err))
 	}
 	fmt.Printf("retention object downloaded: key=%s output=%s\n", *key, filepath.Clean(*output))
 }

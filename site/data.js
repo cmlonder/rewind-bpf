@@ -7,8 +7,8 @@ export const siteData = {
     ["Benchmarks", "#benchmarks"],
   ],
   status: {
-    label: "Linux verified / release-ready",
-    sublabel: "Disposable Ubuntu VM · ARM64 · kernel 6.8",
+    label: "Linux verified · macOS native staged lifecycle",
+    sublabel: "Ubuntu VM reference · EndpointSecurity/Windows helper gates",
   },
   metrics: [
     { value: "1 operation", label: "to discard a failed run" },
@@ -73,10 +73,10 @@ export const siteData = {
     { label: "04 / DECIDE", title: "Keep, review, commit, or rewind", body: "Status, events, verify, diff, export, and conflict-checked commit make the outcome inspectable before anything permanent changes.", icon: "↺" },
   ],
   roadmap: [
-    { phase: "NOW", title: "P0: safe transaction core", status: "Complete", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, and review export." },
-    { phase: "P1", title: "P1: Linux productisation", status: "Partial", body: "The proxy, fail-closed deny, and namespace broker backends, raw/packet socket refusal plus socket-deny evidence, atomic DNS/IPSet refresh with an opt-in lifecycle-bound scheduler, short-lived command and native keychain/Secret Service credential leases with an authenticated metadata endpoint, conflict-checked commit, authenticated supervisor, history retention, detachable local session leases, AES-256-GCM evidence envelopes, multi-key trust rotation, signed policy import, reconnecting browser event stream, text/full-fidelity patch exports, checksummed release metadata with local Ed25519 signing, clean-branch Git acceptance, and signed evidence hand-off are shipped. Long-running leak measurement, scoped secret injection, KMS/object-store restore, and distributed session coordination remain." },
-    { phase: "P2", title: "P2: native macOS adapter", status: "Prepared / manual gate", body: "Read-only APFS/Seatbelt/diskutil probes plus a Seatbelt process wrapper and native contract are shipped. EndpointSecurity signing, APFS disposable rollback, and destructive acceptance on disposable storage remain deliberately fail-closed." },
-    { phase: "P3", title: "P3: native Windows adapter", status: "Prepared / manual gate", body: "Cross-build, capability refusal, and a kill-on-close Job Object helper are ready. A signed minifilter, restricted-token launch, disposable VHDX workspace, and Windows VM acceptance are still required before host enforcement." },
+    { phase: "NOW", title: "P0: safe transaction core", status: "Complete · UTM gate passed", body: "Cgroup-v2 scope, start gate, Landlock reads, FUSE OverlayFS rollback, crash recovery, dropped-event evidence, hash-chain verification, diff, review export, final benchmarks, release checksums, namespace egress, and the jury demo are verified in a disposable Ubuntu VM." },
+    { phase: "P1", title: "P1: Linux productisation", status: "Complete", body: "Proxy, fail-closed deny, namespace/veth/IPSet/NAT enforcement, atomic DNS refresh, cgroup/network leak cleanup smoke, scoped one-shot credential consumption, authenticated supervisor mutation, conflict-checked acceptance, encrypted signed evidence, digest-pinned atomic remote restore, release signing, and connected Control Plane flows are shipped. KMS key lifecycle, provider IAM, per-agent profiles, and distributed sessions remain deployment/productisation work." },
+    { phase: "P2", title: "P2: native macOS adapter", status: "Lifecycle + crash smoke shipped", body: "APFS clone-backed staging, Seatbelt launch, sensitive-read hiding, review/diff/rollback/commit, conflict checks, manual E2E, and synthetic SIGKILL rollback are shipped and covered by disposable-fixture tests. EndpointSecurity telemetry, network/resource enforcement, signed helper entitlement, and crash/power-loss acceptance on disposable APFS storage remain fail-closed gates." },
+    { phase: "P3", title: "P3: native Windows adapter", status: "Code complete / manual gate", body: "Cross-build, capability refusal, configurable kill-on-close Job Object lifecycle, native contract, and signed-helper checksum/signature verification are shipped. A signed minifilter, restricted-token launch, disposable VHDX workspace, and Windows VM acceptance remain before host enforcement." },
     { phase: "P4", title: "P4: scale + ecosystem", status: "Partial", body: "Local history, authenticated supervisor, follow streams with reconnect, signed policy provenance, encrypted hand-off/fetch, multi-process leases, agent lifecycle identity, deterministic PII pre-read enforcement, checkpoint graph foundation, server-proxied trusted registry list/fetch/revoke, and supervisor-bound action-token UX are shipped. SDK-specific adapters, registry server durability/KMS, streaming PII coverage, and live multi-agent orchestration remain." },
   ],
   delivered: [

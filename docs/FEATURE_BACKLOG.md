@@ -1,7 +1,7 @@
 # RewindBPF Feature Backlog
 
 **Status:** canonical delivery ledger  
-**Last updated:** 2026-07-20  
+**Last updated:** 2026-07-21
 **Rule:** a feature is `shipped` only when its code path, unit tests, and (where privileged) disposable-VM evidence exist.
 
 This ledger is the source of truth for the question “is the feature backlog finished?” The public site and other plans summarize this file; they must not turn a contract, scaffold, or fixture into a production capability.
@@ -15,37 +15,37 @@ This ledger is the source of truth for the question “is the feature backlog fi
 | Process and resource scope | **Shipped / Linux** | cgroup-v2 scope, descendant drain gate, PID/memory/CPU limits, fail-closed cleanup | Windows Job Object and macOS native process scope |
 | eBPF evidence | **Shipped / Linux** | CO-RE trace sensor, start gate, sequence numbers, hash chain, dropped-event accounting, bounded cap, ordered rotation, standalone verifier | Kernel-side backpressure policy and remote signed evidence storage |
 | Crash and stale-run recovery | **Shipped / Linux** | Parent death, open descriptors, stale FUSE mount, child drain, idempotent rollback/recover | Power-loss/startup matrix across filesystems |
-| Network policy | **Partial / fail-closed** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs deny raw/packet sockets; explicit `deny` backend refuses non-proxy-aware egress; namespace backend resolves domains, moves a veth peer into the child namespace at the start gate, installs NAT/IPSet/iptables rules, supports atomic DNS/IPSet refresh, and can run an opt-in refresh loop with clean lifecycle shutdown; `rewind network plan` remains reviewable and injectable VM tests cover the command sequence | Long-running leak evidence remains operational hardening; privileged VM acceptance is passing |
-| Credential safety | **Partial / broker MVP** | Capability-only references, default refusal, opt-in command and native macOS Keychain/Linux Secret Service providers with short-lived one-shot leases, expiry/revoke, no secret in lease JSON/argv/workspace, and an authenticated supervisor `POST /v1/credential-leases` metadata endpoint | Scoped injection protocol and leakage tests against real providers |
+| Network policy | **Shipped / Linux P1** | Explicit loopback HTTP/HTTPS proxy backend; `audit` persists observations and `enforce` applies allow/deny decisions in the run evidence chain for proxy-aware clients; enforce runs deny raw/packet sockets; explicit `deny` backend refuses non-proxy-aware egress; namespace backend resolves domains, moves a veth peer into the child namespace at the start gate, installs NAT/IPSet/iptables rules, supports atomic DNS/IPSet refresh, and can run an opt-in refresh loop with clean lifecycle shutdown; `rewind network plan` remains reviewable and the long-running leak smoke proves cleanup | Future per-agent network profiles and remote policy orchestration |
+| Credential safety | **Shipped / Linux P1** | Capability-only references, default refusal, opt-in command and native macOS Keychain/Linux Secret Service providers with short-lived one-shot leases, expiry/revoke, no secret in lease JSON/argv/workspace, authenticated metadata endpoint, and callback-scoped one-shot consumption that clears the in-memory reader | Provider-specific secret-manager installation and future scoped network injection |
 | Explicit acceptance | **Shipped / Linux** | Review-only JSON export, text-file unified patch export, full-fidelity Git patch export, manifest conflict checks, and clean-branch `rewind branch apply`; `rewind commit --confirm`; supervisor commit requires confirmation | Remote review workflow and richer provider adapters |
 | Signed policy provenance | **Shipped / local trust** | Ed25519 keygen/sign/verify policy bundles, persisted envelope re-verification, signer key IDs, optional supervisor public-key allow-list enforcement, a fail-closed HTTPS registry client with retry, size bound, and pinned-key verification, plus an atomic file registry with list and marker-based revocation (`410 Gone`) | Organization trust distribution, KMS-backed registry durability, and revocation federation |
-| Local supervisor | **Shipped / Linux** | Permissioned Unix socket, token auth, health/capabilities/history, status/rollback/recover/commit, snapshot/follow events, redacted action audit, history pruning, and expiring acquire/heartbeat/takeover/release session leases; `--session-backend sqlite` selects the WAL-backed store | Runtime-enforced multi-operator policy and distributed session deployment |
+| Local supervisor | **Shipped / Linux + macOS native bridge** | Permissioned local socket/loopback HTTP, token auth, health/capabilities/history, status/rollback/recover/commit, native record snapshot/follow events, redacted action audit, history pruning, and expiring acquire/heartbeat/takeover/release session leases; `--session-backend sqlite` selects the WAL-backed store; native runs can persist to the same history index with `--history` | Windows native transaction actions, runtime-enforced multi-operator policy, and distributed session deployment |
 | Control Plane UI | **Shipped / fixture + authenticated bridge** | Responsive operational views, local policy/workspace config store, loopback HTTP supervisor bridge, bearer-authenticated rollback/recover/commit and policy/workspace writes, authenticated SSE evidence follow with reconnect backoff, signed policy bundle import, credential lease metadata flow, retention pruning, detachable session controls, one-time supervisor-bound action-token challenges with replay refusal, and trusted registry list/fetch/revoke proxy UX | Server-side organization-level action policy beyond bearer + challenge boundaries |
 | Public jury site | **Shipped** | Static modular single-page narrative, honest competitor matrix, roadmap, measured normalized benchmark ledger, storage/evidence/lifecycle callouts, and explicit local/S3 publish automation | External hosting credentials and post-hackathon content updates |
 | Linux release/bootstrap | **Shipped / signed locally** | VM bootstrap, release Make targets, cross-build checks, SHA256SUMS, release metadata, and detached Ed25519 signature/verification with optional pinned public key | Public registry trust, key rotation/revocation, and package repository |
-| macOS native backend | **Prepared / manual gate** | Read-only APFS/Seatbelt/diskutil prerequisite plan, platform CLI, fail-closed capability report, Seatbelt profile/command wrapper, and native contract; no destructive operation is enabled | EndpointSecurity telemetry, APFS disposable-volume rollback, signed helper, and destructive tests on disposable storage |
-| Windows native backend | **Prepared / manual gate** | Cross-build, fail-closed capability report, read-only PowerShell/fsutil prerequisite plan, Job Object/restricted-token contract, and kill-on-close Job Object helper; WSL2 remains compatibility mode | Signed filesystem minifilter, restricted-token launch integration, disposable VHDX workspace, and Windows VM tests |
+| macOS native backend | **Shipped / partial enforcement** | APFS clone-backed staged workspace, Seatbelt launcher, sensitive-read hiding from user-defined patterns/PII findings, review/diff/rollback/commit lifecycle, destination conflict checks, platform status/contract CLI, and signed-helper checksum/signature verification | EndpointSecurity telemetry, network/resource enforcement, signed helper entitlement, crash/power-loss acceptance, and destructive tests on disposable storage |
+| Windows native backend | **Code-complete / manual gate** | Cross-build, fail-closed capability report, read-only PowerShell/fsutil prerequisite plan, Job Object/restricted-token contract, configurable kill-on-close Job Object launcher with wait/cleanup lifecycle, and signed-helper checksum/signature verification | Signed filesystem minifilter/service, restricted-token launch integration, disposable VHDX workspace, and Windows VM tests |
 | Agent integrations | **Partial / lifecycle contract** | `--agent-adapter` validates and persists identity; adapter registry records executable aliases and `rewind/v1` prepare/start/exit hook contract; run IDs are injected into the child environment; `rewind agent list|contract` exposes the registry | SDK-specific launch semantics, callbacks, and provider tests |
-| Durable remote retention | **Partial / encrypted signed hand-off** | Bounded local history and keep-latest pruning, AES-256-GCM encrypted evidence envelopes, checksum-indexed archives, detached Ed25519 signatures, multi-key trust rotation, explicit HTTPS publish, and digest-pinned fetch/restore | Object-store durability, KMS-backed key lifecycle, and real-provider restore automation |
+| Durable remote retention | **Shipped / P1 transport** | Bounded local history and keep-latest pruning, AES-256-GCM encrypted evidence envelopes, checksum-indexed archives, detached Ed25519 signatures, multi-key trust rotation, explicit HTTPS/S3-compatible publish, bounded retries, digest-pinned fetch, and atomic retention restore | Production KMS/key lifecycle and provider-specific IAM remain deployment configuration |
 | Detachable/ghost sessions | **Partial / local + SQLite + remote protocol** | Expiring authenticated acquire/heartbeat/takeover/release owner leases, reconnectable event follow, redacted session audit, atomic cross-process lock file, bearer-authenticated remote lease client with bounded retries, and a WAL-backed SQLite store with expiry/ownership tests | Distributed deployment/consensus and operational migration tooling |
 | Content-aware PII protection | **Partial / bounded lifecycle coverage** | Deterministic bounded scanner detects common PII/token patterns; audit findings contain hashes only; `read.pii.mode: enforce` turns findings into exact Landlock denies before agent start; protected runs rescan newly-created files after exit; event paths and proxy hosts are redacted before evidence persistence; configurable regex rules, streaming limits, and no-leakage tests | Configurable classifiers beyond regex, VM leakage benchmark runs, and richer event-level finding metadata |
 | Multi-agent/checkpoint graph | **Partial / live lifecycle foundation** | Durable dependency graph with parent validation, deterministic state transitions, pending-child merge guard, descendant-first rollback, CLI transitions, and protected-run lifecycle wiring | Full multi-agent orchestration, durable remote graph store, and process-memory checkpoints |
 
 ## What this means before tests
 
-The **Linux demo and product-core feature set is complete enough to enter the verification phase**. The entire long-term backlog is not complete, and it cannot honestly be completed in the current test pass because the native macOS/Windows backends and remote integrations require separate disposable platform environments and product decisions.
+The **Linux demo and product-core feature set is complete enough to enter the verification phase**. The macOS native filesystem lifecycle is implemented and synthetic-fixture tested; its EndpointSecurity/network/resource helper gates remain. Windows is cross-buildable but still contract-only pending its signed helper and disposable VHDX acceptance. Remote integrations and classifier research remain separate product tracks.
 
-Before running the full regression suite, only these implementation items are still in the current Linux scope:
+After the final P0 gate, the remaining items are verification maintenance or explicitly staged productisation:
 
 1. Keep the documentation/site status synchronized with the shipped supervisor, commit path, proxy backend, event rotation, branch acceptance, evidence bundles, normalized benchmark ledger, and trust UX.
 2. Add and maintain contract tests for every `partial` or `unavailable` capability so unsupported paths fail closed.
-3. Run the disposable-VM acceptance matrix and `make benchmark-verify`; do not run privileged or destructive tests on the development Mac.
+3. Repeat the disposable-VM gate when runtime or kernel-facing code changes; do not run privileged or destructive tests on the development Mac.
 
 Everything else in the table is a deliberately staged post-demo/productisation item, not a hidden unfinished P0 feature.
 
 ## Verification evidence
 
-On 2026-07-20, the disposable Ubuntu 24.04 ARM64 VM passed
+On 2026-07-21, the disposable Ubuntu 24.04 ARM64 VM passed
 `REWIND_VM_CONFIRM=VM_ONLY make final-vm` after bootstrapping packages,
 rebuilding the Go binary
 and eBPF object. The gate covered:
@@ -56,7 +56,9 @@ and eBPF object. The gate covered:
 - proxy allow/deny for a local HTTP endpoint and `example.invalid`; and
 - strict deny/no-route namespace isolation plus real allow-listed namespace
   egress through a temporary veth/IPSet/NAT chain; and
-- bounded-event evidence marked incomplete and rejected by verification.
+- bounded-event evidence marked incomplete and rejected by verification;
+- the deterministic jury demo, release metadata, and cross-platform checksum
+  verification.
 
 The network case also persisted one `allow` and one `deny` `network_connect`
 event in the ordered hash-chained evidence stream. The same acceptance matrix
@@ -68,6 +70,11 @@ refused while Unix-domain socket creation remained available.
 The separate supervisor smoke also passed: the mode-`0600` Unix socket returned
 `401` without a bearer token, authenticated status and explicit commit succeeded,
 and the redacted action audit contained the commit record.
+
+The P1 lifecycle leak smoke also passed in the same VM: three repeated
+long-lived-child runs rolled back with no surviving cgroup scope, process,
+mounted merged view, veth, IPSet, or `REWIND_ALLOWLIST` iptables chain. The
+final-vm evidence directory contains `logs/p1-leak.log` and its checksum.
 
 The new content-aware gate also passed in the disposable Ubuntu 24.04 ARM64 VM
 on 2026-07-20. A synthetic file containing `alice@example.com` was denied by
@@ -84,25 +91,33 @@ checks also pass. Privileged OverlayFS/eBPF tests remain VM-only by design.
 
 Run unit, static, UI, and disposable-VM integration tests; verify rollback, read denial, process drain, evidence integrity, commit conflicts, supervisor auth, and proxy enforcement.
 
-### P1 — Linux productisation
+### P1 — Linux productisation (complete)
 
 The local fail-closed network boundary, signed evidence hand-off, release signing,
 authenticated supervisor, connected Control Plane mutation, isolated Linux network
-namespace backend with atomic and scheduled allowlist refresh, and opt-in command-provider credential lease endpoint are
-shipped. The remaining P1 gates are long-running namespace/cgroup leak tests, a real platform credential provider, and remote review/object storage with retention,
-encryption, and trust rotation.
+namespace backend with atomic and scheduled allowlist refresh, credential provider
+leases with scoped one-shot consumption, atomic digest-pinned remote restore, and
+the long-running cgroup/network leak smoke are shipped and tested. Production KMS
+key lifecycle, provider-specific IAM, per-agent network profiles, and distributed
+deployment remain configuration/productisation work rather than unfinished P1
+runtime code.
 
 ### P2 — Native macOS
 
-The read-only native prerequisite plan and capability CLI are prepared. The
-remaining gate is manual: validate Seatbelt/EndpointSecurity plus APFS
-clone/snapshot or disposable workspace on disposable storage, then wire the
-enforcing process adapter. Report a native capability matrix and refuse any
+The Go-side Seatbelt launcher, platform capability matrix, helper trust gate,
+and native contract are complete. The remaining gate is manual: validate
+Seatbelt/EndpointSecurity plus APFS clone/snapshot or disposable workspace on
+disposable storage, then install the signed helper and run the destructive
+acceptance matrix. Report a native capability matrix and refuse any
 unsupported promise.
 
 ### P3 — Native Windows
 
-Implement and test Windows-native process/filesystem policy and a disposable workspace. Keep WSL2 explicitly separate from Windows-host protection.
+The Go-side Job Object lifecycle, platform capability matrix, helper trust gate,
+and native contract are complete. The remaining gate is manual: install the
+signed minifilter/service, validate restricted-token launch and a disposable
+VHDX workspace, then run the Windows acceptance matrix. Keep WSL2 explicitly
+separate from Windows-host protection.
 
 ### P4 — Scale and ecosystem
 

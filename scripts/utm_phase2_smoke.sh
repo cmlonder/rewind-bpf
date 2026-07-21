@@ -18,7 +18,7 @@ printf '%s\n' \
   --checkpoint-id root \
   --on-success review \
   --overlay-backend fuse \
-  -- /bin/sh -c 'printf "github token ghp_abcdefghijklmnopqrstuvwxyz123456\n" > generated.env; rm -f marker.txt'
+  -- /bin/sh -c 'prefix="ghp_"; suffix="synthetic_1234567890abcdef"; printf "github token %s%s\n" "$prefix" "$suffix" > generated.env; rm -f marker.txt'
 
 /tmp/rewind status --record "$ROOT/runtime/record.json"
 /tmp/rewind checkpoint graph inspect --path "$ROOT/graph.json"

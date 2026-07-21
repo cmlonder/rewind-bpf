@@ -15,6 +15,13 @@ printf '%s\n' 'read:' '  mode: off' '' 'write:' '  mode: rollback' '  scope: wor
 GOTOOLCHAIN=local go test ./internal/agent ./internal/pii ./internal/platform ./internal/registry ./internal/session ./internal/runplan
 GOTOOLCHAIN=local go run ./cmd/rewind platform contract --platform darwin --workspace "$ROOT/workspace" | tee "$ROOT/native-contract.json"
 GOTOOLCHAIN=local go run ./cmd/rewind platform contract --platform windows --workspace "$ROOT/workspace" | tee "$ROOT/windows-contract.json"
+GOTOOLCHAIN=local go run ./cmd/rewind platform plan --workspace "$ROOT/workspace" | tee "$ROOT/macos-plan.json"
+grep -q '"filesystem":"apfs"' "$ROOT/macos-plan.json"
+grep -q '"enforcement_ready":false' "$ROOT/macos-plan.json"
+grep -q '"manual_gate_required":true' "$ROOT/macos-plan.json"
+GOTOOLCHAIN=local go run ./cmd/rewind platform status | tee "$ROOT/platform-status.json"
+grep -q '"code_complete":true' "$ROOT/platform-status.json"
+grep -q '"manual_gate_required":true' "$ROOT/platform-status.json"
 GOTOOLCHAIN=local go run ./cmd/rewind pii scan --path "$ROOT/workspace" --output "$ROOT/pii.json"
 test -s "$ROOT/pii.json"
 if GOTOOLCHAIN=local go run ./cmd/rewind run --workspace "$ROOT/workspace" --runtime-root "$ROOT/runtime" --policy "$ROOT/policy.yaml" --record "$ROOT/runtime/record.json" -- /bin/true 2>"$ROOT/linux-run.err"; then

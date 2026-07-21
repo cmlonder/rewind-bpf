@@ -166,7 +166,11 @@ export async function followEvents(baseUrl, token, runId, onEvent, signal) {
     headers: { Accept: "text/event-stream", Authorization: `Bearer ${token.trim()}` },
     signal,
   });
-  if (!response.ok) throw new Error(`supervisor returned HTTP ${response.status}`);
+  if (!response.ok) {
+    const error = new Error(`supervisor returned HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
   if (!response.body) throw new Error("supervisor event stream is unavailable");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

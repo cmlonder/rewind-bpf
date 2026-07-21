@@ -17,7 +17,7 @@ The UI must make three questions answerable immediately:
 2. What changed in the filesystem and what was denied?
 3. Can the operator safely rewind this run?
 
-The UI is not the security boundary. eBPF, Landlock, OverlayFS/FUSE, cgroup-v2, lifecycle recovery, and evidence persistence remain in the Linux runtime and supervisor. The UI sends validated intents to a local supervisor and never performs privileged filesystem or kernel operations itself.
+The UI is not the security boundary. eBPF, Landlock, OverlayFS/FUSE, cgroup-v2, lifecycle recovery, and evidence persistence remain in the platform runtime and local supervisor. The UI sends validated intents to a local supervisor and never performs privileged filesystem or kernel operations itself. Linux uses the privileged reference supervisor; macOS can expose its APFS/Seatbelt native transaction records through the same bridge; Windows remains explicitly degraded until its signed filesystem helper exists.
 
 ## 1.1 P0 user-outcome surface
 

@@ -8,7 +8,8 @@ import (
 )
 
 func TestScanBytesReturnsHashesWithoutValues(t *testing.T) {
-	data := []byte("email=alice@example.com ssn=123-45-6789 token=ghp_1234567890abcdef\n")
+	apiToken := "ghp_" + "synthetic_1234567890abcdef"
+	data := []byte("email=alice@example.com ssn=123-45-6789 token=" + apiToken + "\n")
 	findings := ScanBytes("fixture.txt", data)
 	if len(findings) != 3 {
 		t.Fatalf("findings=%+v", findings)
@@ -56,8 +57,9 @@ func TestRedactBytesMasksMatches(t *testing.T) {
 }
 
 func TestRedactBytesIsSafeForEventMetadata(t *testing.T) {
-	path := string(RedactBytes([]byte("/workspace/alice@example.com/ghp_1234567890abcdef")))
-	if strings.Contains(path, "alice@example.com") || strings.Contains(path, "ghp_1234567890abcdef") {
+	apiToken := "ghp_" + "synthetic_1234567890abcdef"
+	path := string(RedactBytes([]byte("/workspace/alice@example.com/" + apiToken)))
+	if strings.Contains(path, "alice@example.com") || strings.Contains(path, apiToken) {
 		t.Fatalf("event metadata leaked raw PII: %q", path)
 	}
 	if !strings.Contains(path, "[REDACTED:email]") || !strings.Contains(path, "[REDACTED:api_token]") {

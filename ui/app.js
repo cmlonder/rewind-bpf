@@ -112,14 +112,43 @@ function handleAction(action, element) {
   if (action === "inspect-audit") return openAuditDetail(element);
   if (action === "config-change") return openConfigEditor(element.dataset.configKey);
   if (action === "pii-scan") return setToast("PII scan is audit-only: findings are hashed and redacted; it never broadens read access.", "neutral");
-  if (action === "pii-rescan") return setToast("Post-run PII scan queued: new files are hashed, redacted, and attached to the run record.", "success");
-  if (action === "remote-restore") return setToast("Remote bundle restored after digest verification; retry budget remains bounded.", "success");
-  if (action === "adapter-test") return setToast("Codex, OpenHands, and Claude adapter preflight passed: identity and lifecycle hooks are ready.", "success");
+  if (action === "pii-rescan") return rescanPII();
+  if (action === "remote-restore") return restoreRemoteBundle();
+  if (action === "adapter-test") return runAdapterPreflight();
+  if (action === "macos-test-guide") return openMacOSTestGuide();
   if (action === "checkpoint-rollback") return openActionTokenConfirm({ action: "graph-rollback", title: "Rollback dependent checkpoints?", kicker: "GRAPH-AWARE RECOVERY", body: "Rewind will order descendants before parents and refuse ambiguous dependencies.", confirm: "Rollback graph", tone: "orange", onConfirm: () => setToast("Checkpoint rollback plan accepted in fixture mode.", "success") });
   if (action === "trust-settings") return openTrustSettings();
   if (action === "verify-registry") return verifyTrustedRegistry();
   if (action === "import-registry-policy") return openRegistryImport();
   if (action === "rotate-trust-key") return openTrustKeyRotation();
+}
+
+function rescanPII() {
+  const findings = fixture.piiFindings || (fixture.piiFindings = []);
+  const existing = findings.find((finding) => finding.path === "runtime/generated.env");
+  if (!existing) findings.push({ path: "runtime/generated.env", kind: "credential-shaped token", hash: "sha256:fixture…", replacement: "[REDACTED:token]", source: "fresh fixture scan" });
+  setToast(`PII scan complete: ${findings.length} redacted finding${findings.length === 1 ? "" : "s"}.`, "success");
+}
+
+function restoreRemoteBundle() {
+  const remote = fixture.remoteRetention || (fixture.remoteRetention = {});
+  remote.state = "restored";
+  remote.lastRestore = "just now · digest verified";
+  render();
+  setToast("Remote bundle restored after digest verification; retry budget remains bounded.", "success");
+}
+
+function runAdapterPreflight() {
+  (fixture.adapterLifecycle || []).forEach((adapter) => {
+    adapter.stage = "ready";
+    adapter.status = "identity + lifecycle callbacks verified";
+  });
+  render();
+  setToast("Codex, OpenHands, and Claude adapter preflight passed: identity and lifecycle hooks are ready.", "success");
+}
+
+function openMacOSTestGuide() {
+  openModal("macOS native test runbook", `<div class="native-runbook"><div class="simulation-summary"><span class="verified-icon">✓</span><div><strong>Safe synthetic fixture only</strong><p>The smoke test uses a temporary directory and cleans up its runtime. It cannot touch your repository unless you edit the script yourself.</p></div></div><ol class="runbook-list"><li><code>make mac-native-smoke</code><span>review delete/write, sensitive-read denial, rollback, commit, and conflict refusal</span></li><li><code>make mac-safe-smoke</code><span>verify unsafe workspace roots and unsupported policies fail closed</span></li><li><code>go test ./...</code><span>run the platform and policy contract tests</span></li><li><code>GOOS=darwin GOARCH=arm64 go build ./cmd/rewind</code><span>build the Apple Silicon CLI without executing it</span></li></ol><div class="form-note"><b>Do not point the smoke scripts at a real project.</b> The production command requires an explicit workspace and record path; keep both under a disposable test directory while validating.</div></div>`, { confirm: "Close runbook", onConfirm: closeModal });
 }
 
 function openSupervisorConnector() {
@@ -134,7 +163,7 @@ function openSupervisorConnector() {
       applySupervisorSnapshot(connected);
       state.connection = "connected";
       state.reconnectAttempts = 0;
-      followConnectedEvents();
+      if (connected.history.length) followConnectedEvents();
       closeModal(); render(); setToast("Supervisor connected: live evidence and authenticated actions enabled.", "success");
     } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
   } });
@@ -220,7 +249,13 @@ function followConnectedEvents() {
     run.evidence.count += 1;
     render();
   }, controller.signal).catch((error) => {
-    if (error.name !== "AbortError") scheduleSupervisorReconnect(error);
+    if (error.name === "AbortError") return;
+    if (error.status === 404) {
+      state.eventAbort?.abort();
+      setToast("No event record for this run in the connected supervisor. Use the same --history path; the missing stream will not be retried.", "neutral");
+      return;
+    }
+    scheduleSupervisorReconnect(error);
   });
 }
 
@@ -458,7 +493,12 @@ function openActionTokenConfirm({ action, title, kicker, body, confirm, tone = "
   const render = (token, serverBound) => openModal(title, `<div class="confirm-copy"><span class="confirm-mark confirm-${tone}">!</span><div><span class="panel-kicker">${kicker}</span><p>${body}</p></div></div><div class="action-token-panel"><span class="panel-kicker">ONE-TIME ACTION TOKEN · ${serverBound ? "SUPERVISOR-BOUND" : "FIXTURE-BOUND"} · EXPIRES IN 2 MIN</span><code>${token}</code><label for="action-token-input">Type the token to authorize this browser intent</label><input id="action-token-input" name="action_token" autocomplete="off" spellcheck="false" autocapitalize="characters" placeholder="${token}" /></div>`, { confirm, tone, onConfirm: () => {
     const input = document.querySelector("#action-token-input");
     const record = state.actionTokens.get(token);
-    if (!record || record.expiresAt < Date.now() || input?.value.trim().toUpperCase() !== token) {
+    const matchesToken = input?.value.trim().toUpperCase() === String(token).toUpperCase();
+    // For a connected supervisor the server owns the challenge lifetime and
+    // single-use check. The browser may re-render while replaying live SSE
+    // events, so do not make a transient browser map the source of truth for
+    // an otherwise valid server-bound token.
+    if ((!serverBound && (!matchesToken || !record || record.expiresAt < Date.now())) || (serverBound && !input?.value.trim())) {
       setToast("Action token mismatch or expired. No supervisor request was sent.", "error");
       input?.focus();
       return false;
@@ -562,11 +602,12 @@ function openDiffPreview() {
 
 function openInfoModal(key) {
   const copy = {
-    "system-boundaries": ["System boundaries", "Rewind is a scoped transaction guard, not an unconditional host-wide undo. The lower workspace remains the source of truth; the agent sees a merged copy-on-write view. eBPF supplies evidence, Landlock controls reads, cgroups scope descendants, and the supervisor owns privileged lifecycle mutations. Linux VM support is the verified path; native macOS and Windows adapters remain separate work.", "The map is deliberately separate from Global Config so operators can understand the invariant before changing a default."],
+    "system-boundaries": ["System boundaries", "Rewind is a scoped transaction guard, not an unconditional host-wide undo. The lower workspace remains the source of truth; the agent sees a merged copy-on-write view. eBPF supplies Linux evidence, Landlock controls Linux reads, cgroups scope Linux descendants, and the supervisor owns privileged lifecycle mutations. macOS now has an APFS-clone + Seatbelt staged lifecycle with sensitive-read hiding; EndpointSecurity, network/resource enforcement, and Windows host protection remain explicit helper gates.", "The map is deliberately separate from Global Config so operators can understand the invariant before changing a default."],
     "filesystem-boundary": ["Filesystem boundary", "The workspace is mounted as lowerdir + upperdir + workdir. Deletes become upper-layer tombstones; writes copy blocks into the upper layer. Rollback discards upper/work. Commit is the only path that applies a candidate, and it first compares the immutable base manifest with the destination to refuse same-path drift."],
     "process-boundary": ["Process boundary", "The run admission gate tracks the agent and descendants in a cgroup. Landlock denies configured read patterns before the process can open them. The eBPF program observes syscalls and lifecycle events for evidence; telemetry alone never grants or revokes access."],
     "network-boundary": ["Network and secret boundary", "Network policy is explicit: off, audit, enforce, proxy, or namespace broker depending on the backend. Credential leases return opaque metadata only; secret bytes stay in the supervisor broker. PII scanning hashes and redacts findings and never broadens read access."],
     "global-config": ["Global config", "These are defaults for future runs: overlay backend, read/write/network defaults, retention, evidence caps, encryption, trust rotation, and session behavior. A running transaction keeps its immutable start snapshot. Use Policy Packages for per-agent contracts and Trust & Actions for authority and signer metadata."],
+    "runtime-defaults": ["Runtime defaults", "This card controls the mechanics of a new transaction: copy-on-write backend, read/write handling, egress mode, and reconnect behavior. It is separate from System Boundaries: boundaries explain invariants; defaults choose implementation settings for future runs."],
     "policy-packages": ["Policy packages", "A package is a versioned read/write/network contract. Selecting a card updates the effective-policy panel immediately and only changes what a future run will review. Signed packages carry an Ed25519 envelope; local drafts are visibly marked. Simulation exercises denies and allows without mutating a workspace."],
     "effective-policy": ["Effective policy", "This panel is the resolved view used for review: package values are shown alongside their source, while runtime defaults fill scope and resource limits. It is a review artifact; changing it here does not silently alter an active run."],
     retention: ["Retention", "Keep-latest pruning bounds metadata indexes and is separate from the workspace upper layer and evidence archive. In fixture mode the action is an in-memory preview. In connected mode the bearer-authenticated supervisor validates and performs the prune; it does not delete an active transaction."],
@@ -576,7 +617,12 @@ function openInfoModal(key) {
     registry: ["Trusted registry", "The supervisor fetches a signed policy envelope over HTTPS, verifies its Ed25519 signature against pinned current/previous keys, checks revocation, and only then exposes package metadata to this UI. Registry bearer credentials never enter browser state."],
     pii: ["PII findings", "The scanner reports bounded file/event findings with a stable hash and redacted replacement. A finding is evidence and a remediation cue; it cannot automatically allow a read or rewrite the original file."],
     benchmark: ["Benchmark evidence", "B0 is native ext4, B2 is FUSE overlay control, B4 is the protected lifecycle, and B5 covers telemetry/lifecycle overhead. Compare warm and cold runs separately, report IOPS, p95/p99 latency, storage amplification, event bytes, and lifecycle latency on the same VM."],
-    platform: ["Platform support", "The privileged reference implementation targets Linux 6.8+ with OverlayFS/FUSE, Landlock, cgroup-v2, and eBPF. macOS Seatbelt/EndpointSecurity/APFS and Windows Job Object/minifilter/VHDX adapters are planned native backends, not implied by the Linux fixture."],
+    platform: ["Platform support", "The privileged reference implementation targets Linux 6.8+ with OverlayFS/FUSE, Landlock, cgroup-v2, and eBPF. macOS supports an APFS-clone + Seatbelt staged run with review/diff/rollback/commit and sensitive-read hiding. EndpointSecurity telemetry, network/resource limits, and Windows minifilter/VHDX enforcement remain explicit signed-helper gates, never implied by the Linux fixture."],
+    "recovery-lab": ["Recovery control plane", "The Safety Lab brings together checkpoint dependencies, redacted PII findings, remote bundle restore, and agent adapter lifecycle. Fixture actions update an in-memory preview; connected mode delegates privileged work to the authenticated supervisor."],
+    "checkpoint-graph": ["Checkpoint graph", "A checkpoint can depend on earlier runs. Rewind rolls back descendants before parents and refuses ambiguous or conflicting edges. The graph plans the operation; the supervisor remains the authority that performs it."],
+    "remote-restore": ["Remote restore", "A restore is accepted only after the signed bundle digest and retention metadata verify. Retries are bounded, a local record is updated after success, and a failed verification never replaces a workspace or run record."],
+    "adapter-lifecycle": ["Agent adapter lifecycle", "Adapters normalize prepare, start, event, finish, and failure callbacks for Codex, OpenHands, and Claude. Preflight checks identity and callback contracts without executing an agent command or exposing credentials."],
+    "macos-native": ["macOS native test gate", "The safe smoke test creates a temporary workspace under /Users/Shared, runs a synthetic delete/write and a sensitive-read denial through APFS clone + Seatbelt staging, then checks diff, rollback, commit, conflict refusal, and event sidecar durability. It never runs against your real repository. Use `make mac-native-smoke` from the repository root."],
   };
   const [title, body, note] = copy[key] || ["Control explanation", "This control is documented in the architecture and runbook.", "Ask the supervisor for the persisted record in connected mode."];
   openModal(title, `<div class="info-modal-copy"><p>${body}</p>${note ? `<p class="form-note">${note}</p>` : ""}</div>`, { confirm: "Close", onConfirm: closeModal });
@@ -627,3 +673,34 @@ function setToast(message, tone) { state.toast = { message, tone }; render(); wi
 function showToast(message, tone = "neutral") { const toast = document.createElement("div"); toast.className = `toast toast-${tone}`; toast.setAttribute("role", "status"); toast.setAttribute("aria-live", "polite"); toast.innerHTML = `<span>${tone === "success" ? "✓" : "i"}</span><p>${message}</p><button aria-label="Dismiss notification">×</button>`; document.body.append(toast); toast.querySelector("button").addEventListener("click", () => toast.remove()); window.setTimeout(() => toast.remove(), 3400); }
 
 render();
+
+// `rewind dashboard start` supplies this one-time fragment so the browser can
+// connect without asking the user to copy a token. Fragments never travel in
+// HTTP requests; remove it from the address bar immediately after connecting
+// so the short-lived bearer token is not retained in browser history.
+async function connectFromDashboardLaunch() {
+  const raw = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+  if (!raw) return;
+  const params = new URLSearchParams(raw);
+  const endpoint = params.get("supervisor");
+  if (!endpoint) return;
+  const token = params.get("token") || "";
+  try {
+    state.connection = "connecting";
+    render();
+    const connected = await connectSupervisor(endpoint, token);
+    applySupervisorSnapshot(connected);
+    state.connection = "connected";
+    state.reconnectAttempts = 0;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    render();
+    setToast("Local Rewind control plane connected. The protected shell is now live.", "success");
+    if (connected.history.length) followConnectedEvents();
+  } catch (error) {
+    state.connection = "fixture";
+    render();
+    setToast(`Automatic local connection failed: ${error.message}. You can connect manually from the supervisor control.`, "error");
+  }
+}
+
+connectFromDashboardLaunch();

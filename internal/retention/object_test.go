@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -44,5 +46,31 @@ func TestObjectClientRejectsExternalHTTP(t *testing.T) {
 	client := Client{Endpoint: "http://example.test"}
 	if err := client.Put(context.Background(), "x", []byte(strings.Repeat("a", 1))); err == nil {
 		t.Fatal("expected HTTPS refusal")
+	}
+}
+
+func TestObjectClientRestoresAtomicallyWithExpectedDigest(t *testing.T) {
+	data := []byte("signed evidence archive")
+	digest := sha256.Sum256(data)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Rewind-Object-SHA256", hex.EncodeToString(digest[:]))
+		_, _ = w.Write(data)
+	}))
+	defer server.Close()
+	directory := t.TempDir()
+	output := filepath.Join(directory, "restore.tar.gz")
+	client := Client{Endpoint: server.URL}
+	if err := client.GetFile(context.Background(), "runs/demo", output, hex.EncodeToString(digest[:])); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(output)
+	if err != nil || string(got) != string(data) {
+		t.Fatalf("restored=%q err=%v", got, err)
+	}
+	if err := client.GetFile(context.Background(), "runs/demo", output, strings.Repeat("0", 64)); err == nil {
+		t.Fatal("expected digest refusal")
+	}
+	if got, _ := os.ReadFile(output); string(got) != string(data) {
+		t.Fatalf("digest failure replaced existing output: %q", got)
 	}
 }

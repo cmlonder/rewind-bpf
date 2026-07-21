@@ -2,7 +2,7 @@ BIN_DIR := bin
 BIN := $(BIN_DIR)/rewind
 EVIDENCE_BIN := $(BIN_DIR)/rewind-evidence
 
-.PHONY: build test fmt clean release release-manifest release-sign release-bundle publish-site benchmark-verify bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm mac-safe-smoke jury-demo-vm final-vm
+.PHONY: build test fmt clean release release-manifest release-sign release-bundle release-preflight hackathon-preflight public-audit publish-site benchmark-verify evidence-bundle ui-smoke site-smoke dashboard-smoke bootstrap acceptance-vm supervisor-smoke-vm policy-bundle-smoke-vm p1-leak-smoke-vm mac-safe-smoke mac-native-smoke mac-crash-smoke platform-status jury-demo-vm final-vm
 
 build:
 	mkdir -p $(BIN_DIR)
@@ -35,6 +35,15 @@ release-sign: release-manifest
 release-bundle: release-manifest
 	./scripts/release_bundle.sh $(BIN_DIR)
 
+release-preflight:
+	./scripts/release_preflight.sh
+
+hackathon-preflight:
+	./scripts/hackathon_preflight.sh
+
+public-audit:
+	./scripts/public_repo_audit.sh
+
 publish-site:
 	./scripts/publish_site.sh site
 
@@ -42,6 +51,18 @@ benchmark-verify:
 	python3 benchmarks/normalize_results.py
 	python3 benchmarks/plot_results.py
 	./scripts/benchmark_verify.sh benchmarks
+
+evidence-bundle:
+	./scripts/final_evidence_bundle.sh
+
+ui-smoke:
+	./scripts/ui_smoke.sh
+
+dashboard-smoke:
+	./scripts/dashboard_smoke.sh
+
+site-smoke:
+	./scripts/site_smoke.sh
 
 bootstrap:
 	./scripts/bootstrap_vm.sh
@@ -55,8 +76,20 @@ supervisor-smoke-vm:
 policy-bundle-smoke-vm:
 	./scripts/policy_bundle_smoke_vm.sh
 
+p1-leak-smoke-vm:
+	REWIND_VM_CONFIRM=VM_ONLY ./scripts/p1_leak_smoke_vm.sh
+
 mac-safe-smoke:
 	./scripts/mac_safe_smoke.sh
+
+mac-native-smoke:
+	./scripts/mac_native_smoke.sh
+
+mac-crash-smoke:
+	./scripts/macos_crash_smoke.sh
+
+platform-status:
+	go run ./cmd/rewind platform status
 
 jury-demo-vm:
 	./scripts/jury_demo_vm.sh

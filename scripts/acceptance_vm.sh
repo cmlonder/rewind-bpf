@@ -180,8 +180,12 @@ mkdir -p "$ROOT/network-deny/workspace"
 make_policy "$ROOT/network-deny/policy.yaml" off enforce
 sudo env PATH="$PATH" "$BIN" run $(run_args "$ROOT/network-deny/workspace" "$ROOT/network-deny/runtime" "$ROOT/network-deny/policy.yaml" "$ROOT/network-deny/runtime/record.json") --network-backend deny --on-success review -- \
   /bin/sh -c '/usr/bin/python3 -c "import socket; socket.socket(socket.AF_INET, socket.SOCK_STREAM)" && printf "internet-allowed\\n" > net.status || printf "internet-denied\\n" > net.status; /usr/bin/python3 -c "import socket; socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)" && printf "unix-allowed\\n" >> net.status'
-grep -qx 'internet-denied' "$ROOT/network-deny/runtime/merged/net.status"
-grep -qx 'unix-allowed' <(sed -n '2p' "$ROOT/network-deny/runtime/merged/net.status")
+NETWORK_DENY_STATUS="$ROOT/network-deny/runtime/merged/net.status"
+test -s "$NETWORK_DENY_STATUS"
+echo "network-deny status:"
+cat "$NETWORK_DENY_STATUS"
+test "$(sed -n '1p' "$NETWORK_DENY_STATUS")" = internet-denied
+test "$(sed -n '2p' "$NETWORK_DENY_STATUS")" = unix-allowed
 sudo "$BIN" rollback --record "$ROOT/network-deny/runtime/record.json"
 # The strict deny backend is enforced by seccomp before the syscall reaches
 # the telemetry hook; the process outcome is the authoritative evidence here.

@@ -1,6 +1,6 @@
 # RewindBPF Product Strategy
 
-> **Delivery status:** the Linux transaction/product-core slice is implemented and entering disposable-VM verification. The complete multi-platform/productisation backlog is not finished; see [`FEATURE_BACKLOG.md`](FEATURE_BACKLOG.md) for the canonical shipped/partial/not-implemented matrix.
+> **Delivery status:** the Linux transaction/product-core slice and P1 acceptance gates are complete in the disposable Ubuntu VM. Native helper and distributed productisation tracks remain explicitly staged; see [`FEATURE_BACKLOG.md`](FEATURE_BACKLOG.md) for the canonical matrix.
 
 **Status:** adopted after the nono comparison review  
 **Decision:** focus on destructive-change safety and sensitive-data safety before pursuing broad sandbox parity
@@ -27,7 +27,7 @@ Default outcome: **discard**, not “remember to rollback.”
 
 Sensitive files are not merely blocked after an attempted read; the preferred experience is that they are absent from the agent’s view. User-defined patterns cover `.env`, SSH keys, cloud credentials, certificates, PII directories, and organization-specific paths.
 
-When an agent genuinely needs external access, a future credential broker supplies a short-lived, scoped capability without placing the raw secret in the workspace or process environment.
+When an agent genuinely needs external access, the opt-in credential broker supplies a short-lived, scoped capability without placing the raw secret in the workspace, argv, or process environment. Provider-specific KMS/IAM wiring remains deployment configuration.
 
 ### 2.3 Explicit acceptance
 
@@ -104,23 +104,30 @@ Implement patch/branch export and conflict-checked apply. Acceptance must compar
 ### Track D — Native platform adapters
 
 The cross-platform implementation is capability-driven and fail-closed. The
-shared policy, manifest, evidence, and acceptance schemas are portable; the
-transaction backend is not assumed portable. macOS uses a planned
-Seatbelt/EndpointSecurity + APFS adapter, while Windows uses a planned native
-process/filesystem policy + disposable-workspace adapter. WSL2 is explicitly a
-compatibility path, not Windows-host protection.
+shared policy, manifest, evidence, acceptance schemas, platform status matrix,
+and signed-helper trust gate are portable; the transaction backend is not
+assumed portable. macOS now has an APFS clone + Seatbelt staged filesystem
+lifecycle behind the same transaction contract; EndpointSecurity telemetry,
+network/resource enforcement, and its signed helper gate remain. Windows has a
+code-complete Job Object lifecycle contract behind the signed minifilter/VHDX
+helper gate.
+WSL2 is explicitly a compatibility path, not Windows-host protection.
 
 Preserve one user-facing contract while using native primitives per platform:
 
 - Linux: OverlayFS/FUSE + Landlock/eBPF + cgroup-v2.
-- macOS: Seatbelt/EndpointSecurity policy adapter plus APFS clone/snapshot or disposable workspace backend.
+- macOS: Seatbelt + APFS clone/disposable workspace backend; EndpointSecurity
+  telemetry and network/resource helper enforcement remain gated.
 - Windows: native process/filesystem policy adapter plus a disposable workspace backend; WSL2 remains a compatibility path, not host protection.
 
-Native adapters are not allowed to silently downgrade the four promises. Each run must display its capability matrix and refuse unsupported enforce modes.
+Native adapters are not allowed to silently downgrade the four promises. Each
+run must display its capability matrix and refuse unsupported enforce modes.
+`rewind platform status` makes the distinction explicit between code-complete,
+helper-verified, enforcement-ready, and manual-gate states.
 
 ### Track E — Durable history and supervisor UX
 
-The current slice includes bounded history, signed policy provenance, a token-authenticated supervisor API with status/rollback/recover/commit actions, follow-mode event streaming, redacted action audit, and a browser adapter. Remaining work is detachable sessions and registry/provenance distribution.
+The current slice includes bounded history, signed policy provenance, a token-authenticated supervisor API with status/rollback/recover/commit actions, follow-mode event streaming, redacted action audit, reconnectable local/SQLite/remote lease contracts, and a browser adapter. Distributed deployment and organization-scale registry/provenance distribution remain post-hackathon.
 
 ## 7. Platform roadmap
 
@@ -134,7 +141,12 @@ Ship `rewindd`, persistent policy/workspace state, network enforcement, credenti
 
 ### Phase P2 — macOS native
 
-Implement a macOS backend behind the same transaction/policy/evidence interfaces. Validate project immutability, secret absence/denial, explicit acceptance, and fail-closed recovery with synthetic fixtures. Do not claim Linux-equivalent kernel telemetry; report the native capability matrix.
+The APFS clone + Seatbelt transaction, sensitive-read hiding, review/diff/
+rollback/commit lifecycle, and destination conflict checks are implemented and
+covered by `make mac-native-smoke`. The remaining work is the signed
+EndpointSecurity helper, network/resource enforcement, crash/power-loss
+acceptance on disposable storage, and native evidence parity. Do not claim
+Linux-equivalent kernel telemetry; report the native capability matrix.
 
 ### Phase P3 — Windows native
 

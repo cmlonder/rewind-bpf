@@ -69,6 +69,32 @@ type managedLease struct {
 	expires time.Time
 }
 
+type leaseReader struct {
+	data []byte
+	off  int
+}
+
+func (r *leaseReader) Read(p []byte) (int, error) {
+	if r == nil || len(r.data) == 0 || r.off >= len(r.data) {
+		return 0, io.EOF
+	}
+	n := copy(p, r.data[r.off:])
+	r.off += n
+	return n, nil
+}
+
+func (r *leaseReader) Close() error {
+	if r == nil {
+		return nil
+	}
+	for i := range r.data {
+		r.data[i] = 0
+	}
+	r.data = nil
+	r.off = 0
+	return nil
+}
+
 // ManagedBroker adds short-lived, one-shot handles around a Provider. Open is
 // intentionally an explicit runtime-only operation; callers must decide how a
 // secret is used without placing it in an agent environment or workspace.
@@ -134,7 +160,7 @@ func (b *ManagedBroker) Open(id string) (io.ReadCloser, error) {
 	if !ok || !now().Before(lease.expires) {
 		return nil, fmt.Errorf("credential lease is expired or revoked")
 	}
-	return io.NopCloser(bytes.NewReader(lease.secret)), nil
+	return &leaseReader{data: lease.secret}, nil
 }
 
 func (b *ManagedBroker) Revoke(id string) {

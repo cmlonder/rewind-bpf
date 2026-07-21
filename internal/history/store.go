@@ -13,7 +13,10 @@ import (
 )
 
 type Entry struct {
-	RunID      string    `json:"run_id"`
+	RunID string `json:"run_id"`
+	// Backend identifies the record contract used by the local control plane.
+	// Empty is retained for legacy Linux records and is interpreted as linux.
+	Backend    string    `json:"backend,omitempty"`
 	State      string    `json:"state"`
 	Workspace  string    `json:"workspace"`
 	RecordPath string    `json:"record_path"`

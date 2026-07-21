@@ -590,7 +590,31 @@ func (s Server) events(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if recordPath == "" {
-		writeJSON(w, http.StatusNotFound, Response{OK: false, Message: "run not found in history"})
+		writeJSON(w, http.StatusNotFound, Response{OK: false, Message: "run not found in supervisor history; start it with the same --history path"})
+		return
+	}
+	if native, ok, detectErr := platform.NativeRecordForSupervisor(recordPath, runID); detectErr != nil {
+		writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: detectErr.Error()})
+		return
+	} else if ok {
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("X-Accel-Buffering", "no")
+		flusher, flushOK := w.(http.Flusher)
+		if !flushOK {
+			writeJSON(w, http.StatusInternalServerError, Response{OK: false, Message: "streaming is unavailable"})
+			return
+		}
+		follow, err := parseFollow(r.URL.Query().Get("follow"))
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, Response{OK: false, Message: err.Error()})
+			return
+		}
+		if !follow {
+			streamNativeEventSnapshot(w, flusher, native)
+			return
+		}
+		streamNativeEventFollow(r.Context(), w, flusher, recordPath, native)
 		return
 	}
 	record, err := runstore.Read(recordPath)
@@ -645,6 +669,89 @@ func streamEventSnapshot(w http.ResponseWriter, flusher http.Flusher, record run
 			flusher.Flush()
 		}
 		_ = file.Close()
+	}
+}
+
+func streamNativeEventSnapshot(w http.ResponseWriter, flusher http.Flusher, record platform.NativeRecord) {
+	position := int64(0)
+	streamNativeEventDelta(w, flusher, record.EventsPath, &position)
+}
+
+func streamNativeEventFollow(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, recordPath string, record platform.NativeRecord) {
+	position := int64(0)
+	deadline := time.NewTimer(30 * time.Second)
+	defer deadline.Stop()
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		current := record
+		if refreshed, err := platform.ReadNativeRecord(recordPath); err == nil {
+			current = refreshed
+		}
+		wrote := streamNativeEventDelta(w, flusher, current.EventsPath, &position)
+		if nativeRecordTerminal(current.State) {
+			return
+		}
+		if wrote {
+			if !deadline.Stop() {
+				select {
+				case <-deadline.C:
+				default:
+				}
+			}
+			deadline.Reset(30 * time.Second)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-deadline.C:
+			return
+		case <-ticker.C:
+		}
+	}
+}
+
+func streamNativeEventDelta(w http.ResponseWriter, flusher http.Flusher, path string, position *int64) bool {
+	if path == "" {
+		return false
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	if _, err := file.Seek(*position, io.SeekStart); err != nil {
+		return false
+	}
+	data, err := io.ReadAll(file)
+	if err != nil {
+		return false
+	}
+	lastNewline := strings.LastIndexByte(string(data), '\n')
+	if lastNewline < 0 {
+		return false
+	}
+	complete := string(data[:lastNewline+1])
+	wrote := false
+	for _, raw := range strings.Split(complete, "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" || !json.Valid([]byte(line)) {
+			continue
+		}
+		_, _ = fmt.Fprintf(w, "data: %s\n\n", line)
+		flusher.Flush()
+		wrote = true
+	}
+	*position += int64(lastNewline + 1)
+	return wrote
+}
+
+func nativeRecordTerminal(state string) bool {
+	switch state {
+	case "succeeded", "failed", "discarded", "committed", "rolled_back":
+		return true
+	default:
+		return false
 	}
 }
 

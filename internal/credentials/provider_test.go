@@ -34,6 +34,27 @@ func TestCommandProviderManagedLeaseIsOneShot(t *testing.T) {
 	}
 }
 
+func TestManagedBrokerUseIsScopedAndOneShot(t *testing.T) {
+	broker := &ManagedBroker{Provider: CommandProvider{Path: "/bin/sh", Args: []string{"-c", "printf scoped-token"}}, TTL: time.Minute}
+	lease, err := broker.Issue(Request{Ref: "service"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got strings.Builder
+	if err := broker.Use(lease.ID, func(reader io.Reader) error {
+		_, copyErr := io.Copy(&got, reader)
+		return copyErr
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got.String() != "scoped-token" {
+		t.Fatalf("secret=%q", got.String())
+	}
+	if err := broker.Use(lease.ID, func(io.Reader) error { return nil }); err == nil {
+		t.Fatal("lease was reusable")
+	}
+}
+
 func TestManagedBrokerExpiresAndRevokes(t *testing.T) {
 	clock := time.Date(2026, 7, 20, 12, 0, 0, 0, time.UTC)
 	broker := &ManagedBroker{Provider: CommandProvider{Path: "/bin/sh", Args: []string{"-c", "printf token"}}, TTL: time.Second, Now: func() time.Time { return clock }}

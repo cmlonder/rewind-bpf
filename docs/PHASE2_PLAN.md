@@ -1,8 +1,8 @@
 # RewindBPF Phase 2 Plan
 
-**Status:** Linux implementation complete; disposable-VM verification gate next
+**Status:** P0 final VM gate complete; macOS safe/native/crash smokes complete; Windows privileged-helper acceptance remains platform-specific
 **Owner:** RewindBPF team
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-21
 **Decision horizon:** Hackathon demo in six days, followed by a 90-day productisation track
 
 ## 1. Executive decision
@@ -28,7 +28,7 @@ P0 is now organized by user outcome, with a runtime workstream and a matching Co
 | Explicit acceptance | Review export first; `rewind commit --confirm` applies only after destination manifest checks pass | Show the conflict gate, commit confirmation, and export/discard paths | Destination drift must refuse apply |
 | Fail-closed trust | Cleanup, process drain, mount state, event drops, truncation, and unsupported backends become explicit failure states | Evidence health, degraded backend banner, recovery progress, and actionable error states | Fault-injection matrix and incomplete-evidence verification |
 
-P0 scope excludes durable snapshot history, detachable sessions, registry features, local authentication, native macOS/Windows enforcement, and real credential providers. Those are post-demo/productisation work unless required by a connected deployment boundary.
+P0 scope excludes durable snapshot history, detachable sessions, registry features, local authentication, and privileged native helper acceptance. The macOS APFS-clone + Seatbelt staged lifecycle is now implemented and synthetic-fixture tested; EndpointSecurity/network/resource enforcement and minifilter/VHDX acceptance remain platform-specific manual work.
 
 ### P1 implementation boundary
 
@@ -39,6 +39,10 @@ The first product-core slice adds three explicit, portable contracts:
 - `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before `rewind commit --confirm` applies regular-file and directory changes.
 
 The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This keeps the demo honest while preserving the API shape for native backends.
+
+#### P1 completion (2026-07-21)
+
+P1 Linux productisation is complete for the runtime boundary. The namespace broker now has a repeatable three-iteration leak smoke that verifies cgroup drain, mount cleanup, owned veth/ipset/iptables cleanup, and no surviving run processes. Credential leases expose a callback-scoped one-shot consumer that clears the reader on close instead of requiring environment or file injection. S3-compatible retention now supports bounded retries, response/expected digest pinning, and atomic restore into a protected temporary file before rename. The existing encrypted envelope, detached signatures, pinned-key rotation, and supervisor/Control Plane paths remain part of the same evidence flow. KMS/IAM setup, distributed deployment, and per-agent policy profiles are explicit deployment tracks, not hidden runtime gaps.
 
 ### P4 implementation boundary
 
@@ -69,14 +73,25 @@ This is deliberately narrower than “protect the whole operating system” or �
 1. The record and event log are now restored to the invoking user after `sudo`; the privileged FUSE mount still requires `sudo` for unmount/rollback.
 2. Cgroup-v2 is now the primary process identity and drain boundary; PID descendant tracking remains in the eBPF sensor for event correlation and compatibility.
 3. The event stream is JSONL and can grow much faster than the run record; kernel-side reserve failures are now counted and make evidence incomplete. A bounded `REWIND_EVENT_MAX_BYTES` cap marks userspace truncation explicitly, while `REWIND_EVENT_ROTATE_BYTES` rotates the stream into ordered files without resetting the hash chain. The read-only evidence verifier checks the combined digest and chain; backpressure remains future work.
-4. Rollback is strong for the mounted filesystem transaction, but crash recovery and open-file-descriptor semantics need explicit tests.
+4. macOS synthetic `SIGKILL` rollback is covered by `make mac-crash-smoke`; Linux startup/open-descriptor/power-loss recovery remains a disposable-VM acceptance gate.
 5. Conflict-aware `commit --confirm` is now implemented for regular files/directories. It refuses incomplete evidence, destination drift, unsafe paths, and symlink/other entries; JSON export, text-file unified patches, and full-fidelity Git patches are review artifacts, while `rewind branch apply` adds a clean-checkout, Git-preflighted branch adapter with explicit optional commit.
 6. Kernel OverlayFS and FUSE OverlayFS have different capabilities and performance. Backend selection is explicit, but the capability report and compatibility matrix are not yet productised.
 7. Network policy now has an explicit loopback proxy backend for HTTP/CONNECT proxy-aware clients, a strict seccomp deny backend, and a Linux network-namespace broker. Enforced proxy runs deny AF_PACKET and raw AF_INET/AF_INET6 socket creation through seccomp; namespace runs resolve configured domains and DNS resolvers, move a veth peer into the child namespace at the start gate, enforce an IPSet-backed destination allowlist with NAT/default reject, atomically refresh DNS-derived destinations through an IPSet swap, and optionally repeat that refresh for the lifetime of the run with deterministic shutdown. The privileged veth/iptables path has passing disposable-VM acceptance evidence; long-running leak measurement remains operational hardening.
 
 ### Phase 2 implementation progress
 
-The first P0 slice is now implemented and verified in the disposable VM:
+#### P0 final gate result (2026-07-21)
+
+The disposable Ubuntu 24.04 ARM64 UTM VM completed `REWIND_VM_CONFIRM=VM_ONLY make final-vm` successfully. The evidence directory and compressed archive contain the logs, normalized benchmark data, release metadata, and checksums. The gate covered:
+
+- Cross-built Linux amd64/arm64, macOS arm64, and Windows amd64 binaries, CO-RE eBPF object, example policy, release metadata, and SHA-256 verification.
+- B0/B2/B4/B5 benchmark normalization, chart generation, and ledger verification.
+- Rollback/read denial, review/commit, clean branch, destination-drift conflict refusal, proxy allow/deny, raw socket enforcement and audit semantics, strict non-proxy deny, isolated namespace egress, allow-listed veth/IPSet/NAT egress, and incomplete-evidence refusal.
+- Jury demo: destructive `src/` removal stayed in the transaction layer, the synthetic sensitive read was denied, and rollback restored the original workspace.
+
+The final VM gate is now the authoritative privileged Linux acceptance command; the local Mac remains limited to safe/native fixture tests.
+
+The P0 implementation is now complete and verified in the disposable VM:
 
 - `mounted` lifecycle state plus prepared run journal before mount/agent start.
 - Idempotent `rollback` and explicit `recover` for stale records.
@@ -87,7 +102,7 @@ The first P0 slice is now implemented and verified in the disposable VM:
 - Event count, byte count, SHA-256 digest, kernel-side dropped-event count, sequence numbers, a userspace hash chain, and complete/truncated JSONL evidence flag.
 - Read-only `diff --record` manifest comparison for a live merged view.
 
-The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. An open-descriptor crash smoke wrote through fd 9 in the merged layer, was forcibly terminated, and recovered with the lower marker unchanged. A VM-only small-ring stress test intentionally dropped 37 events from 50,000 writes; the run record remained `dropped=37`, `complete=false` after rollback, and `rewind verify` exited 2. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. The review-only `rewind export`, `policy learn`, optional cgroup resource-limit workflow, independent evidence verifier, ordered JSONL rotation, network proxy path, conflict-checked commit, and authenticated supervisor actions are implemented. Remaining Linux work is verification and broader filesystem/power-loss coverage; explicit backpressure, native platform backends, and remote productisation remain staged work.
+The VM smoke recorded 77 events (14,428 bytes) for a short synthetic command with `dropped=0`, and rollback preserved the lower-layer marker. A follow-up synthetic destructive run recorded 39 events (7,334 bytes), `dropped=0`, and rolled back successfully. A background `sleep` child was then detected by the cgroup drain gate; the run failed closed, rolled back, and left no child process or cgroup behind. Finally, a `SIGKILL` parent crash left a `running` record; `rewind recover` accepted the already-torn-down FUSE mount, killed/drained the scope, discarded upper/work, and restored the lower marker. An open-descriptor crash smoke wrote through fd 9 in the merged layer, was forcibly terminated, and recovered with the lower marker unchanged. A VM-only small-ring stress test intentionally dropped 37 events from 50,000 writes; the run record remained `dropped=37`, `complete=false` after rollback, and `rewind verify` exited 2. P0 now includes sequence/hash-chain evidence in addition to kernel drop accounting. The review-only `rewind export`, `policy learn`, optional cgroup resource-limit workflow, independent evidence verifier, ordered JSONL rotation, network proxy path, conflict-checked commit, authenticated supervisor actions, final benchmark ledger, release bundle, and deterministic jury demo are implemented. Broader filesystem/power-loss coverage, explicit backpressure, native privileged helpers, and remote productisation remain staged work rather than hidden P0 blockers.
 
 ## 3. Research and competitive findings
 
@@ -343,7 +358,7 @@ flowchart LR
 
 - Expand the shipped supervisor with distributed detachable sessions and authenticated run handles suitable for CI; local leases, history pruning, and action audit are already available.
 - Add CI mode: every agent task runs in a disposable workspace; output is a patch/artifact rather than an implicit host merge.
-- Add remote/object-store evidence bundles, KMS-backed retention policies, and public release trust distribution. Local AES-256-GCM envelopes, checksum-indexed archives, detached release signatures, multi-key trust rotation, and explicit HTTPS publish are shipped; provider-backed key lifecycle and restore automation remain.
+- Add remote/object-store evidence bundles, KMS-backed retention policies, and public release trust distribution. Local AES-256-GCM envelopes, checksum-indexed archives, detached release signatures, multi-key trust rotation, explicit HTTPS publish, bounded retries, digest-pinned fetch, and atomic restore are shipped; provider-backed key lifecycle and IAM remain deployment configuration.
 - Add network namespace/proxy policy as a separate plane; make credentials injectable without placing raw secrets in the agent filesystem.
 - Evaluate seccomp filters for syscall-surface reduction. Use seccomp user notification only for narrow, reviewable operations; the kernel documentation warns about notification TOCTOU and blocking semantics, so it is not a default file-write interceptor. See the [kernel seccomp documentation](https://docs.kernel.org/userspace-api/seccomp_filter.html).
 
@@ -376,6 +391,19 @@ not the same as claiming all six are production-ready. The remaining gates are
 privileged VM egress, signed native helpers and disposable platform volumes,
 provider SDK callback tests, distributed deployment, a registry service/KMS,
 and measured VM leakage benchmarks.
+
+### Local release/evidence pass (2026-07-21)
+
+- `make mac-crash-smoke` now kills a synthetic Seatbelt child and verifies
+  failed-run rollback, lower-layer preservation, runtime cleanup, and exit
+  evidence.
+- `make release-preflight` emits Linux amd64/arm64, macOS arm64, and Windows
+  amd64 binaries, policy/docs, checksums, and an explicit VM-only eBPF status.
+- `make evidence-bundle` runs UI, macOS safe/native/crash smoke, regenerates
+  normalized B0/B2/B4/B5 ledgers and charts, records platform status, and
+  produces a SHA-256 manifest plus compressed archive under `dist/`.
+- `scripts/windows_acceptance.ps1` provides a safe Windows contract preflight;
+  signed minifilter/VHDX enforcement remains a target-host manual gate.
 
 Phase 2 is complete when all of the following are true:
 

@@ -84,8 +84,8 @@ export const fixture = {
     registry: { state: "verified", title: "Signed policy registry", detail: "HTTPS + pinned Ed25519 keys + retry bound" },
     sessions: { state: "ready", title: "SQLite lease store", detail: "WAL · expiry · takeover semantics" },
     native: [
-      { platform: "macOS", state: "manual gate", detail: "Seatbelt + EndpointSecurity + APFS" },
-      { platform: "Windows", state: "manual gate", detail: "Job Object + minifilter + VHDX" },
+      { platform: "macOS", state: "partial enforcement", detail: "APFS clone + Seatbelt lifecycle; manual E2E + SIGKILL rollback smoke passed; EndpointSecurity/network/resource helper pending" },
+      { platform: "Windows", state: "code complete / manual gate", detail: "Job Object lifecycle + helper trust; minifilter + VHDX acceptance pending" },
     ],
   },
   registry: {

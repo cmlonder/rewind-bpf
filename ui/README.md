@@ -15,6 +15,21 @@ open http://127.0.0.1:4173
 
 The prototype never loads eBPF, mounts a filesystem, starts a process, or writes a workspace. Actions mutate only in-memory fixture state so the interaction model can be reviewed safely on a personal host.
 
+## Connected local demo
+
+To exercise the real local experience without copying a token into the
+browser, start the launcher from the repository root:
+
+```bash
+go run ./cmd/rewind dashboard start --workspace /Users/Shared/rewind-demo
+```
+
+It opens this UI automatically, connects it to the loopback supervisor, and
+starts a protected shell. Use a disposable workspace for the first run. The
+launcher keeps the supervisor alive after the shell exits so the UI can review,
+rollback, or commit the staged transaction. The static `python3 -m
+http.server` preview above remains useful when reviewing fixture-only UI work.
+
 ## What is interactive today
 
 - Search and filter the run ledger, then open a transaction detail view.
@@ -37,8 +52,10 @@ The prototype never loads eBPF, mounts a filesystem, starts a process, or writes
   signed policy fetch without exposing bearer tokens or private keys. A connected
   supervisor also renders the server-proxied registry package inventory.
 - Use all destinations on mobile through a horizontally scrollable bottom navigation.
-- Use the dedicated **System Boundaries** screen to distinguish the lower/merged/upper invariant, process scope, network/secret boundary, and platform support from editable defaults.
+- Use the dedicated **System Boundaries** screen to distinguish the lower/merged/upper invariant, process scope, network/secret boundary, and platform support from editable defaults. macOS is shown as a partial native APFS/Seatbelt lifecycle (with helper limitations); Windows remains a code-complete/manual-gate contract. Neither is silently presented as Linux-equivalent support.
 - Open the small `i` help affordances beside controls for a deeper explanation of authority, retention, session leases, evidence, PII, registry verification, and benchmark caveats.
+- Open **Safety Lab → macOS test gate → Open test runbook** for the exact safe native smoke sequence. It calls `make mac-native-smoke` and `make mac-safe-smoke`; both create disposable fixtures and refuse to run on non-macOS hosts.
+- PII rescan, remote restore, and adapter preflight update their fixture state so the success toast is backed by a visible result instead of being a dead-end notification.
 
 Fixture mode has no browser authentication because it has no kernel, mount,
 process, workspace, or host access. The retention and session dialogs remain

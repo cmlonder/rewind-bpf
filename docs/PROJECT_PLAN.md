@@ -358,7 +358,7 @@ Add eBPF telemetry, read policies, fail-safe process isolation, VM system scope,
 
 ### Current continuation: Linux feature implementation complete, verification next
 
-The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, protected-run coordinator, policy-aware helper, atomic run store, cgroup-v2 scope, capability probe, event evidence digest with kernel-side dropped-event accounting, sensor start gate, merged-view diff, non-mutating export bundle, hash-chain evidence verifier, full `inspect`, and `run/status/inspect/events/verify/diff/export/rollback/recover/commit` CLI paths are implemented. The disposable VM reports Landlock and cgroup-v2 active and BPF-LSM absent. The Landlock child-process test, isolated OverlayFS rollback test, full FUSE protected-run smoke, descendant telemetry smoke, short-run sensor-gate smoke, cgroup drain/fail-closed smoke, parent-`SIGKILL` and open-descriptor stale-run recovery smokes, proxy network smoke, authenticated supervisor smoke, and warm/cold B0/B2/B4 benchmark controls passed with generated fixtures. The Linux feature implementation is complete enough for the verification gate; remaining work is the acceptance matrix and benchmark re-run in the disposable VM, followed by staged native-platform and productisation work tracked in [`docs/FEATURE_BACKLOG.md`](FEATURE_BACKLOG.md).
+The manifest-to-kernel compiler, Landlock allowlist planner, fixed-size rule-map ABI, optional BPF-LSM `file_open` source, userspace loaders, Go OverlayFS manager, protected-run coordinator, policy-aware helper, atomic run store, cgroup-v2 scope, capability probe, event evidence digest with kernel-side dropped-event accounting, sensor start gate, merged-view diff, non-mutating export bundle, hash-chain evidence verifier, full `inspect`, and `run/status/inspect/events/verify/diff/export/rollback/recover/commit` CLI paths are implemented. The disposable VM reports Landlock and cgroup-v2 active and BPF-LSM absent. The Landlock child-process test, isolated OverlayFS rollback test, full FUSE protected-run smoke, descendant telemetry smoke, short-run sensor-gate smoke, cgroup drain/fail-closed smoke, parent-`SIGKILL` and open-descriptor stale-run recovery smokes, proxy network smoke, authenticated supervisor smoke, warm/cold B0/B2/B4 benchmark controls, namespace allowlist acceptance, P1 leak smoke, remote restore verification, and release evidence gate passed with generated fixtures. The Linux P0/P1 implementation is complete; native helper acceptance and post-hackathon distributed/productisation work remain explicitly staged in [`docs/FEATURE_BACKLOG.md`](FEATURE_BACKLOG.md).
 
 The helper refuses to launch an agent as root: when the parent requires `sudo`, it drops to `SUDO_UID`/`SUDO_GID` before Landlock and `exec`. This was verified in the end-to-end smoke rather than treated as an optional hardening step.
 
@@ -388,13 +388,20 @@ The test must use only generated fixture files and an explicitly scoped child pr
 
 The product is not a general-purpose sandbox parity project. The primary user outcome is: **the agent can work aggressively without direct access to the real project or real credentials**. The four promises are immutable project writes, invisible secrets, explicit acceptance, and fail-closed trust. The detailed decision record is [docs/PRODUCT_STRATEGY.md](PRODUCT_STRATEGY.md).
 
-The current Linux VM remains the reference implementation. Native macOS and Windows are planned as separate platform backends behind the same transaction, policy, and evidence contracts; they are not implemented by pretending that OverlayFS/eBPF exist on those operating systems.
+The current Linux VM remains the privileged reference implementation. macOS
+now has a cross-buildable APFS-clone + Seatbelt staged filesystem lifecycle
+behind the same transaction and policy contracts, including sensitive-read
+hiding, review/diff/rollback/commit, and destination conflict checks. It does
+not pretend that OverlayFS/eBPF exist on macOS: EndpointSecurity telemetry,
+network/resource enforcement, crash/power-loss acceptance, and the signed
+helper remain explicit gates. Windows remains a contract-only path pending its
+minifilter/VHDX helper.
 
 ```text
 P0  Linux VM demo: delete isolation + sensitive-read denial + rollback proof
 P1  Linux product core: supervisor + credential/network plane + conflict-safe accept
-P2  macOS native backend: Seatbelt/EndpointSecurity + APFS/disposable workspace
-P3  Windows native backend: Windows process/filesystem policy + disposable workspace
+P2  macOS native backend: APFS clone + Seatbelt staged workspace (partial enforcement shipped; helper/telemetry gate)
+P3  Windows native backend: Windows process/filesystem policy + disposable workspace (code complete; manual helper gate)
 P4  Durable history, retention, detachable sessions, registry, integrations
 ```
 

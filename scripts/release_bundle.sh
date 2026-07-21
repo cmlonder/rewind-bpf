@@ -17,6 +17,9 @@ find "$BIN_DIR" -maxdepth 1 -type f \
   -exec cp -- {} "$BUNDLE_DIR/" \;
 cp -- "$OBJECT" "$BUNDLE_DIR/rewind_trace.bpf.o"
 cp -- "$POLICY" "$BUNDLE_DIR/policy.example.yaml"
+if [[ -f "$BIN_DIR/release-metadata.txt" ]]; then
+  cp -- "$BIN_DIR/release-metadata.txt" "$BUNDLE_DIR/release-metadata.txt"
+fi
 
 if command -v sha256sum >/dev/null 2>&1; then
   (cd "$BUNDLE_DIR" && find . -maxdepth 1 -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum) > "$BUNDLE_DIR/SHA256SUMS"

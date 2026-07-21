@@ -16,6 +16,7 @@ jobs:
       - run: go vet ./...
       - run: GOOS=darwin GOARCH=arm64 go build ./cmd/rewind
       - run: GOOS=windows GOARCH=amd64 go build ./cmd/rewind
+      - run: go run ./cmd/rewind platform status
       - run: node --check ui/app.js
       - run: node --check ui/components/layout.js
       - run: node --check ui/data/supervisor-adapter.js

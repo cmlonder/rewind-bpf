@@ -18,6 +18,20 @@ coverage.out
 *.pem
 *.key
 *.crt
+*.p12
+*.pfx
+*.token
+*.token.*
+*.secret
+*.credentials
+
+# Private notes and conversation exports (never publish these)
+PRIVATE_*.md
+*_PRIVATE.md
+private/
+docs/private/
+notes/private/
+**/conversation-export.*
 
 # Runtime data
 .rewind/
@@ -25,6 +39,14 @@ runtime/
 tmp/
 logs/
 benchmarks/results/
+*.events.jsonl
+*.audit.jsonl
+*.history.json
+*.record.json
+*.sqlite
+*.sqlite3
+*.db
+*.pid
 
 # VM/build artifacts
 .vagrant/

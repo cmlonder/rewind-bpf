@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -27,12 +26,14 @@ import (
 )
 
 func handleSupervisor(args []string) {
-	if runtime.GOOS != "linux" {
-		fatal("rewind supervisor currently requires Linux Unix-socket support")
-	}
+	// The control plane is portable: Linux uses it for the privileged runtime,
+	// while macOS exposes the native APFS/Seatbelt record lifecycle through the
+	// same authenticated bridge. Windows remains capability/read-only until its
+	// signed filesystem helper is installed.
 	flags := flag.NewFlagSet("rewind supervisor", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	socketPath := flags.String("socket", "", "Unix socket path")
+	httpOnly := flags.Bool("http-only", false, "run only the loopback HTTP bridge; useful on Windows")
 	historyPath := flags.String("history", "", "durable history JSON path")
 	tokenPath := flags.String("token-file", "", "bearer token file (created with mode 0600 when absent)")
 	configPath := flags.String("config", "", "local policy/workspace config JSON path")
@@ -46,10 +47,18 @@ func handleSupervisor(args []string) {
 	sessionBackend := flags.String("session-backend", "local", "session backend: local or sqlite")
 	sessionPath := flags.String("session-path", "", "optional session store path (defaults beside history)")
 	if err := flags.Parse(args); err != nil || flags.NArg() != 0 {
-		fatal("usage: rewind supervisor --socket PATH --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,... --registry-endpoint URL --registry-token TOKEN --credential-provider-command PATH]")
+		fatal("usage: rewind supervisor [--socket PATH|--http-only] --history PATH [--config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --trusted-policy-keys PATH,... --registry-endpoint URL --registry-token TOKEN --credential-provider-command PATH]")
 	}
-	if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
-		fatal(err.Error())
+	if strings.TrimSpace(*socketPath) == "" && !*httpOnly {
+		fatal("--socket is required unless --http-only is set")
+	}
+	if *httpOnly && strings.TrimSpace(*httpListen) == "" {
+		fatal("--http-only requires --http-listen")
+	}
+	if strings.TrimSpace(*socketPath) != "" {
+		if err := supervisor.ValidateUnixSocketPath(*socketPath); err != nil {
+			fatal(err.Error())
+		}
 	}
 	if *historyPath == "" {
 		fatal("supervisor history path is required")
@@ -63,7 +72,11 @@ func handleSupervisor(args []string) {
 		}
 	}
 	if *tokenPath == "" {
-		*tokenPath = *socketPath + ".token"
+		if strings.TrimSpace(*socketPath) != "" {
+			*tokenPath = *socketPath + ".token"
+		} else {
+			*tokenPath = *historyPath + ".token"
+		}
 	}
 	if strings.TrimSpace(*configPath) == "" {
 		*configPath = *historyPath + ".config.json"
@@ -90,21 +103,25 @@ func handleSupervisor(args []string) {
 	if err != nil {
 		fatal(err.Error())
 	}
-	if info, err := os.Stat(*socketPath); err == nil {
-		if info.Mode()&os.ModeSocket == 0 {
-			fatal("refusing to replace a non-socket supervisor path")
+	var listener net.Listener
+	if strings.TrimSpace(*socketPath) != "" {
+		if info, statErr := os.Stat(*socketPath); statErr == nil {
+			if info.Mode()&os.ModeSocket == 0 {
+				fatal("refusing to replace a non-socket supervisor path")
+			}
+			if removeErr := os.Remove(*socketPath); removeErr != nil {
+				fatal(fmt.Sprintf("remove stale supervisor socket: %v", removeErr))
+			}
 		}
-		if err := os.Remove(*socketPath); err != nil {
-			fatal(fmt.Sprintf("remove stale supervisor socket: %v", err))
+		var listenErr error
+		listener, listenErr = net.Listen("unix", *socketPath)
+		if listenErr != nil {
+			fatal(fmt.Sprintf("listen supervisor socket: %v", listenErr))
 		}
-	}
-	listener, err := net.Listen("unix", *socketPath)
-	if err != nil {
-		fatal(fmt.Sprintf("listen supervisor socket: %v", err))
-	}
-	defer listener.Close()
-	if err := os.Chmod(*socketPath, 0o600); err != nil {
-		fatal(fmt.Sprintf("protect supervisor socket: %v", err))
+		defer listener.Close()
+		if err := os.Chmod(*socketPath, 0o600); err != nil {
+			fatal(fmt.Sprintf("protect supervisor socket: %v", err))
+		}
 	}
 	if *sessionPath == "" {
 		*sessionPath = *historyPath + ".sessions.json"
@@ -163,19 +180,34 @@ func handleSupervisor(args []string) {
 	}
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-stop
+	shutdown := func() {
 		_ = server.Shutdown(context.Background())
 		if httpServer != nil {
 			_ = httpServer.Shutdown(context.Background())
 		}
-	}()
-	fmt.Printf("rewind supervisor listening: %s token=%s\n", *socketPath, *tokenPath)
+	}
+	if listener != nil {
+		fmt.Printf("rewind supervisor listening: %s token=%s\n", *socketPath, *tokenPath)
+	} else {
+		fmt.Printf("rewind supervisor HTTP-only token=%s\n", *tokenPath)
+	}
 	if httpListener != nil {
 		fmt.Printf("rewind supervisor HTTP bridge: %s origin=%s\n", *httpListen, *corsOrigin)
 	}
-	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-		fatal(fmt.Sprintf("supervisor serve: %v", err))
+	if listener == nil {
+		<-stop
+		shutdown()
+		return
+	}
+	serveResult := make(chan error, 1)
+	go func() { serveResult <- server.Serve(listener) }()
+	select {
+	case <-stop:
+		shutdown()
+	case serveErr := <-serveResult:
+		if serveErr != nil && serveErr != http.ErrServerClosed {
+			fatal(fmt.Sprintf("supervisor serve: %v", serveErr))
+		}
 	}
 }
 

@@ -2,17 +2,37 @@
 
 RewindBPF is an **AI Agent Safety Runtime** for running autonomous agents inside reversible, policy-controlled filesystem transactions.
 
-Its product focus is deliberately narrow: **let an agent work aggressively without giving it direct access to the real project or real credentials**. The current production proof is Linux-first; native macOS and Windows backends are planned behind the same transaction contract.
+Its product focus is deliberately narrow: **let an agent work aggressively without giving it direct access to the real project or real credentials**. Linux is the privileged reference backend. macOS now has a working APFS-clone + Seatbelt native filesystem lifecycle; Windows remains a fail-closed native contract pending its signed helper and disposable VHDX gate.
 
 The product strategy is documented in [docs/PRODUCT_STRATEGY.md](docs/PRODUCT_STRATEGY.md).
+The concise native-platform status and remaining manual gates are in
+[docs/PLATFORM_STATUS.md](docs/PLATFORM_STATUS.md).
 
 ## Current status
 
-The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, narrow raw/packet-socket denial in enforce mode, fail-closed `deny` and isolated `namespace` network backends for non-proxy-aware clients, an opt-in short-lived external credential-provider broker, conflict-checked `commit --confirm`, durable history, signed evidence hand-off, an authenticated supervisor transport with lifecycle actions and follow-mode events, release/bootstrap scripts, checkpoint lifecycle wiring, bounded post-run PII scanning, an S3-compatible HTTPS retention adapter with digest/retry, a remote session lease protocol, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. The namespace backend now owns a reviewed veth/IPSet/iptables broker lifecycle, atomic DNS/IPSet refresh, and a passing privileged VM acceptance path. Native macOS/Windows enforcement remains fail-closed until signed platform helpers and disposable acceptance environments exist.
+The MVP is complete for its explicitly documented disposable-VM boundary. The Linux product-core slice now includes cgroup-v2 scopes, capability reporting, prepared-run journaling, recovery, evidence digests and hash chains, diff/export, signed policy envelopes, a loopback proxy network backend, narrow raw/packet-socket denial in enforce mode, fail-closed `deny` and isolated `namespace` network backends for non-proxy-aware clients, an opt-in short-lived external credential-provider broker, conflict-checked `commit --confirm`, durable history, signed evidence hand-off, an authenticated supervisor transport with lifecycle actions and follow-mode events, release/bootstrap scripts, checkpoint lifecycle wiring, bounded post-run PII scanning, an S3-compatible HTTPS retention adapter with digest/retry, a remote session lease protocol, and the fixture Control Plane UI. Warm and cold B0/B2/B4 measurements, storage footprint, telemetry growth, and benchmark charts are recorded. The namespace backend now owns a reviewed veth/IPSet/iptables broker lifecycle, atomic DNS/IPSet refresh, and a passing privileged VM acceptance path. The macOS native CLI now supports staged review/diff/rollback/commit and hides policy-denied sensitive files during the agent run; `make mac-native-smoke` validates the lifecycle entirely inside a temporary fixture. EndpointSecurity telemetry, network/resource enforcement, and the Windows privileged helper remain explicit gates.
 
 Track the implementation and architecture in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). The architecture document is updated after every completed stage. The six hardening boundaries now have portable contracts and safe tests, but a contract is not production enforcement.
 
 The six-day hardening sprint and the post-hackathon product roadmap are in [docs/PHASE2_PLAN.md](docs/PHASE2_PLAN.md). It includes the competitive analysis, P0/P1 work packages, exit criteria, correctness matrix, and research references.
+The complete manual rehearsal, jury narrative, recording checklist, and
+submission bundle are in [docs/HACKATHON_TEST_AND_DEMO_PLAN.md](docs/HACKATHON_TEST_AND_DEMO_PLAN.md).
+The copy-ready Devpost description, Codex/GPT-5.6 contribution statement,
+judge installation path, video script, and final external checklist are in
+[docs/DEVPOST_SUBMISSION.md](docs/DEVPOST_SUBMISSION.md).
+The public-repository privacy boundary and pre-push audit are documented in
+[docs/PUBLIC_REPO_CHECKLIST.md](docs/PUBLIC_REPO_CHECKLIST.md).
+
+## Codex and GPT-5.6 contribution
+
+RewindBPF was built and iterated in Codex with GPT-5.6. Codex was used for the
+runtime decomposition, policy and rollback implementation, crash/evidence
+hardening, supervisor and UI iterations, benchmark tooling, and disposable-VM
+acceptance scripts. GPT-5.6 was a build-time implementation and review partner;
+the shipped runtime deliberately remains model-agnostic and can protect a
+Codex, OpenHands, Claude, or arbitrary command through the same launch boundary.
+The primary Devpost `/feedback` Session ID is
+`019f6f87-53d3-7c11-be4d-6d07217d62ea`.
 
 The final benchmark package is reproducible from the checked-in ledger:
 `python3 benchmarks/normalize_results.py && python3 benchmarks/plot_results.py && make benchmark-verify`.
@@ -86,6 +106,9 @@ The page covers the shipped safety surface, reversible transaction flow, Phase 2
 Publish to an explicit local directory or S3-compatible bucket with
 `REWIND_SITE_DEST=/path/or/s3://bucket make publish-site`; the script refuses
 to guess a destination or silently publish without an explicit target.
+The repository also includes `.github/workflows/pages.yml`; enable GitHub Pages
+with GitHub Actions as the source to publish `site/` on pushes to `main` or
+`master`.
 
 On macOS, the safe prerequisite probe is read-only:
 
@@ -94,8 +117,14 @@ rewind platform plan --workspace /path/to/disposable-apfs-fixture
 ```
 
 It reports APFS, `sandbox-exec`, and `diskutil` availability. It does not
-clone, mount, launch, or delete anything. The macOS backend remains refused
-until the disposable-volume manual gate is completed.
+clone, mount, launch, or delete anything. `rewind platform status` also emits
+the cross-platform code/manual-gate matrix and can verify an exact signed
+native-helper manifest. For a temporary synthetic fixture, use
+`make mac-native-smoke`; the native CLI supports review/diff/rollback/commit
+and sensitive-read hiding. EndpointSecurity telemetry, network/resource
+enforcement, and the privileged helper gate remain explicit limitations.
+The complete reproducible manual sequence is documented in
+[`docs/platform/macos_manual_e2e.md`](docs/platform/macos_manual_e2e.md).
 
 ## Control Plane UI
 
@@ -106,7 +135,17 @@ python3 -m http.server 4174 --directory ui
 open http://127.0.0.1:4174
 ```
 
-The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, a dedicated System Boundaries map, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and live selection, signed policy bundle import, workspace-to-policy assignments, revisioned global configuration controls, retention/session previews, contextual `i` explanations, notifications, keyboard-safe dialogs, effective policy resolution, and benchmark/evidence surfaces. A local supervisor bridge exposes authenticated health, capability, history, snapshot/follow event streams with reconnect backoff, status, rollback/recover, explicit commit actions, validated policy/workspace writes, signed bundle import, and optional server-proxied trusted-registry list/fetch/revoke operations; mutating browser actions obtain a two-minute, one-time supervisor-bound challenge and are refused on replay or action/run mismatch. The browser adapter can invoke those actions only through the bearer-token bridge and never receives root privileges. Fixture mode requires no authentication because it has no host access; local authentication beyond the Unix-socket and bearer-token boundary is intentionally post-demo.
+The cross-platform local connection model is documented in
+[`docs/LOCAL_CONTROL_PLANE.md`](docs/LOCAL_CONTROL_PLANE.md). UTM is the
+privileged Linux acceptance environment, not a requirement for the Mac native
+transaction UI path.
+
+The current fixture slice includes Overview, Runs, an animated Run Detail timeline, filesystem diff, a dedicated System Boundaries map, evidence health, rollback/recover/export confirmation flows, searchable run filters with empty states, policy package creation and live selection, signed policy bundle import, workspace-to-policy assignments, revisioned global configuration controls, retention/session previews, contextual `i` explanations, notifications, keyboard-safe dialogs, effective policy resolution, benchmark/evidence surfaces, and a Safety Lab macOS test gate with a safe native runbook. PII rescan, remote restore, and adapter preflight actions update visible fixture state instead of ending in a dead-end toast. A local supervisor bridge exposes authenticated health, capability, history, snapshot/follow event streams with reconnect backoff, status, rollback/recover, explicit commit actions, validated policy/workspace writes, signed bundle import, and optional server-proxied trusted-registry list/fetch/revoke operations; mutating browser actions obtain a two-minute, one-time supervisor-bound challenge and are refused on replay or action/run mismatch. The browser adapter can invoke those actions only through the bearer-token bridge and never receives root privileges. Fixture mode requires no authentication because it has no host access; local authentication beyond the Unix-socket and bearer-token boundary is intentionally post-demo.
+
+Run the non-mutating UI check with `make ui-smoke`. It validates module syntax,
+the macOS runbook wiring, modal markup, and whitespace without opening a host
+workspace. `make site-smoke` additionally serves the public single-page site
+locally and checks its JavaScript modules and HTTP shell.
 
 ## Safety warning
 
@@ -122,12 +161,40 @@ On macOS itself, use the non-destructive contract/simulation smoke only:
 
 ```bash
 make mac-safe-smoke
+make mac-native-smoke
+make mac-crash-smoke
 ```
 
 It validates PII scanning, native capability contracts, registry/session/run
 plan packages, and confirms that the Linux protected-run path refuses instead
 of touching the Mac filesystem. It does not mount, load eBPF, change cgroups,
 or attempt to roll back a real Mac workspace.
+
+`mac-native-smoke` covers the APFS clone/Seatbelt review, sensitive-read
+denial, rollback, commit, and conflict refusal lifecycle. `mac-crash-smoke`
+terminates a synthetic child with `SIGKILL` and verifies the failed run rolls
+back without mutating the lower fixture. Both scripts use disposable
+`/Users/Shared` fixtures and never use a real project path.
+
+The final local packaging commands are:
+
+```bash
+make release-preflight
+make benchmark-verify
+make site-smoke
+make evidence-bundle
+```
+
+Run the complete safe host-side checklist with `make hackathon-preflight`.
+It runs Go tests/vet, shell/UI/site checks, benchmark verification, release
+preflight, and evidence packaging. It does not mount filesystems, load eBPF,
+change firewall state, or touch a real workspace; run `make final-vm` only
+inside the disposable Ubuntu UTM VM for privileged acceptance.
+
+`release-preflight` emits Linux/macOS/Windows binaries, the example policy,
+platform documentation, checksums, and an explicit VM-only eBPF status.
+`evidence-bundle` runs the safe UI/native/crash checks and packages their logs,
+benchmark artifacts, platform status, and a SHA-256 manifest under `dist/`.
 
 After building the binary and eBPF object inside that VM, run the repeatable
 synthetic acceptance matrix with:
@@ -143,6 +210,16 @@ create/verify, review/commit, clean-branch acceptance, destination-drift
 refusal, proxy/raw-socket semantics, strict namespace isolation, real
 allow-listed veth/IPSet/NAT egress, and incomplete-evidence refusal. Run
 `make benchmark-verify` to validate the checked-in B0/B2/B4 ledger and chart.
+The same gate runs the P1 lifecycle leak smoke: three repeated protected runs
+with a long-lived child, followed by checks for leftover cgroups, processes,
+FUSE mounts, veths, ipsets, and owned iptables chains. Retention restore can be
+digest-pinned and is atomic:
+
+```bash
+rewind retention get --endpoint https://retention.example --key runs/demo \
+  --output ./restored-evidence.tar.gz --sha256 <expected-sha256>
+```
+
 The supervisor boundary can be checked separately with
 `REWIND_VM_CONFIRM=VM_ONLY make supervisor-smoke-vm`.
 The same VM-only gate now includes `read.pii.mode: enforce`: a synthetic email
@@ -173,6 +250,7 @@ rewind pii scan --path ./project/config.env --redact-output ./runtime/config.env
 rewind agent list
 rewind agent contract codex
 rewind network plan --domains api.example.com,registry.example.com --resolve
+rewind platform status
 rewind platform contract --platform darwin --workspace /path/to/disposable-apfs-fixture
 sudo rewind status --record ./runtime/record.json
 rewind inspect --record ./runtime/record.json
@@ -243,6 +321,37 @@ budget. It never turns an unverified remote payload into an active run policy.
 
 ### Local supervisor control plane
 
+#### One-command local experience (recommended)
+
+For the normal operator flow, do not start the supervisor, copy a token, or
+manually connect the browser. Build or install the CLI, then run:
+
+```bash
+go run ./cmd/rewind dashboard start --workspace "$PWD"
+```
+
+The command creates a safe local policy in the user cache, starts a loopback
+supervisor and the Control Plane UI, opens the browser with a short-lived
+in-memory connection token, and drops you into a protected interactive shell.
+Commands typed in that shell are staged in the native transaction (macOS) or
+the Linux OverlayFS transaction (inside the VM). A destructive command such as
+`rm -rf src` therefore appears in the dashboard timeline and diff while the
+real workspace remains unchanged. When the shell exits, the dashboard remains
+open so you can inspect the diff and choose **Rollback** or **Commit**. Press
+`Ctrl-C` in the launcher terminal only after that decision.
+
+The browser URL contains the connection token only in a URL fragment; the UI
+removes it immediately after connecting. The token is never sent to the UI
+static server or stored in browser history. The protected shell is the scope
+of this local MVP: terminals opened independently of the launcher are not
+retroactively monitored. Host-wide observation requires the signed
+EndpointSecurity (macOS), eBPF process-scope (Linux), or minifilter (Windows)
+helpers described in the platform status docs.
+
+Useful options for a manual test are `--state-dir /Users/Shared/rewind-demo`
+and `--no-open`. `--exit-after-shell` is reserved for automated smoke tests;
+normal users should leave the launcher running while reviewing the run.
+
 The Linux VM can expose health, capability, and durable-history data over a
 permissioned Unix socket. Action endpoints intentionally refuse until the
 supervisor has an authenticated authorization layer:
@@ -282,7 +391,7 @@ sudo rewind supervisor \
   --socket /tmp/rewind-supervisor.sock \
   --history /tmp/rewind-history.json \
   --http-listen 127.0.0.1:8787 \
-  --cors-origin http://127.0.0.1:4173 \
+  --cors-origin http://127.0.0.1:4174 \
   --trusted-policy-keys /etc/rewind/trusted-signer.pub \
   --registry-endpoint https://registry.example \
   --registry-token "$REWIND_REGISTRY_TOKEN"
@@ -306,6 +415,33 @@ browser. Pass
 it, the supervisor still verifies the envelope’s embedded key and signature but
 does not claim organization-level trust. Fixture mode remains the safe default
 for the static demo.
+
+To connect the Mac-hosted Control Plane to a supervisor running inside the UTM
+VM, forward the loopback bridge over SSH, then open the UI on the host:
+
+```bash
+# host Mac: keep this session open
+ssh -p 2222 -L 8787:127.0.0.1:8787 vagrant@127.0.0.1
+
+# host Mac, second terminal
+python3 -m http.server 4174 --directory ui
+open http://127.0.0.1:4174
+```
+
+Click the `FIXTURE` badge in the top-right corner, enter
+`http://127.0.0.1:8787`, and paste the contents of the supervisor token file
+(for example, `sudo cat /tmp/rewind-supervisor.sock.token` inside the VM).
+The badge changes to `LOCAL VM` when the connection succeeds. Connected history
+only includes runs started with the same `--history` path supplied to the
+supervisor; the fixture data disappears from the connected view. The browser
+keeps the bearer token in memory and sends privileged intents only to the local
+supervisor.
+
+If port `8787` is already occupied on the host, keep the VM listener unchanged
+and use a different local forwarding port, for example
+`-L 18787:127.0.0.1:8787`; enter `http://127.0.0.1:18787` in the UI. The
+supervisor CORS origin must still match the page exactly:
+`http://127.0.0.1:4174` (not `file://` and not `http://localhost:4174`).
 
 Example policy:
 

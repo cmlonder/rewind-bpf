@@ -10,6 +10,7 @@ import (
 	"github.com/rewindbpf/rewind/internal/lifecycle"
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/overlay"
+	"github.com/rewindbpf/rewind/internal/platform"
 	"github.com/rewindbpf/rewind/internal/protectedrun"
 	"github.com/rewindbpf/rewind/internal/runstore"
 	"github.com/rewindbpf/rewind/internal/supervisor"
@@ -26,6 +27,15 @@ func supervisorAction(historyPath string, request supervisor.Request) (superviso
 	entry, err := historyEntry(store, request.RunID)
 	if err != nil {
 		return supervisor.Response{}, err
+	}
+	if _, native, detectErr := platform.NativeRecordForSupervisor(entry.RecordPath, request.RunID); detectErr != nil {
+		return supervisor.Response{}, detectErr
+	} else if native {
+		result, actionErr := platform.ApplyNativeSupervisorAction(context.Background(), request.Action, entry.RecordPath, request.Confirmation)
+		if actionErr != nil {
+			return supervisor.Response{}, actionErr
+		}
+		return supervisor.Response{OK: true, State: result.State, Message: result.Message}, nil
 	}
 	record, err := runstore.Read(entry.RecordPath)
 	if err != nil {

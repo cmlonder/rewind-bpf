@@ -18,6 +18,7 @@ const usage = `RewindBPF — AI Agent Safety Runtime
 
 Usage:
   rewind run [options] -- <agent-command>
+  rewind native run|status|events|diff|rollback|commit   (macOS APFS/Seatbelt backend; --history enables Control Plane indexing)
   rewind status --record PATH
   rewind inspect --record PATH
   rewind events --record PATH
@@ -31,19 +32,21 @@ Usage:
   rewind bundle sign --input PATH --private-key PATH --output PATH
   rewind bundle publish --input PATH --endpoint URL --signature PATH [--public-key PATH --trusted-public-keys PATH,... --token-file PATH --encrypted --allow-insecure-localhost]
   rewind bundle fetch --endpoint URL --output PATH [--token TOKEN --sha256 HEX]
-  rewind retention put|get --endpoint URL --key KEY --input|--output PATH
+  rewind retention put|get --endpoint URL --key KEY --input|--output PATH [--sha256 HEX]
   rewind bundle verify --input PATH [--signature PATH --public-key PATH]
   rewind registry fetch --endpoint URL --name NAME --version VERSION --output PATH [--trusted-public-keys PATH,...]
   rewind registry serve --root PATH [--listen 127.0.0.1:8790 --bearer TOKEN]
   rewind branch apply --record PATH --repo PATH --branch NAME --confirm [--commit --message TEXT]
   rewind capabilities
+  rewind platform status [--helper-manifest PATH]
   rewind platform plan --workspace PATH
   rewind platform contract --platform darwin|windows --workspace PATH
   rewind network plan --domains HOST[,HOST...] [--resolve]
   rewind release keygen --private PATH --public PATH
   rewind release sign --input PATH --private-key PATH --output PATH
   rewind release verify --input PATH --signature PATH [--public-key PATH]
-  rewind supervisor --socket PATH --history PATH [--session-backend local|sqlite --session-path PATH --config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
+  rewind supervisor [--socket PATH|--http-only] --history PATH [--session-backend local|sqlite --session-path PATH --config PATH --http-listen 127.0.0.1:8787 --cors-origin ORIGIN --credential-provider-command PATH]
+  rewind dashboard start --workspace PATH [--state-dir PATH --policy PATH --ui-dir PATH --supervisor-port PORT --ui-port PORT --no-open --no-shell]
   rewind history prune --path PATH --keep N
   rewind pii scan --path PATH [--output PATH --redact-output PATH]
   rewind agent list|contract KIND
@@ -63,7 +66,12 @@ Usage:
   rewind manifest create <directory> [manifest.json]
   rewind manifest verify <directory> <manifest.json>
 
-The run command is Linux-only and requires a disposable VM for OverlayFS/eBPF integration.
+The protected transaction command is Linux-first and requires a disposable VM
+for OverlayFS/eBPF integration. On macOS, "rewind native run" provides an
+APFS-clone + Seatbelt staged filesystem lifecycle with review/diff/rollback/
+commit and sensitive-read hiding. EndpointSecurity telemetry, network/resource
+enforcement, and Windows host protection remain fail-closed until their
+signed helpers pass disposable acceptance.
 Successful runs discard the temporary write layer by default; use --on-success review to hold it for inspection.
 `
 
@@ -86,6 +94,8 @@ func main() {
 		handleHelper(os.Args[2:])
 	case "run":
 		handleRun(os.Args[2:])
+	case "native":
+		handleNative(os.Args[2:])
 	case "rollback":
 		handleRollback(os.Args[2:])
 	case "recover":
@@ -118,6 +128,8 @@ func main() {
 		handleRelease(os.Args[2:])
 	case "supervisor":
 		handleSupervisor(os.Args[2:])
+	case "dashboard":
+		handleDashboard(os.Args[2:])
 	case "history":
 		handleHistory(os.Args[2:])
 	case "pii":

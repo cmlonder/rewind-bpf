@@ -20,3 +20,24 @@ func TestUnsupportedCapabilityFailsClosed(t *testing.T) {
 		t.Fatal("unsupported backend should fail closed")
 	}
 }
+
+func TestStatusMatrixKeepsNativeTargetsManualGated(t *testing.T) {
+	status, err := StatusMatrix("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(status) != 3 {
+		t.Fatalf("status length = %d", len(status))
+	}
+	for _, item := range status {
+		if !item.CodeComplete {
+			t.Fatalf("platform is missing code-complete contract: %+v", item)
+		}
+		if item.Platform == "linux" {
+			continue
+		}
+		if item.EnforcementReady || !item.ManualGate {
+			t.Fatalf("native platform was not kept behind manual gate: %+v", item)
+		}
+	}
+}

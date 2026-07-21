@@ -16,11 +16,13 @@ printf 'original-source\n' > "$ROOT/workspace/src/marker.txt"
 printf 'SYNTHETIC_ONLY=true\n' > "$ROOT/workspace/synthetic.env"
 printf '%s\n' 'read:' '  mode: enforce' '  deny:' '    - "**/*.env"' '' 'write:' '  mode: rollback' '  scope: workspace' '' 'network:' '  mode: audit' > "$ROOT/policy.yaml"
 
-sudo "$BIN" run --workspace "$ROOT/workspace" --runtime-root "$ROOT/runtime" --policy "$ROOT/policy.yaml" --record "$ROOT/runtime/record.json" --sensor-object "$OBJECT" --runtime-roots /bin,/usr/bin,/lib,/usr/lib,/etc --overlay-backend fuse --on-success review -- /bin/sh -c 'cat synthetic.env >/tmp/rewind-secret-read 2>/tmp/rewind-secret-read.err || true; rm -rf src; printf "created-by-agent\n" > generated.txt'
+SECRET_OUTPUT="$ROOT/secret-read.out"
+SECRET_ERROR="$ROOT/secret-read.err"
+sudo "$BIN" run --workspace "$ROOT/workspace" --runtime-root "$ROOT/runtime" --policy "$ROOT/policy.yaml" --record "$ROOT/runtime/record.json" --sensor-object "$OBJECT" --runtime-roots /bin,/usr/bin,/lib,/usr/lib,/etc --overlay-backend fuse --on-success review -- /bin/sh -c "cat synthetic.env >'$SECRET_OUTPUT' 2>'$SECRET_ERROR' || true; rm -rf src; printf 'created-by-agent\\n' > generated.txt"
 echo '--- merged view after agent ---'
 test ! -e "$ROOT/runtime/merged/src" && echo 'deleted src is isolated in upper layer'
 cat "$ROOT/runtime/merged/generated.txt"
-grep -q 'Permission denied' /tmp/rewind-secret-read.err && echo 'sensitive read denied'
+grep -q 'Permission denied' "$SECRET_ERROR" && echo 'sensitive read denied'
 sudo "$BIN" rollback --record "$ROOT/runtime/record.json"
 test -f "$ROOT/workspace/src/marker.txt"
 test ! -e "$ROOT/workspace/generated.txt"

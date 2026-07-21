@@ -57,9 +57,17 @@ func SeatbeltProfile(workspace string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if resolved, resolveErr := filepath.EvalSymlinks(abs); resolveErr == nil {
+		abs = resolved
+	}
 	quoted := strings.ReplaceAll(abs, "\\", "\\\\")
 	quoted = strings.ReplaceAll(quoted, "\"", "\\\"")
-	return fmt.Sprintf("(version 1)\n(deny default)\n(allow process*)\n(allow file-read* (subpath \"%s\"))\n(allow file-write* (subpath \"%s\"))\n", quoted, quoted), nil
+	// A native macOS process needs to read system libraries and command
+	// runtimes outside the staged workspace. The strict profile adds those
+	// roots explicitly in SeatbeltProfileWithRoots; it deliberately does not
+	// include a broad allow-file-read rule, which would reopen the real source
+	// workspace through an absolute path.
+	return fmt.Sprintf("(version 1)\n(deny default)\n(allow process*)\n(allow file-read* (literal \"/\"))\n(allow file-read-metadata (subpath \"/\"))\n(allow file-read* (subpath \"%s\"))\n(allow file-write* (subpath \"%s\"))\n(allow file-write* (literal \"/dev/null\"))\n", quoted, quoted), nil
 }
 
 func WindowsJobPlan() []string {

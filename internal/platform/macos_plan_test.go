@@ -14,3 +14,10 @@ func TestMacOSPlanRefusesOtherOperatingSystems(t *testing.T) {
 		t.Fatal("expected non-darwin refusal")
 	}
 }
+
+func TestParseDiskutilFilesystem(t *testing.T) {
+	output := "   Volume Name: Macintosh HD\n   File System Personality: APFS\n   Type (Bundle): apfs\n"
+	if got := parseDiskutilFilesystem(output); got != "apfs" {
+		t.Fatalf("filesystem = %q", got)
+	}
+}

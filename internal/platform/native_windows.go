@@ -4,6 +4,7 @@ package platform
 
 import (
 	"fmt"
+	"io"
 	"os/exec"
 	"unsafe"
 
@@ -16,6 +17,26 @@ import (
 type WindowsJob struct{ handle windows.Handle }
 
 func StartInWindowsJob(command string, args ...string) (*exec.Cmd, *WindowsJob, error) {
+	return StartInWindowsJobWithOptions(WindowsJobOptions{Command: command, Args: args})
+}
+
+// WindowsJobOptions keeps process launch configuration in one auditable
+// object.  The caller should set Dir to the disposable VHDX workspace; this
+// helper never treats a Job Object as filesystem protection.
+type WindowsJobOptions struct {
+	Command     string
+	Args        []string
+	Dir         string
+	Environment []string
+	Stdin       io.Reader
+	Stdout      io.Writer
+	Stderr      io.Writer
+}
+
+func StartInWindowsJobWithOptions(options WindowsJobOptions) (*exec.Cmd, *WindowsJob, error) {
+	if options.Command == "" {
+		return nil, nil, fmt.Errorf("Windows Job Object command is required")
+	}
 	job, err := windows.CreateJobObject(nil, nil)
 	if err != nil {
 		return nil, nil, fmt.Errorf("create Rewind Job Object: %w", err)
@@ -26,7 +47,12 @@ func StartInWindowsJob(command string, args ...string) (*exec.Cmd, *WindowsJob, 
 		_ = windows.CloseHandle(job)
 		return nil, nil, fmt.Errorf("configure Rewind Job Object: %w", err)
 	}
-	cmd := exec.Command(command, args...)
+	cmd := exec.Command(options.Command, options.Args...)
+	cmd.Dir = options.Dir
+	cmd.Env = options.Environment
+	cmd.Stdin = options.Stdin
+	cmd.Stdout = options.Stdout
+	cmd.Stderr = options.Stderr
 	if err := cmd.Start(); err != nil {
 		_ = windows.CloseHandle(job)
 		return nil, nil, err
@@ -45,6 +71,26 @@ func StartInWindowsJob(command string, args ...string) (*exec.Cmd, *WindowsJob, 
 		return nil, nil, fmt.Errorf("assign child to Rewind Job Object: %w", err)
 	}
 	return cmd, &WindowsJob{handle: job}, nil
+}
+
+// Wait waits for the command and closes the Job Object in the same lifecycle
+// step. Closing the job is what terminates any remaining descendants after a
+// crash or an interrupted parent. Callers that need to inspect the process
+// error can use the returned error directly.
+func (j *WindowsJob) Wait(cmd *exec.Cmd) error {
+	if cmd == nil {
+		_ = j.Close()
+		return fmt.Errorf("Windows Job Object command is nil")
+	}
+	err := cmd.Wait()
+	closeErr := j.Close()
+	if err != nil && closeErr != nil {
+		return fmt.Errorf("wait Windows Job Object command: %v; close job: %w", err, closeErr)
+	}
+	if err != nil {
+		return err
+	}
+	return closeErr
 }
 
 func (j *WindowsJob) Close() error {

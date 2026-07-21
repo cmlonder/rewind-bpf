@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -94,6 +95,55 @@ func (c Client) Get(ctx context.Context, key string) ([]byte, error) {
 		time.Sleep(time.Duration(1<<attempt) * 100 * time.Millisecond)
 	}
 	return nil, last
+}
+
+// GetFile restores an object atomically. Verification completes before a
+// temporary file is renamed into place, so a failed download can never
+// replace an existing evidence archive with partial bytes.
+func (c Client) GetFile(ctx context.Context, key, filename, expectedDigest string) error {
+	if strings.TrimSpace(filename) == "" {
+		return fmt.Errorf("retention get: output path is required")
+	}
+	data, err := c.Get(ctx, key)
+	if err != nil {
+		return err
+	}
+	if expected := strings.TrimSpace(expectedDigest); expected != "" {
+		digest := sha256.Sum256(data)
+		actual := hex.EncodeToString(digest[:])
+		if !strings.EqualFold(expected, actual) {
+			return fmt.Errorf("retention get: expected digest %s, got %s", expected, actual)
+		}
+	}
+	directory := filepath.Dir(filename)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return fmt.Errorf("retention get: create output directory: %w", err)
+	}
+	temporary, err := os.CreateTemp(directory, ".rewind-restore-*")
+	if err != nil {
+		return fmt.Errorf("retention get: create temporary output: %w", err)
+	}
+	temporaryName := temporary.Name()
+	defer os.Remove(temporaryName)
+	if err := temporary.Chmod(0o600); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("retention get: protect temporary output: %w", err)
+	}
+	if _, err := temporary.Write(data); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("retention get: write temporary output: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		_ = temporary.Close()
+		return fmt.Errorf("retention get: sync temporary output: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("retention get: close temporary output: %w", err)
+	}
+	if err := os.Rename(temporaryName, filename); err != nil {
+		return fmt.Errorf("retention get: replace output: %w", err)
+	}
+	return nil
 }
 
 func (c Client) request(ctx context.Context, method, key string, data []byte) (*http.Request, error) {

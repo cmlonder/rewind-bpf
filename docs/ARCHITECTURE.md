@@ -4,7 +4,7 @@
 
 **Current stage:** Linux feature implementation complete — disposable-VM verification gate
 
-**Last verified:** 2026-07-20
+**Last verified:** 2026-07-21
 **Source of truth:** This document describes the current product behavior, target architecture, business flows, safety boundaries, and implementation status. It must be updated whenever an implementation stage is completed.
 
 ## 1. Product and business purpose
@@ -216,7 +216,7 @@ The host is development-only. We must not run OverlayFS, eBPF, destructive files
 
 ### 7.2 Direct Ubuntu VM
 
-The kernel MVP runs directly inside an Ubuntu VM managed by UTM on the macOS host. This keeps the Linux kernel, capabilities, mounts, and safety boundary explicit. The macOS native track now has a read-only `rewind platform plan --workspace PATH` prerequisite probe, but the enforcing backend remains fail-closed until disposable APFS/Seatbelt validation.
+The kernel MVP runs directly inside an Ubuntu VM managed by UTM on the macOS host. This keeps the Linux kernel, capabilities, mounts, and safety boundary explicit. macOS now has a native APFS-clone + Seatbelt staged filesystem transaction (`rewind native run`) with review, rollback, sensitive-read hiding, and conflict-checked commit. EndpointSecurity telemetry, network/resource enforcement, and Windows host protection remain fail-closed until their signed-helper/disposable-volume gates pass.
 
 Recommended layout:
 
@@ -375,7 +375,7 @@ The B2 workload left a 134,217,728-byte file in `upper`, matching the 134,217,72
 
 The full protected path was measured with five fio repetitions inside one Rewind run. Mean read throughput was 36,726 KiB/s / 9,181.7 IOPS and mean write throughput was 15,730 KiB/s / 3,932.6 IOPS. This was approximately 11.1% below B0 and 0.4% above B2, indicating that the steady-state I/O cost was dominated by FUSE rather than the userspace lifecycle/eBPF path. The complete run took 64.34 seconds wall-clock for five 10-second workloads plus ramp/setup. The upper layer was 134,253,346 bytes; the difference from B2 was approximately 35.6 KiB of fio JSON outputs and metadata, not another copy of the 128 MiB data file.
 
-The direct-PID telemetry validation ran fio without a shell wrapper and recorded 16,620 events (16,403 `write`, 216 `openat`, and 1 `unlinkat`) in a 2,467,528-byte JSONL log before rollback. The sensor now tracks descendants discovered through `execve` and removes them on process exit. A VM smoke with `/bin/sh` launching `/bin/dd` recorded 46 events across two PIDs (15 writes, 30 opens, and one execve), then rolled back successfully. Cgroup-level scoping remains a future scale option, but parent/descendant PID coverage is verified for the MVP.
+The direct-PID telemetry validation ran fio without a shell wrapper and recorded 16,620 events (16,403 `write`, 216 `openat`, and 1 `unlinkat`) in a 2,467,528-byte JSONL log before rollback. The sensor now tracks descendants discovered through `execve` and removes them on process exit. A VM smoke with `/bin/sh` launching `/bin/dd` recorded 46 events across two PIDs (15 writes, 30 opens, and one execve), then rolled back successfully. Production runs now use a cgroup-v2 scope as the primary process boundary, with descendant-PID correlation retained for telemetry and compatibility; the P1 leak smoke verifies cleanup across repeated runs.
 
 ## 12. Change protocol
 
@@ -766,6 +766,16 @@ workspace assignment writes use a separate mode-`0600` local config store,
 validate names, versions, paths, and policy references, and are recorded in the
 redacted supervisor audit without storing workspace contents.
 
+The `rewind dashboard start` launcher composes this bridge with a static local
+UI and a protected interactive shell. It chooses disposable loopback ports,
+creates a safe default policy outside the workspace, starts the supervisor and
+UI as child processes, and passes the bearer only in a one-time URL fragment.
+The browser removes the fragment after connecting. The launcher keeps the
+supervisor alive after the shell exits so review/rollback/commit actions remain
+available; `--exit-after-shell` is reserved for automated smoke tests. This
+launcher scopes protection to the shell it starts. Host-wide observation still
+belongs to the signed EndpointSecurity/eBPF/minifilter helpers.
+
 Signed policy bundle imports use `POST /v1/policy-bundles`. The supervisor
 verifies the Ed25519 envelope before persistence, stores the signed envelope
 for later verification, and records the signer key ID alongside the package.
@@ -841,9 +851,11 @@ claiming unsupported enforcement:
   cleans only its own chain, ipset, NAT rule, and veth. Real command execution
   remains restricted to the privileged VM acceptance gate.
 - `internal/platform` emits portable macOS Seatbelt/EndpointSecurity/APFS and
-  Windows minifilter/Job Object/VHDX contracts. `rewind platform contract` is
-  a read-only report and both native contracts remain `ready: false` until
-  signed helper and disposable-volume tests exist.
+  Windows minifilter/Job Object/VHDX contracts. The macOS build additionally
+  implements the APFS clone transaction and native CLI lifecycle; the
+  EndpointSecurity/network/resource helper gate remains explicit. `rewind
+  platform contract` is a read-only report and Windows remains `ready: false`
+  until its signed helper and disposable-volume tests exist.
 - `internal/agent` records executable aliases plus a `rewind/v1` lifecycle
   environment (`prepare,start,exit,run_id`). The same hook protocol and
   executable aliases are persisted in the immutable run plan. Commands are

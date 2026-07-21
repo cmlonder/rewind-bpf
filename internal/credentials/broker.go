@@ -4,6 +4,7 @@ package credentials
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -27,6 +28,12 @@ type Broker interface {
 	Issue(Request) (Lease, error)
 }
 
+// ScopedConsumer receives a lease's secret through a short-lived reader. The
+// broker consumes the lease exactly once and clears its in-memory copy when
+// the callback returns. Callers should use this boundary instead of exporting
+// a secret through argv, environment variables, or workspace files.
+type ScopedConsumer func(io.Reader) error
+
 // RefusingBroker is the safe default until a platform-specific secret broker
 // is configured. It prevents accidental fallback to environment injection.
 type RefusingBroker struct{}
@@ -49,4 +56,19 @@ func ValidateRequest(ref policy.CredentialRef, request Request) error {
 		}
 	}
 	return nil
+}
+
+// Use opens a managed lease for one callback and closes/clears it
+// deterministically. It is intentionally defined on ManagedBroker rather
+// than Broker: refusing and metadata-only brokers never expose a secret.
+func (b *ManagedBroker) Use(id string, consumer ScopedConsumer) error {
+	if consumer == nil {
+		return fmt.Errorf("credential scoped consumer is required")
+	}
+	reader, err := b.Open(id)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+	return consumer(reader)
 }

@@ -83,7 +83,8 @@ func TestRecordNetworkAppendsHashChainedEvent(t *testing.T) {
 func TestScanPIIAfterRunFindsCreatedFileWithoutRawValue(t *testing.T) {
 	merged := t.TempDir()
 	path := filepath.Join(merged, "generated.txt")
-	if err := os.WriteFile(path, []byte("token=ghp_1234567890abcdef\n"), 0o600); err != nil {
+	apiToken := "ghp_" + "synthetic_1234567890abcdef"
+	if err := os.WriteFile(path, []byte("token="+apiToken+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	plan := &runplan.Plan{Layout: overlay.Layout{Merged: merged}, PIIMode: policy.ModeAudit}
