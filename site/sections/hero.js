@@ -10,17 +10,16 @@ export function Hero() {
       <div class="hero-actions"><a class="button button-primary" href="#system">See the system <span>↓</span></a><a class="button button-secondary" href="#benchmarks">Read the evidence <span>↗</span></a></div>
       <div class="hero-proof"><span class="proof-line"></span><span>Hot path: observe.</span><span>Slow path: copy-on-write.</span></div>
     </div>
-    <div class="hero-instrument reveal reveal-delay-1" aria-label="Live transaction status">
-      <div class="instrument-top"><span class="instrument-label">RUN / DEMO-042</span><span class="instrument-status"><i></i> protected</span></div>
-      <div class="instrument-screen">
-        <div class="screen-grid"></div>
-        <div class="screen-core"><span class="core-ring ring-a"></span><span class="core-ring ring-b"></span><span class="core-icon">↺</span></div>
-        <div class="screen-callout callout-one"><b>LOWER</b><span>original / intact</span></div>
-        <div class="screen-callout callout-two"><b>UPPER</b><span>agent changes / 0 B</span></div>
-        <div class="screen-callout callout-three"><b>POLICY</b><span>enforce / ready</span></div>
-        <div class="screen-axis axis-x"></div><div class="screen-axis axis-y"></div>
+    <div class="hero-instrument admin-run-card reveal reveal-delay-1" aria-label="Active transaction status">
+      <div class="admin-run-top"><span class="instrument-label">ACTIVE TRANSACTION</span><span class="instrument-status"><i></i> review</span></div>
+      <div class="admin-run-id">d1b08d60<span>· rewind-demo</span></div>
+      <div class="admin-run-meta"><span><b class="admin-live-dot"></b>00:00:03 elapsed</span><code>rm -rf src &amp;&amp; generate</code></div>
+      <div class="admin-run-grid">
+        <div><small>LOWER LAYER</small><strong>INTACT</strong><span>manifest verified</span></div>
+        <div><small>UPPER LAYER</small><strong>128 MiB</strong><span>copy-on-write</span></div>
+        <div><small>EVIDENCE</small><strong>51</strong><span>events · complete</span></div>
       </div>
-      <div class="instrument-foot"><span>overlayfs.transaction</span><span>evidence ✓</span></div>
+      <div class="admin-run-foot"><span>last event <b>ROLLBACK</b></span><span>inspect run ↗</span></div>
     </div>
     <div class="hero-evidence reveal reveal-delay-2">
       <article class="proof-panel proof-timeline">
