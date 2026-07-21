@@ -37,6 +37,28 @@ func TestStoreCreatesPolicyAndAssignsWorkspaceAtomically(t *testing.T) {
 	}
 }
 
+func TestStoreUpdatesPolicyInPlace(t *testing.T) {
+	store := Open(filepath.Join(t.TempDir(), "config.json"))
+	value := PolicyPackage{Name: "strict-agent", Version: "1.0.0", Description: "before", Policy: testPolicy()}
+	if err := store.CreatePolicy(value); err != nil {
+		t.Fatal(err)
+	}
+	updated := value
+	updated.Description = "after"
+	updated.Policy.Read.Mode = policy.ModeEnforce
+	updated.Policy.Read.Deny = []string{"**/*.env"}
+	if err := store.UpdatePolicy(updated); err != nil {
+		t.Fatal(err)
+	}
+	snapshot, err := store.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(snapshot.Policies) != 1 || snapshot.Policies[0].Description != "after" || snapshot.Policies[0].Policy.Read.Mode != policy.ModeEnforce {
+		t.Fatalf("snapshot=%+v", snapshot)
+	}
+}
+
 func TestStoreRejectsUnknownPolicyAndDuplicatePackage(t *testing.T) {
 	store := Open(filepath.Join(t.TempDir(), "config.json"))
 	value := PolicyPackage{Name: "safe", Version: "1.0.0", Policy: testPolicy()}

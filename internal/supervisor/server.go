@@ -160,8 +160,8 @@ func (s Server) Handler() http.Handler {
 			writeJSON(w, http.StatusOK, snapshot.Policies)
 			return
 		}
-		if r.Method != http.MethodPost {
-			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "policies require GET or POST"})
+		if r.Method != http.MethodPost && r.Method != http.MethodPut {
+			writeJSON(w, http.StatusMethodNotAllowed, Response{OK: false, Message: "policies require GET, POST, or PUT"})
 			return
 		}
 		if !s.authorized(r) {
@@ -173,12 +173,26 @@ func (s Server) Handler() http.Handler {
 			writeJSON(w, http.StatusBadRequest, Response{OK: false, State: "refused", Message: "invalid policy package"})
 			return
 		}
-		if err := s.createPolicy(value); err != nil {
-			s.recordAudit(Request{Action: "policy_create", Policy: value.Name + "@" + value.Version}, Response{OK: false, State: "refused", Message: err.Error()}, err)
-			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: err.Error()})
+		action := "policy_create"
+		if r.Method == http.MethodPut {
+			action = "policy_update"
+		}
+		var mutationErr error
+		if r.Method == http.MethodPut {
+			mutationErr = s.updatePolicy(value)
+		} else {
+			mutationErr = s.createPolicy(value)
+		}
+		if mutationErr != nil {
+			s.recordAudit(Request{Action: action, Policy: value.Name + "@" + value.Version}, Response{OK: false, State: "refused", Message: mutationErr.Error()}, mutationErr)
+			writeJSON(w, http.StatusConflict, Response{OK: false, State: "refused", Message: mutationErr.Error()})
 			return
 		}
-		writeJSON(w, http.StatusCreated, Response{OK: true, State: "created", Message: value.Name + "@" + value.Version})
+		state := "created"
+		if r.Method == http.MethodPut {
+			state = "updated"
+		}
+		writeJSON(w, http.StatusCreated, Response{OK: true, State: state, Message: value.Name + "@" + value.Version})
 	})
 	mux.HandleFunc("/v1/workspaces", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
@@ -450,7 +464,7 @@ func (s Server) Handler() http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", s.CORSOrigin)
 			w.Header().Set("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
 			if r.Method == http.MethodOptions {
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -475,6 +489,17 @@ func (s Server) createPolicy(value controlplane.PolicyPackage) error {
 		return err
 	}
 	s.recordAudit(Request{Action: "policy_create", Policy: value.Name + "@" + value.Version}, Response{OK: true, State: "created", Message: value.Name + "@" + value.Version}, nil)
+	return nil
+}
+
+func (s Server) updatePolicy(value controlplane.PolicyPackage) error {
+	if s.Config == nil || !s.Config.Enabled() {
+		return fmt.Errorf("control-plane config store is disabled")
+	}
+	if err := s.Config.UpdatePolicy(value); err != nil {
+		return err
+	}
+	s.recordAudit(Request{Action: "policy_update", Policy: value.Name + "@" + value.Version}, Response{OK: true, State: "updated", Message: value.Name + "@" + value.Version}, nil)
 	return nil
 }
 

@@ -7,6 +7,23 @@ const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolic
 let modalRestoreFocus = null;
 let toastTimer = null;
 
+function loadFixtureOverrides() {
+  try {
+    const raw = window.localStorage.getItem("rewind.fixture.overrides");
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved.workspaces)) fixture.workspaces = saved.workspaces;
+    if (Array.isArray(saved.policies)) fixture.policies = saved.policies;
+  } catch (_) { /* storage may be blocked or contain an older schema */ }
+}
+
+function saveFixtureOverrides() {
+  if (state.supervisor) return;
+  try {
+    window.localStorage.setItem("rewind.fixture.overrides", JSON.stringify({ workspaces: fixture.workspaces, policies: fixture.policies }));
+  } catch (_) { /* private browsing may disable persistent preview storage */ }
+}
+
 function currentRun() { return getRun(state.selectedRun); }
 function escapeUI(value) { return String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[character])); }
 
@@ -104,6 +121,7 @@ function handleAction(action, element) {
   if (action === "export-policy-bundle") return exportPolicyBundle();
   if (action === "simulate-policy") return openSimulation();
   if (action === "new-policy") return openPolicyEditor();
+  if (action === "edit-policy") return openPolicyEditor(fixture.policies.find((policy) => policy.name === state.selectedPolicy));
   if (action === "import-policy") return openSignedPolicyImport();
   if (action === "new-workspace") return openWorkspaceEditor();
   if (action === "edit-workspace") return openWorkspaceEditor(element.closest(".workspace-card")?.querySelector("h2")?.textContent);
@@ -424,6 +442,7 @@ function remoteRun(item) {
 }
 
 function remotePolicy(item) {
+  const policy = item.policy || {};
   return {
     name: item.name,
     version: item.version,
@@ -431,9 +450,13 @@ function remotePolicy(item) {
     signed: Boolean(item.signed),
     signerKeyId: item.signer_key_id || "",
     description: item.description || "Local supervisor policy package",
-    reads: item.policy?.read?.mode || "off",
-    writes: item.policy?.write?.mode || "rollback",
-    network: item.policy?.network?.mode || "off",
+    reads: policy.read?.mode || "off",
+    readDeny: policy.read?.deny || [],
+    pii: policy.read?.pii?.mode || "off",
+    writes: policy.write?.mode || "rollback",
+    scope: policy.write?.scope || "workspace",
+    network: policy.network?.mode || "off",
+    allowDomains: policy.network?.allow_domains || [],
     assigned: 0,
     updated: item.updated_at ? new Date(item.updated_at).toLocaleString() : "just now",
   };
@@ -499,16 +522,25 @@ function openSimulation() {
   openModal("Policy simulation", `<div class="simulation-summary"><span class="verified-icon">✓</span><div><strong>strict-agent@1.3.0</strong><p>Fixture replay completed without changing a workspace.</p></div></div><div class="simulation-list"><div><b>DENY</b><code>.env</code><span>matched **/*.env</span></div><div><b>DENY</b><code>/home/cemal/.ssh/id_rsa</code><span>matched SSH rule</span></div><div><b>ALLOW</b><code>src/main.go</code><span>no matching deny</span></div><div><b>AUDIT</b><code>api.github.com</code><span>network mode is audit</span></div></div>`, { confirm: "Close simulation", onConfirm: closeModal });
 }
 
-function openPolicyEditor() {
-  openModal("New policy package", `<form id="policy-form" class="modal-form"><label>Package name<input name="name" value="review-safe" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" maxlength="64" required aria-describedby="policy-name-help" /><small id="policy-name-help" class="field-help">Letters, numbers, dots, dashes, and underscores only.</small></label><label>Version<input name="version" value="0.1.0" pattern="[0-9]+\\.[0-9]+\\.[0-9]+" maxlength="32" required /></label><label>Description<textarea name="description" maxlength="240">Review-first profile for a new workspace.</textarea></label><div class="form-note">New packages start in review mode and apply only to future runs.</div></form>`, { confirm: "Create package", onConfirm: () => {
+function openPolicyEditor(existing = null) {
+  const source = existing || { name: "review-safe", version: "0.1.0", description: "Review-first profile for a new workspace.", reads: "audit", readDeny: ["**/*.env"], pii: "audit", writes: "rollback", scope: "workspace", network: "off", allowDomains: [] };
+  const options = (values, current) => values.map((value) => `<option value="${value}" ${value === current ? "selected" : ""}>${value}</option>`).join("");
+  const title = existing ? `Edit ${existing.name}@${existing.version}` : "New policy package";
+  openModal(title, `<form id="policy-form" class="modal-form"><label>Package name<input name="name" value="${escapeUI(source.name)}" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" maxlength="64" required ${existing ? "readonly" : ""} aria-describedby="policy-name-help" /><small id="policy-name-help" class="field-help">Letters, numbers, dots, dashes, and underscores only.</small></label><label>Version<input name="version" value="${escapeUI(source.version)}" pattern="[0-9]+\\.[0-9]+\\.[0-9]+" maxlength="32" required ${existing ? "readonly" : ""} /></label><label>Description<textarea name="description" maxlength="240">${escapeUI(source.description)}</textarea></label><div class="form-grid-two"><label>Read mode<select name="read_mode">${options(["off", "audit", "enforce"], source.reads)}</select></label><label>PII mode<select name="pii_mode">${options(["off", "audit", "enforce"], source.pii || "audit")}</select></label></div><label>Denied path patterns<textarea name="read_deny" rows="4" placeholder="One glob per line">${escapeUI((source.readDeny || []).join("\\n"))}</textarea><small class="field-help">Examples: **/*.env, **/*.pem, /home/*/.ssh/**</small></label><div class="form-grid-two"><label>Write behavior<select name="write_mode">${options(["rollback"], source.writes || "rollback")}</select></label><label>Write scope<select name="write_scope">${options(["workspace", "system"], source.scope || "workspace")}</select></label></div><label>Network mode<select name="network_mode">${options(["off", "audit", "enforce"], source.network || "off")}</select></label><label>Allowed domains<textarea name="allow_domains" rows="2" placeholder="api.example.com, github.com">${escapeUI((source.allowDomains || []).join(", "))}</textarea></label><div class="form-note">${existing ? "This updates the selected package in the supervisor catalog. Existing runs keep their immutable policy snapshot." : "New packages start in review mode and apply only to future runs."}</div></form>`, { confirm: existing ? "Save policy" : "Create package", onConfirm: () => {
     const form = document.querySelector("#policy-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
-    const value = { name: data.get("name"), version: data.get("version"), description: data.get("description"), policy: { read: { mode: "audit", pii: { mode: "audit" } }, write: { mode: "rollback", scope: "workspace" }, network: { mode: "off" } } };
-    const save = state.supervisor ? state.supervisor.createPolicy(value) : Promise.resolve();
+    const deny = String(data.get("read_deny") || "").split(/\\n|,/).map((item) => item.trim()).filter(Boolean);
+    const domains = String(data.get("allow_domains") || "").split(/\\n|,/).map((item) => item.trim()).filter(Boolean);
+    const value = { name: data.get("name"), version: data.get("version"), description: data.get("description"), policy: { read: { mode: data.get("read_mode"), deny, pii: { mode: data.get("pii_mode") } }, write: { mode: data.get("write_mode"), scope: data.get("write_scope") }, network: { mode: data.get("network_mode"), allow_domains: domains } } };
+    const save = state.supervisor ? (existing ? state.supervisor.updatePolicy(value) : state.supervisor.createPolicy(value)) : Promise.resolve();
     save.then(() => {
-      fixture.policies.unshift({ name: value.name, version: value.version, state: "available", signed: false, description: value.description, reads: "audit", writes: "rollback", network: "off", assigned: 0, updated: "just now" });
-      closeModal(); render(); setToast(state.supervisor ? "Policy package persisted by supervisor." : "Policy package created in fixture mode.", "success");
+      const view = { name: value.name, version: value.version, state: "available", signed: false, description: value.description, reads: value.policy.read.mode, readDeny: deny, pii: value.policy.read.pii.mode, writes: value.policy.write.mode, scope: value.policy.write.scope, network: value.policy.network.mode, allowDomains: domains, assigned: existing?.assigned || 0, updated: "just now" };
+      const index = fixture.policies.findIndex((policy) => policy.name === view.name && policy.version === view.version);
+      if (index >= 0) fixture.policies[index] = view; else fixture.policies.unshift(view);
+      state.selectedPolicy = view.name;
+      saveFixtureOverrides();
+      closeModal(); render(); setToast(state.supervisor ? `Policy ${view.name}@${view.version} persisted by supervisor.` : `Policy ${view.name}@${view.version} saved in fixture mode.`, "success");
     }).catch((error) => setToast(`Policy package refused: ${error.message}`, "error"));
     return save;
   } });
@@ -571,15 +603,19 @@ function bundleName(bundle) {
 }
 
 function openWorkspaceEditor(name = "") {
-  openModal(name ? `Edit ${name}` : "Add workspace", `<form id="workspace-form" class="modal-form"><label>Workspace name<input name="name" value="${name}" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" maxlength="64" required /></label><label>Workspace path<input name="path" value="/workspaces/${name || "new-project"}" pattern="/[A-Za-z0-9._~/-]+" maxlength="240" required /></label><label>Policy package<select name="policy"><option>strict-agent@1.3.0</option><option>developer-safe@0.8.2</option><option>hackathon-demo@0.4.0</option></select></label><label>Agent adapter<select name="adapter"><option>generic</option><option>codex</option><option>openhands</option><option>claude-code</option></select></label><div class="form-note">The adapter records agent identity; it never rewrites the operator command. Assignment applies to new runs only.</div></form>`, { confirm: name ? "Save assignment" : "Add workspace", onConfirm: () => {
+  const existing = fixture.workspaces.find((workspace) => workspace.name === name);
+  const policyOptions = fixture.policies.map((policy) => `${policy.name}@${policy.version}`);
+  const selectedPolicy = existing?.policy || policyOptions[0] || "none";
+  openModal(name ? `Edit ${name}` : "Add workspace", `<form id="workspace-form" class="modal-form"><label>Workspace name<input name="name" value="${escapeUI(name)}" pattern="[A-Za-z0-9][A-Za-z0-9._-]{1,63}" maxlength="64" required ${name ? "readonly" : ""} /></label><label>Workspace path<input name="path" value="${escapeUI(existing?.path || "/workspaces/new-project")}" pattern="/[A-Za-z0-9._~/-]+" maxlength="240" required /></label><label>Policy package<select name="policy">${policyOptions.map((policy) => `<option ${policy === selectedPolicy ? "selected" : ""}>${escapeUI(policy)}</option>`).join("")}</select></label><label>Agent adapter<select name="adapter">${["generic", "codex", "openhands", "claude-code"].map((adapter) => `<option ${adapter === (existing?.adapter || "generic") ? "selected" : ""}>${adapter}</option>`).join("")}</select></label><div class="form-note">The adapter records agent identity; it never rewrites the operator command. Assignment applies to new runs only. ${state.supervisor ? "This connected assignment is stored in the supervisor config." : "Fixture mode stores it only in this browser."}</div></form>`, { confirm: name ? "Save assignment" : "Add workspace", onConfirm: () => {
     const form = document.querySelector("#workspace-form");
     if (!form?.reportValidity()) return false;
     const data = new FormData(form);
     const value = { name: data.get("name"), path: data.get("path"), policy: data.get("policy"), adapter: data.get("adapter") };
     const save = state.supervisor ? state.supervisor.assignWorkspace(value) : Promise.resolve();
     save.then(() => {
-      const existing = fixture.workspaces.find((workspace) => workspace.name === name);
-      if (existing) { existing.path = value.path; existing.policy = value.policy; existing.adapter = value.adapter; } else fixture.workspaces.push({ name: value.name, path: value.path, policy: value.policy, status: "protected", lastRun: "—", agent: "not configured", adapter: value.adapter, network: "off" });
+      const current = fixture.workspaces.find((workspace) => workspace.name === name);
+      if (current) { current.path = value.path; current.policy = value.policy; current.adapter = value.adapter; } else fixture.workspaces.push({ name: value.name, path: value.path, policy: value.policy, status: "protected", lastRun: "—", agent: "not configured", adapter: value.adapter, network: "off" });
+      saveFixtureOverrides();
       closeModal(); render(); setToast(state.supervisor ? "Workspace assignment persisted by supervisor." : "Workspace assignment saved for future runs.", "success");
     }).catch((error) => setToast(`Workspace assignment refused: ${error.message}`, "error"));
     return save;
@@ -789,6 +825,7 @@ function closeModal() {
 function setToast(message, tone) { state.toast = { message, tone }; render(); window.clearTimeout(toastTimer); toastTimer = window.setTimeout(() => { state.toast = null; }, 3200); }
 function showToast(message, tone = "neutral") { const toast = document.createElement("div"); toast.className = `toast toast-${tone}`; toast.setAttribute("role", "status"); toast.setAttribute("aria-live", "polite"); toast.innerHTML = `<span>${tone === "success" ? "✓" : "i"}</span><p>${message}</p><button aria-label="Dismiss notification">×</button>`; document.body.append(toast); toast.querySelector("button").addEventListener("click", () => toast.remove()); window.setTimeout(() => toast.remove(), 3400); }
 
+loadFixtureOverrides();
 render();
 
 // `rewind dashboard start` supplies this one-time fragment so the browser can

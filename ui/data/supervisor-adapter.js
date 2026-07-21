@@ -33,6 +33,7 @@ export async function connectSupervisor(baseUrl, token = "") {
     challenge: (request) => issueActionChallenge(root, token.trim(), request),
     action: (request) => executeAction(root, token.trim(), request),
     createPolicy: (value) => createResource(root, token.trim(), "policies", value),
+    updatePolicy: (value) => updateResource(root, token.trim(), "policies", value),
     assignWorkspace: (value) => createResource(root, token.trim(), "workspaces", value),
     uploadPolicyBundle: (value) => uploadPolicyBundle(root, token.trim(), value),
     issueCredentialLease: (value) => issueCredentialLease(root, token.trim(), value),
@@ -132,6 +133,17 @@ export async function sessionAction(baseUrl, token, value) {
 async function createResource(baseUrl, token, resource, value) {
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/${resource}`, {
     method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
+    body: JSON.stringify(value),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
+}
+
+async function updateResource(baseUrl, token, resource, value) {
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/${resource}`, {
+    method: "PUT",
     headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token.trim()}` },
     body: JSON.stringify(value),
   });

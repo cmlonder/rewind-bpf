@@ -79,6 +79,31 @@ func (s *Store) CreatePolicy(value PolicyPackage) error {
 	})
 }
 
+// UpdatePolicy replaces an existing package in place. Package identity is the
+// name+version reference used by workspace assignments; changing identity is a
+// new package operation, which keeps active assignments deterministic.
+func (s *Store) UpdatePolicy(value PolicyPackage) error {
+	if err := validatePolicyPackage(value); err != nil {
+		return err
+	}
+	return s.mutate(func(snapshot *Snapshot) error {
+		for i := range snapshot.Policies {
+			if snapshot.Policies[i].Name == value.Name && snapshot.Policies[i].Version == value.Version {
+				if snapshot.Policies[i].Signed {
+					return fmt.Errorf("signed policy package %s@%s is immutable; publish a new version", value.Name, value.Version)
+				}
+				value.UpdatedAt = time.Now().UTC()
+				value.Signed = snapshot.Policies[i].Signed
+				value.SignerKeyID = snapshot.Policies[i].SignerKeyID
+				value.SignedBundle = snapshot.Policies[i].SignedBundle
+				snapshot.Policies[i] = value
+				return nil
+			}
+		}
+		return fmt.Errorf("policy package %s@%s does not exist", value.Name, value.Version)
+	})
+}
+
 // CreateSignedPolicy verifies the self-contained Ed25519 envelope before it is
 // admitted to the local policy catalog. Trust distribution is deliberately
 // separate: callers that need an allow-list can verify the envelope against
