@@ -10,12 +10,21 @@ export const siteData = {
     label: "Linux verified · macOS native staged lifecycle",
     sublabel: "Ubuntu VM reference · EndpointSecurity/Windows helper gates",
   },
-  metrics: [
-    { value: "1 operation", label: "to discard a failed run" },
-    { value: "0 dropped", label: "in the normal demo path" },
-    { value: "11.1%", label: "warm B4 throughput gap vs native" },
-    { value: "129 MiB", label: "upper-layer logical footprint for 128 MiB workload" },
-  ],
+  heroRun: {
+    id: "RUN / DEMO-042",
+    status: "review",
+    timeline: [
+      ["prepare", "allow", "00:00.000"],
+      ["read_policy", "deny · .env", "00:00.001"],
+      ["execve", "allow · /bin/sh", "00:00.003"],
+      ["exit", "review", "00:00.020"],
+    ],
+    diff: [
+      ["deleted", "src/", "staged"],
+      ["created", "generated.txt", "staged"],
+      ["denied", ".env", "read policy"],
+    ],
+  },
   capabilities: [
     {
       number: "01",
