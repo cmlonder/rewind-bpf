@@ -39,6 +39,10 @@ working tree; it does not replace GitHub secret scanning or a review of old
 commits. Existing token-shaped strings in tests must remain clearly synthetic
 and must never be replaced with a real credential.
 
+Choose a repository license before publishing. MIT or Apache-2.0 are reasonable
+defaults for a reusable hackathon developer tool, but the owner must make the
+legal choice; this repository does not silently assume one.
+
 ## What this project does not publish
 
 The public repository does not contain the private Codex conversation transcript.

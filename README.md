@@ -22,6 +22,7 @@ judge installation path, video script, and final external checklist are in
 [docs/DEVPOST_SUBMISSION.md](docs/DEVPOST_SUBMISSION.md).
 The public-repository privacy boundary and pre-push audit are documented in
 [docs/PUBLIC_REPO_CHECKLIST.md](docs/PUBLIC_REPO_CHECKLIST.md).
+The vulnerability-reporting boundary is in [SECURITY.md](SECURITY.md).
 
 ## Codex and GPT-5.6 contribution
 
