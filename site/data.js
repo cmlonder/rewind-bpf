@@ -69,7 +69,7 @@ export const siteData = {
     {
       number: "06",
       title: "One explicit boundary",
-      tag: "HONEST SCOPE",
+      tag: "DEFINED SCOPE",
       body: "This is a Linux runtime application, not an agent plugin. It protects filesystem state inside a disposable VM; kernel, device, network, and external-service side effects need their own controls.",
       detail: "The safety claim is narrow enough to test and strong enough to demo.",
       tone: "sand",

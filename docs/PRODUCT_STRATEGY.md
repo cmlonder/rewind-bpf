@@ -74,7 +74,7 @@ The roadmap is measured by user-visible guarantees:
 
 ## 5. Competitive position
 
-The honest positioning is:
+The product positioning is:
 
 > **nono is a developer-friendly sandbox and durable undo system. RewindBPF is a high-assurance transaction runtime for agent runs: changes are isolated before execution, secrets are policy-hidden, acceptance is explicit, and incomplete evidence is treated as failure.**
 

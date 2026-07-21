@@ -126,7 +126,7 @@ The output directory contains `logs/acceptance.log`, `logs/p1-leak.log`, `logs/j
 2. **Invariant (30 seconds):** the agent writes to an OverlayFS/FUSE upper layer; Landlock denies sensitive reads; cgroup-v2 scopes descendants; eBPF records evidence.
 3. **Live act (90 seconds):** run the intentionally bad agent command, show `src/` disappearing only from the merged view, show the `.env` denial, then rollback and show the original source restored.
 4. **Trust act (25 seconds):** show the event chain, dropped/truncated evidence state, and destination-drift commit refusal.
-5. **Performance and differentiation (35 seconds):** show B0/B2/B4/B5, storage amplification, event bytes, and explain that the measured hot-path cost is reported honestly rather than marketed as zero overhead.
+5. **Performance and differentiation (35 seconds):** show B0/B2/B4/B5, storage amplification, event bytes, and explain the measured hot-path tradeoff rather than presenting it as zero overhead.
 6. **Close (20 seconds):** RewindBPF is a transaction runtime for agents, not an SDK plugin and not a replacement for a VM/container; it accepts only reviewed, verifiable results.
 
 ### 4.2 What to show on screen

@@ -59,9 +59,8 @@ rewind platform status
   sensitive-read denial, crash recovery, and destination conflict refusal.
 
 The remaining native-helper gates require the target operating systems,
-privileged entitlements, and disposable storage. They cannot be honestly
-simulated on the personal Mac or replaced by a WSL2 claim about Windows-host
-protection.
+privileged entitlements, and disposable storage. They cannot be validated on
+the personal Mac or replaced by a WSL2 claim about Windows-host protection.
 
 ## Productisation after the gates
 

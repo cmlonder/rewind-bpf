@@ -17,7 +17,7 @@ This is a developer tool, not an MCP server or an agent SDK plugin. The agent co
 
 AI agents are good at changing files and bad at understanding the blast radius of a destructive command. RewindBPF gives an agent a reversible work session instead of direct access to the real project: copy-on-write keeps writes in a disposable layer, policy rules deny configured sensitive reads, and the supervisor records the run. The operator can inspect a manifest and timeline, reject the run in one rollback, or accept it through an explicit conflict-checked commit. The recorded Mac demo uses a synthetic project: the agent deletes `src/`, attempts to read a synthetic `.env`, creates output, and the original source is restored without touching the real workspace. The Ubuntu VM scenario demonstrates the additional Linux enforcement layers.
 
-The central claim is deliberately narrower than “zero overhead”: copy-on-write avoids a full pre-run copy, while the benchmark ledger reports the measured B0/B2/B4/B5 throughput, latency, storage, telemetry, and lifecycle costs. The system is honest about its boundary: it does not undo external databases, cloud APIs, devices, or arbitrary kernel side effects.
+The central claim is deliberately narrower than “zero overhead”: copy-on-write avoids a full pre-run copy, while the benchmark ledger reports the measured B0/B2/B4/B5 throughput, latency, storage, telemetry, and lifecycle costs. The supported boundary is explicit: RewindBPF does not undo external databases, cloud APIs, devices, or arbitrary kernel side effects.
 
 ## How Codex and GPT-5.6 contributed
 

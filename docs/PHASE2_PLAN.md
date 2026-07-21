@@ -38,7 +38,7 @@ The first product-core slice adds three explicit, portable contracts:
 - `internal/credentials` exposes capability references, an opt-in command provider, and short-lived leases. Raw values have no representation in policy, lease JSON, argv, or workspace files; native keychains remain platform-specific.
 - `internal/acceptance` compares the immutable base, destination, and candidate manifests and rejects same-path drift before `rewind commit --confirm` applies regular-file and directory changes.
 
-The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This keeps the demo honest while preserving the API shape for native backends.
+The Control Plane fixture exposes these states as operational UI: network mode is visible, the broker is visibly refusing, and “Test boundary” explains why a secret is never injected. This makes the boundary visible while preserving the API shape for native backends.
 
 #### P1 completion (2026-07-21)
 
@@ -125,7 +125,7 @@ Phase 2 must stop treating “kernel-level” as a differentiator by itself. The
 - **Two independent safety planes:** filesystem rollback for integrity, and Landlock/BPF-LSM policy for confidentiality/prevention.
 - **Agent-agnostic process scope:** no SDK or agent rewrite; all descendants are covered.
 - **Evidence-first lifecycle:** every run has a state, policy digest, backend, event-loss status, manifest, and rollback/commit result.
-- **Honest portability:** capability detection chooses kernel OverlayFS, FUSE OverlayFS, Landlock, or a safe refusal instead of silently weakening the guarantee.
+- **Capability-based portability:** capability detection chooses kernel OverlayFS, FUSE OverlayFS, Landlock, or a safe refusal instead of silently weakening the guarantee.
 
 ### Competitive benchmark strategy
 
@@ -168,7 +168,7 @@ These are product hypotheses to validate, not current claims:
 1. **Transaction-native writes:** make the lower/upper/merged filesystem boundary the primary object from which diffs, rollback, and future commit are derived, instead of treating undo as a post-session snapshot feature.
 2. **Filesystem and policy timeline in one run:** correlate the eBPF event stream, Landlock decisions, process/cgroup identity, upper-layer diff, and final state in one evidence bundle.
 3. **Conflict-safe export:** make `commit` refuse when the destination lower manifest changed, then export a reviewable JSON bundle or full-fidelity Git patch rather than overwriting the live workspace.
-4. **Capability honesty:** report exactly which guarantees are active on this kernel (Landlock ABI, BPF-LSM, cgroup-v2, OverlayFS/FUSE, network backend) and fail closed when an enforce-mode guarantee cannot be provided.
+4. **Capability reporting:** report exactly which guarantees are active on this kernel (Landlock ABI, BPF-LSM, cgroup-v2, OverlayFS/FUSE, network backend) and fail closed when an enforce-mode guarantee cannot be provided.
 5. **Agent-agnostic deployment:** keep the core runtime independent of Claude/Codex/OpenHands/etc.; integrations remain thin adapters.
 
 ## 4. Phase 2 goals and non-goals
