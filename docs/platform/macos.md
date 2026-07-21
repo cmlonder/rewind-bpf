@@ -14,6 +14,11 @@ It is intentionally separate from the Linux OverlayFS/Landlock/eBPF path.
 - Manifest-based destination conflict detection before commit.
 - Durable JSON run record and `<record>.events.jsonl` sidecar that survive
   rollback/discard.
+- Workspace-wide coverage: the APFS staged view is not limited to source code;
+  images, media, PDFs, binaries, generated assets, directories, symlinks, and
+  file metadata appear in the diff and can be discarded on rollback. The
+  current commit path accepts regular files and directories and refuses
+  unsupported special entries such as symlinks.
 
 ## Safe invocation
 

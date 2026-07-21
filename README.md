@@ -54,6 +54,36 @@ Sensitive reads are controlled separately with user-defined patterns. For
 example, a policy can deny `**/*.env`, `**/*.pem`, or a project-specific PII
 path without treating `.env` as a special hard-coded file.
 
+## What gets protected
+
+The boundary is based on filesystem paths, not on programming languages,
+extensions, or Git tracking. Files inside the protected workspace can be
+rewound regardless of type: source code, images, video, audio, PDFs, archives,
+binaries, fonts, models, generated assets, symlinks, directories, and selected
+file metadata.
+Linux stages the workspace with OverlayFS/FUSE; macOS stages it with an APFS
+clone-backed view. The run manifest records path, type, mode, size, symlink
+targets, and content hashes where applicable.
+
+This scope is intentionally clear. RewindBPF can rewind filesystem changes in
+the protected workspace; it does not undo database writes, cloud/API calls,
+network traffic, device state, kernel changes, or files outside that workspace.
+
+## RewindBPF and Git
+
+Git and RewindBPF solve different problems and work well together:
+
+| Question | Git | RewindBPF |
+| --- | --- | --- |
+| When is protection created? | After a file is tracked and committed | Before the agent process starts |
+| What is the unit? | Repository history | A live filesystem transaction |
+| What about untracked or ignored assets? | They are not part of Git history | They are included when they are inside the protected workspace |
+| How is a bad run undone? | Restore a known commit or working tree | Discard the disposable upper layer |
+| What does it accept? | A commit chosen by a developer | A reviewed, conflict-checked filesystem result |
+
+Git remains the right place for accepted project history. RewindBPF is the
+guardrail around the risky run that happens before that history exists.
+
 ## What is implemented
 
 - OverlayFS/FUSE copy-on-write workspace isolation

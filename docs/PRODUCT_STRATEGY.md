@@ -21,6 +21,12 @@ This turns the product from a generic sandbox into a **high-assurance agent tran
 
 The agent starts in a disposable write layer. Deletes, renames, overwrites, generated files, and dependency changes are visible to the agent but do not touch the protected workspace before explicit acceptance.
 
+This is a filesystem boundary, not a source-code rule. Images, video, audio,
+PDFs, archives, binaries, fonts, model files, generated assets, symlinks,
+directories, and their metadata are covered when they live inside the protected
+workspace. The boundary follows paths, so it also includes files Git has never
+tracked.
+
 Default outcome: **discard**, not “remember to rollback.”
 
 ### 2.2 Invisible secrets
@@ -45,6 +51,18 @@ are checked safely; same-path drift and incomplete evidence refuse the apply.
 The runtime must not report a run as safely complete when policy installation, process cleanup, mount cleanup, or evidence capture is incomplete. Dropped events, truncated evidence, unsupported enforcement, and stale descendants are visible failure states.
 
 eBPF, cgroups, Landlock, OverlayFS, hash chains, and recovery are implementation mechanisms for these promises. They are not the headline product features.
+
+### 2.5 RewindBPF and Git solve different problems
+
+Git protects repository history after a developer tracks and commits a change.
+RewindBPF protects a live agent run before that history exists. It stages the
+whole protected workspace, so an untracked image, generated bundle, binary, or
+deleted directory can be reviewed and discarded as part of the same run.
+
+Git is still the system of record for accepted project history. RewindBPF is the
+transaction boundary around the risky work that may or may not become a Git
+commit. Neither system can undo database writes, cloud/API calls, device state,
+or other effects outside the protected filesystem.
 
 ## 3. What we deliberately do not chase first
 

@@ -144,6 +144,19 @@ For enforcement, use the appropriate hook and mechanism (BPF LSM, Landlock, secc
 
 `lowerdir` contains the original fixture or rootfs. `upperdir` receives copy-up changes and whiteouts. `workdir` is required by OverlayFS and must satisfy the kernel filesystem requirements. The agent sees only `merged`.
 
+The transaction is content-agnostic: the protected unit is the workspace path,
+not a programming language or file extension. A deleted image, overwritten
+binary, generated archive, font, model, symlink, directory, or source file is
+represented in the same before/after manifest. Manifests retain path, type,
+mode, size, symlink target, and SHA-256 content metadata where applicable.
+This is why RewindBPF complements rather than replaces Git: Git records
+accepted repository history, while this layer protects the live run before a
+commit exists, including files Git does not track.
+
+Rollback can discard every staged entry in the boundary. The current explicit
+commit path applies regular files and directories; it refuses unsupported
+special entries such as symlinks instead of silently changing their meaning.
+
 #### Policy engine
 
 User-facing glob patterns are compiled into filesystem access rules. The first read policy supports:

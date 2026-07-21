@@ -28,10 +28,10 @@ export const siteData = {
   capabilities: [
     {
       number: "01",
-      title: "Reversible writes",
+      title: "Reversible workspace",
       tag: "SHIPPED",
-      body: "The agent works in a pre-created OverlayFS transaction. Deletes, overwrites, renames, and new files land in the temporary upper layer; the original lower layer stays intact.",
-      detail: "Rollback unmounts the merged view and discards upper/work. No pre-operation cp loop, no shell command deny-list.",
+      body: "The agent works in a pre-created filesystem transaction. Source code, images, video, audio, binaries, generated assets, deletes, overwrites, renames, and new files stay in the temporary upper layer; the original workspace stays intact.",
+      detail: "The boundary follows workspace paths, not file extensions or Git tracking. Manifests also capture type, mode, size, symlink targets, and content hashes where applicable. Rollback discards upper/work; no pre-operation cp loop or shell command deny-list.",
       tone: "orange",
     },
     {
