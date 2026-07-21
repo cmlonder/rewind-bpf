@@ -229,11 +229,14 @@ func runDashboardShell(executable, workspace, state, policy, history, shell stri
 	stamp := time.Now().UTC().Format("20060102T150405.000000000Z")
 	runtimeRoot := filepath.Join(state, "runtime-"+stamp)
 	record := filepath.Join(state, "run-"+stamp+".json")
+	shellArgs := dashboardInteractiveShellArgs(shell)
 	args := []string{}
 	if runtime.GOOS == "darwin" {
-		args = []string{"native", "run", "--workspace", workspace, "--runtime-root", runtimeRoot, "--policy", policy, "--record", record, "--history", history, "--on-success", "review", "--", shell, "-i"}
+		args = []string{"native", "run", "--workspace", workspace, "--runtime-root", runtimeRoot, "--policy", policy, "--record", record, "--history", history, "--on-success", "review", "--", shell}
+		args = append(args, shellArgs...)
 	} else if runtime.GOOS == "linux" {
-		args = []string{"run", "--workspace", workspace, "--runtime-root", runtimeRoot, "--policy", policy, "--record", record, "--history", history, "--overlay-backend", "fuse", "--runtime-roots", "/bin,/usr/bin,/lib,/usr/lib,/etc", "--on-success", "review", "--", shell, "-i"}
+		args = []string{"run", "--workspace", workspace, "--runtime-root", runtimeRoot, "--policy", policy, "--record", record, "--history", history, "--overlay-backend", "fuse", "--runtime-roots", "/bin,/usr/bin,/lib,/usr/lib,/etc", "--on-success", "review", "--", shell}
+		args = append(args, shellArgs...)
 	} else {
 		return fmt.Errorf("native protected shell is not available on %s; install the signed Windows helper before enabling host enforcement", runtime.GOOS)
 	}
@@ -242,6 +245,21 @@ func runDashboardShell(executable, workspace, state, policy, history, shell stri
 	cmd.Env = append(os.Environ(), "REWIND_DASHBOARD=1")
 	fmt.Printf("starting protected shell (%s); run `rewind native diff --record %s` after exit to review\n", shell, record)
 	return cmd.Run()
+}
+
+// dashboardInteractiveShellArgs keeps the protected terminal independent of
+// host dotfiles. A user's zsh/Oh My Zsh setup may read paths that Seatbelt
+// correctly denies outside the staged workspace, which would otherwise make
+// the dashboard shell exit before the user can type a command.
+func dashboardInteractiveShellArgs(shell string) []string {
+	switch filepath.Base(shell) {
+	case "zsh":
+		return []string{"-f", "-i"}
+	case "bash":
+		return []string{"--noprofile", "--norc", "-i"}
+	default:
+		return []string{"-i"}
+	}
 }
 
 func startDashboardChild(cmd *exec.Cmd) error {
