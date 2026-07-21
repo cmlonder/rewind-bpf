@@ -217,13 +217,16 @@ func handleDashboard(args []string) {
 
 func runDashboardShell(executable, workspace, state, policy, history, shell string) error {
 	if shell == "" {
-		shell = os.Getenv("SHELL")
-	}
-	if shell == "" {
 		if runtime.GOOS == "darwin" {
-			shell = "/bin/zsh"
-		} else {
+			// The system zsh exits immediately under the current Seatbelt
+			// profile even with dotfiles disabled. Bash provides the same
+			// interactive POSIX shell surface without depending on host config.
 			shell = "/bin/bash"
+		} else {
+			shell = os.Getenv("SHELL")
+			if shell == "" {
+				shell = "/bin/bash"
+			}
 		}
 	}
 	stamp := time.Now().UTC().Format("20060102T150405.000000000Z")
