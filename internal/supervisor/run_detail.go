@@ -2,11 +2,13 @@ package supervisor
 
 import (
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/platform"
+	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
 
@@ -73,6 +75,11 @@ func (s Server) runDetail(w http.ResponseWriter, r *http.Request) {
 				changes = diff.Compare(native.BaseManifest, after)
 			}
 		}
+		// Read-policy enforcement temporarily hides sensitive paths from the
+		// staged view. A missing hidden path is expected, not an agent delete.
+		// Filter both new records (which carry exact hidden paths) and older
+		// records by consulting their deny patterns.
+		changes = filterPolicyHiddenChanges(changes, native)
 		writeJSON(w, http.StatusOK, RunDetail{
 			RunID: native.RunID, State: native.State, Backend: native.Backend,
 			Workspace: native.Workspace, Command: append([]string(nil), native.Command...),
@@ -92,6 +99,51 @@ func (s Server) runDetail(w http.ResponseWriter, r *http.Request) {
 		Workspace: record.Plan.Layout.Lower, ChangeCount: 0, EventCount: record.Events.Count,
 		EventBytes: record.Events.Bytes, EvidenceDone: record.Events.Complete,
 	})
+}
+
+func filterPolicyHiddenChanges(changes []diff.Change, native platform.NativeRecord) []diff.Change {
+	if len(changes) == 0 {
+		return changes
+	}
+	hidden := make([]string, 0, len(native.HiddenPaths))
+	for _, path := range native.HiddenPaths {
+		if native.View == "" {
+			continue
+		}
+		rel, err := filepath.Rel(native.View, filepath.Clean(path))
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			hidden = append(hidden, filepath.ToSlash(rel))
+		}
+	}
+	var readDeny func(string) bool
+	if native.PolicyPath != "" {
+		if value, err := policy.Load(native.PolicyPath); err == nil && value.Read.Mode == policy.ModeEnforce {
+			readDeny = func(path string) bool {
+				return value.Read.Explain(path).Decision == "deny" || value.Read.Explain("/"+path).Decision == "deny"
+			}
+		}
+	}
+	if len(hidden) == 0 && readDeny == nil {
+		return changes
+	}
+	filtered := make([]diff.Change, 0, len(changes))
+	for _, change := range changes {
+		path := filepath.ToSlash(filepath.Clean(change.Path))
+		isHidden := false
+		for _, root := range hidden {
+			if path == root || strings.HasPrefix(path, root+"/") {
+				isHidden = true
+				break
+			}
+		}
+		if !isHidden && readDeny != nil {
+			isHidden = readDeny(path)
+		}
+		if !isHidden {
+			filtered = append(filtered, change)
+		}
+	}
+	return filtered
 }
 
 func stagedBytes(changes []diff.Change) int64 {

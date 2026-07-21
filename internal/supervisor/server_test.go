@@ -198,6 +198,55 @@ func TestRunDetailEndpointReturnsNativeFilesystemChanges(t *testing.T) {
 	}
 }
 
+func TestRunDetailDoesNotReportPolicyHiddenFilesAsDeletes(t *testing.T) {
+	dir := t.TempDir()
+	recordPath := filepath.Join(dir, "run.json")
+	historyPath := filepath.Join(dir, "history.json")
+	policyPath := filepath.Join(dir, "policy.yaml")
+	view := filepath.Join(dir, "view")
+	if err := os.WriteFile(policyPath, []byte("read:\n  mode: enforce\n  deny:\n    - '**/*.env'\nwrite:\n  mode: rollback\n  scope: workspace\nnetwork:\n  mode: audit\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(view, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(view, ".env"), []byte("TOKEN=synthetic\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(view, "src", "marker.txt"), []byte("original\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base, err := manifest.Build(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(view, ".env")); err != nil {
+		t.Fatal(err)
+	}
+	runID := "run_native_hidden"
+	record := platform.NativeRecord{
+		RunID: runID, Platform: "darwin", Backend: "apfs-seatbelt", Workspace: filepath.Join(dir, "workspace"),
+		View: view, PolicyPath: policyPath, BaseManifest: base, State: "running",
+	}
+	if err := platform.WriteNativeRecord(recordPath, record); err != nil {
+		t.Fatal(err)
+	}
+	if err := history.Open(historyPath).Upsert(history.Entry{RunID: runID, Backend: record.Backend, State: record.State, Workspace: record.Workspace, RecordPath: recordPath}); err != nil {
+		t.Fatal(err)
+	}
+	server := Server{History: history.Open(historyPath), AuthToken: "secret", RequireAuth: true}
+	request := httptest.NewRequest(http.MethodGet, "/v1/run?run_id="+runID, nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), ".env") || !strings.Contains(response.Body.String(), `"change_count":0`) {
+		t.Fatalf("policy-hidden file was reported as a live delete: %s", response.Body.String())
+	}
+}
+
 func TestSessionEndpointSupportsReconnectAndTakeover(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sessions.json")

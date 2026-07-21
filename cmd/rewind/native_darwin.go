@@ -137,6 +137,10 @@ func handleNativeRun(args []string) {
 		_ = tx.Discard(context.Background())
 		fatal(fmt.Sprintf("compile macOS read policy: %v", err))
 	}
+	// Persist the paths hidden for read enforcement before the protected
+	// process starts. The supervisor uses this to distinguish policy-hidden
+	// files from genuine deletes in its live diff.
+	record.HiddenPaths = append([]string(nil), denyPaths...)
 	for _, path := range denyPaths {
 		_ = appendNativeEvent(eventsPath, platform.NativeEvent{Operation: "read_policy", Path: path, Decision: "deny", Timestamp: time.Now().UTC().Format(time.RFC3339Nano)})
 	}

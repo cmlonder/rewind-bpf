@@ -22,15 +22,19 @@ type NativeEvent struct {
 }
 
 type NativeRecord struct {
-	Version      int               `json:"version"`
-	RunID        string            `json:"run_id"`
-	Platform     string            `json:"platform"`
-	Backend      string            `json:"backend"`
-	Workspace    string            `json:"workspace"`
-	RuntimeRoot  string            `json:"runtime_root"`
-	HistoryPath  string            `json:"history_path,omitempty"`
-	View         string            `json:"view"`
-	PolicyPath   string            `json:"policy_path,omitempty"`
+	Version     int    `json:"version"`
+	RunID       string `json:"run_id"`
+	Platform    string `json:"platform"`
+	Backend     string `json:"backend"`
+	Workspace   string `json:"workspace"`
+	RuntimeRoot string `json:"runtime_root"`
+	HistoryPath string `json:"history_path,omitempty"`
+	View        string `json:"view"`
+	PolicyPath  string `json:"policy_path,omitempty"`
+	// HiddenPaths contains paths temporarily removed from the staged view while
+	// a read policy is enforced. They are not filesystem changes and must not
+	// appear as live deletes in the dashboard.
+	HiddenPaths  []string          `json:"hidden_paths,omitempty"`
 	Command      []string          `json:"command"`
 	State        string            `json:"state"`
 	ExitCode     int               `json:"exit_code,omitempty"`
