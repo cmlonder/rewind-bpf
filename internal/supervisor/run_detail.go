@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/rewindbpf/rewind/internal/diff"
+	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/platform"
 	"github.com/rewindbpf/rewind/internal/runstore"
 )
@@ -63,6 +64,15 @@ func (s Server) runDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if ok {
 		changes := append([]diff.Change(nil), native.Changes...)
+		// A native record is finalized when the protected command exits. While
+		// the shell is still running, derive a read-only live diff from the
+		// disposable APFS view so the dashboard reflects `rm`/write activity
+		// before the operator closes the session.
+		if len(changes) == 0 && native.View != "" {
+			if after, buildErr := manifest.Build(native.View); buildErr == nil {
+				changes = diff.Compare(native.BaseManifest, after)
+			}
+		}
 		writeJSON(w, http.StatusOK, RunDetail{
 			RunID: native.RunID, State: native.State, Backend: native.Backend,
 			Workspace: native.Workspace, Command: append([]string(nil), native.Command...),

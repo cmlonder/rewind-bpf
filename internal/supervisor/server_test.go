@@ -16,7 +16,6 @@ import (
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/credentials"
-	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/history"
 	"github.com/rewindbpf/rewind/internal/manifest"
 	"github.com/rewindbpf/rewind/internal/platform"
@@ -158,12 +157,26 @@ func TestRunDetailEndpointReturnsNativeFilesystemChanges(t *testing.T) {
 	recordPath := filepath.Join(dir, "run.json")
 	historyPath := filepath.Join(dir, "history.json")
 	runID := "run_native_detail"
+	view := filepath.Join(dir, "view")
+	if err := os.MkdirAll(filepath.Join(view, "src"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(view, "src", "marker.txt"), []byte("original\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	base, err := manifest.Build(view)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Join(view, "src")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(view, "generated.txt"), []byte("created-by-agent\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	record := platform.NativeRecord{
 		RunID: runID, Platform: "darwin", Backend: "apfs-seatbelt", Workspace: filepath.Join(dir, "workspace"),
-		State: "succeeded", Changes: []diff.Change{
-			{Path: "src", Kind: diff.Deleted, Before: &manifest.Entry{Path: "src", Type: "directory", Mode: 0o755}},
-			{Path: "generated.txt", Kind: diff.Created, After: &manifest.Entry{Path: "generated.txt", Type: "file", Mode: 0o644, Size: 17}},
-		},
+		View: view, BaseManifest: base, State: "succeeded",
 	}
 	if err := platform.WriteNativeRecord(recordPath, record); err != nil {
 		t.Fatal(err)
@@ -180,7 +193,7 @@ func TestRunDetailEndpointReturnsNativeFilesystemChanges(t *testing.T) {
 		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 	body := response.Body.String()
-	if !strings.Contains(body, `"change_count":2`) || !strings.Contains(body, `"path":"generated.txt"`) || !strings.Contains(body, `"staged_bytes":17`) {
+	if !strings.Contains(body, `"change_count":3`) || !strings.Contains(body, `"path":"generated.txt"`) || !strings.Contains(body, `"staged_bytes":26`) {
 		t.Fatalf("native detail omitted changes: %s", body)
 	}
 }
