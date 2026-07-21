@@ -5,10 +5,10 @@ export function Hero() {
   return `<section class="hero section-shell" id="top" aria-labelledby="hero-title">
     <div class="hero-copy reveal">
       <div class="eyebrow"><span class="pulse-dot"></span>${siteData.status.label}<span class="eyebrow-rule"></span>${siteData.status.sublabel}</div>
-      <h1 id="hero-title">Let agents work.<br /><em>Keep project and secrets yours.</em></h1>
-      <p class="hero-lede">RewindBPF gives an autonomous agent a disposable write layer and a policy-hidden view of sensitive paths, then asks for explicit acceptance before anything becomes permanent.</p>
-      <div class="hero-actions"><a class="button button-primary" href="#system">See the system <span>↓</span></a><a class="button button-secondary" href="#benchmarks">Read the evidence <span>↗</span></a></div>
-      <div class="hero-proof"><span class="proof-line"></span><span>Hot path: observe.</span><span>Slow path: copy-on-write.</span></div>
+      <h1 id="hero-title">Let agents work.<br /><em>Delete it. Rewind it.</em></h1>
+      <p class="hero-lede">Run your agent normally. RewindBPF keeps deletes, overwrites, and half-finished edits in a disposable layer. If the run goes wrong, discard it and your real project comes back—no backup choreography, no command deny-list.</p>
+      <div class="hero-actions"><a class="button button-primary" href="#system">Watch the rewind <span>↓</span></a><a class="button button-secondary" href="#benchmarks">Inspect the proof <span>↗</span></a></div>
+      <div class="hero-proof"><span class="proof-line"></span><span>No pre-copy.</span><span>One rollback.</span></div>
     </div>
     <div class="hero-instrument admin-run-card reveal reveal-delay-1" aria-label="Active transaction status">
       <div class="admin-run-top"><span class="instrument-label">ACTIVE TRANSACTION</span><span class="instrument-status"><i></i> review</span></div>
@@ -16,10 +16,10 @@ export function Hero() {
       <div class="admin-run-meta"><span><b class="admin-live-dot"></b>00:00:03 elapsed</span><code>rm -rf src &amp;&amp; generate</code></div>
       <div class="admin-run-grid">
         <div><small>LOWER LAYER</small><strong>INTACT</strong><span>manifest verified</span></div>
-        <div><small>UPPER LAYER</small><strong>128 MiB</strong><span>copy-on-write</span></div>
+        <div><small>UPPER LAYER</small><strong>DELETE STAGED</strong><span>discard to rewind</span></div>
         <div><small>EVIDENCE</small><strong>51</strong><span>events · complete</span></div>
       </div>
-      <div class="admin-run-foot"><span>last event <b>ROLLBACK</b></span><span>inspect run ↗</span></div>
+      <div class="admin-run-foot"><span>last event <b>ROLLBACK</b></span><span>one action ↗</span></div>
     </div>
     <div class="hero-evidence reveal reveal-delay-2">
       <article class="proof-panel proof-timeline">

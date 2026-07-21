@@ -78,6 +78,7 @@ h1 em, h2 span { color: var(--orange); font-style: normal; }
 .admin-run-grid small { display: block; color: #b7c7ca; font: 500 9px var(--mono); letter-spacing: .1em; }
 .admin-run-grid strong { display: block; margin: 14px 0 6px; color: var(--paper); font: 600 22px var(--display); letter-spacing: -.05em; }
 .admin-run-grid > div:first-child strong { color: #b7d0c1; }
+.admin-run-grid > div:nth-child(2) strong { font-size: clamp(15px, 1.7vw, 21px); letter-spacing: -.065em; white-space: nowrap; }
 .admin-run-grid span { color: #c8d0c8; font-size: 10px; }
 .admin-run-foot { min-height: 57px; padding: 0 22px; color: #b7c7ca; border-top: 1px solid rgb(255 255 255 / 14%); font: 10px var(--mono); }
 .admin-run-foot b { color: var(--paper); font-weight: 500; }
