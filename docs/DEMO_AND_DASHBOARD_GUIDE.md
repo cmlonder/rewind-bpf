@@ -36,6 +36,7 @@ views of the same transaction.
 
 ```bash
 ROOT="$(mktemp -d /Users/Shared/rewind-video.XXXXXX)"
+printf '%s\n' "$ROOT" > /tmp/rewindbpf-demo-root
 mkdir -p "$ROOT/workspace/src"
 printf 'original-source\n' > "$ROOT/workspace/src/marker.txt"
 printf 'synthetic-secret=do-not-read\n' > "$ROOT/workspace/.env"
@@ -45,7 +46,8 @@ printf 'ROOT=%s\n' "$ROOT"
 In the second terminal:
 
 ```bash
-export ROOT=/Users/Shared/rewind-video.REPLACE_ME
+ROOT="$(cat /tmp/rewindbpf-demo-root)"
+export ROOT
 cat "$ROOT/workspace/src/marker.txt"
 ```
 
@@ -57,8 +59,8 @@ Say:
 > “I am keeping a second terminal outside the protected shell so we can compare
 > the real workspace with the agent’s staged view.”
 
-Replace `rewind-video.REPLACE_ME` with the actual directory printed by the
-first terminal.
+The first terminal writes the path to `/tmp/rewindbpf-demo-root`, so the second
+terminal does not need a manually edited placeholder or a copied path.
 
 ### 2. Start the local Control Plane
 
@@ -68,11 +70,7 @@ From the repository root:
 cd /Users/cemalonder/Dev/RewindBPF
 export BIN=/tmp/rewind-darwin
 GOTOOLCHAIN=local go build -o "$BIN" ./cmd/rewind
-
-"$BIN" dashboard start \
-  --workspace "$ROOT/workspace" \
-  --state-dir "$ROOT/state" \
-  --ui-dir "$PWD/ui"
+"$BIN" dashboard start --workspace "$ROOT/workspace" --state-dir "$ROOT/state" --ui-dir "$PWD/ui"
 ```
 
 Do not pass `--no-open`; the command opens the dashboard automatically. It
@@ -170,10 +168,7 @@ Rollback is terminal for that run. Start a new dashboard transaction with a
 new state directory, using the restored workspace:
 
 ```bash
-"$BIN" dashboard start \
-  --workspace "$ROOT/workspace" \
-  --state-dir "$ROOT/commit-state" \
-  --ui-dir "/Users/cemalonder/Dev/RewindBPF/ui"
+"$BIN" dashboard start --workspace "$ROOT/workspace" --state-dir "$ROOT/commit-state" --ui-dir "/Users/cemalonder/Dev/RewindBPF/ui"
 ```
 
 In the new protected shell, make a harmless candidate change:
