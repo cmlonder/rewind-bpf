@@ -3,7 +3,7 @@ import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, refreshTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, eventRenderTimer: null, refreshTimer: null, snapshotSignature: "", reconnectTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
@@ -216,6 +216,14 @@ function openSessionEditor() {
 }
 
 function applySupervisorSnapshot(connected) {
+  const signature = JSON.stringify({
+    history: connected.history.map((item) => [item.run_id, item.state, item.updated_at, item.upper_bytes]),
+    policies: connected.policies.map((item) => [item.name, item.version, item.updated_at]),
+    workspaces: connected.workspaces.map((item) => [item.name, item.path, item.policy]),
+    audit: connected.audit.map((item) => [item.timestamp, item.action, item.run_id, item.ok]),
+  });
+  const changed = signature !== state.snapshotSignature;
+  state.snapshotSignature = signature;
   state.supervisor = connected;
   fixture.credentialStatus = connected.credentialStatus || { available: false, state: "unavailable" };
   fixture.environment = `Connected supervisor · ${connected.capabilities.platform || "unknown"}`;
@@ -243,6 +251,7 @@ function applySupervisorSnapshot(connected) {
       state.selectedPolicy = fixture.policies[0]?.name || state.selectedPolicy;
   if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
   if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
+  return changed;
 }
 
 function followConnectedEvents() {
@@ -263,7 +272,11 @@ function followConnectedEvents() {
       detail: `sequence ${event.sequence || "—"} · hash ${String(event.hash || "").slice(0, 10)}…`,
     });
     run.evidence.count += 1;
-    render();
+    window.clearTimeout(state.eventRenderTimer);
+    state.eventRenderTimer = window.setTimeout(() => {
+      state.eventRenderTimer = null;
+      render();
+    }, 120);
   }, controller.signal).catch((error) => {
     if (error.name === "AbortError") return;
     if (error.status === 404) {
@@ -307,10 +320,10 @@ function startSupervisorRefresh() {
     if (!state.supervisor || state.connection === "fixture") return;
     try {
       const connected = await connectSupervisor(state.supervisor.baseUrl, state.supervisor.token);
-      applySupervisorSnapshot(connected);
+      const changed = applySupervisorSnapshot(connected);
       state.connection = "connected";
       state.reconnectAttempts = 0;
-      render();
+      if (changed) render();
     } catch (error) {
       scheduleSupervisorReconnect(error);
     }
