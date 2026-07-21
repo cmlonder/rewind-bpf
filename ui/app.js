@@ -3,7 +3,7 @@ import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, reconnectTimer: null, refreshTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
@@ -161,8 +161,10 @@ function openSupervisorConnector() {
     try {
       const connected = await connectSupervisor(endpoint, token);
       applySupervisorSnapshot(connected);
+      rememberSupervisor(endpoint, token);
       state.connection = "connected";
       state.reconnectAttempts = 0;
+      startSupervisorRefresh();
       if (connected.history.length) followConnectedEvents();
       closeModal(); render(); setToast("Supervisor connected: live evidence and authenticated actions enabled.", "success");
     } catch (error) { setToast(`Supervisor connection refused: ${error.message}`, "error"); }
@@ -220,9 +222,23 @@ function applySupervisorSnapshot(connected) {
   fixture.registry.packages = connected.registryEntries || [];
   fixture.history = connected.history.map((item) => ({ id: item.run_id, state: item.state, workspace: item.workspace || "unknown", updated: item.updated_at || "just now", size: `${item.upper_bytes || 0} bytes upper` }));
   if (connected.history.length) {
-    fixture.runs = connected.history.map(remoteRun);
-    state.selectedRun = fixture.runs[0].id;
+    // Keep the object currently used by the live event stream. Replacing it
+    // on every history poll would leave the SSE callback writing to a stale
+    // object and make the UI appear to jump back to the preview state.
+    const existing = new Map(fixture.runs.map((item) => [item.id, item]));
+    fixture.runs = connected.history.map((item) => {
+      const next = existing.get(item.run_id) || remoteRun(item);
+      const liveEvents = next.events || [];
+      const liveEvidence = next.evidence || { count: 0, bytes: 0, dropped: 0, truncated: false, chainValid: true, recordMatch: true, segments: 1 };
+      Object.assign(next, remoteRun(item));
+      next.events = liveEvents;
+      next.evidence = liveEvidence;
+      return next;
+    });
+    if (!fixture.runs.some((item) => item.id === state.selectedRun)) state.selectedRun = fixture.runs[0].id;
   }
+  fixture.metrics.activeRuns = connected.history.filter((item) => item.state === "running").length;
+  fixture.metrics.protectedWorkspaces = connected.workspaces.length || fixture.metrics.protectedWorkspaces;
       if (connected.policies.length) fixture.policies = connected.policies.map(remotePolicy);
       state.selectedPolicy = fixture.policies[0]?.name || state.selectedPolicy;
   if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
@@ -273,6 +289,8 @@ function scheduleSupervisorReconnect(error) {
       applySupervisorSnapshot(connected);
       state.connection = "connected";
       state.reconnectAttempts = 0;
+      rememberSupervisor(state.supervisor.baseUrl, state.supervisor.token);
+      startSupervisorRefresh();
       render();
       setToast("Supervisor connection restored; evidence stream resumed.", "success");
       followConnectedEvents();
@@ -281,6 +299,37 @@ function scheduleSupervisorReconnect(error) {
     }
   }, delay);
   if (error) setToast(`Supervisor stream paused: ${error.message}. Retrying…`, "error");
+}
+
+function startSupervisorRefresh() {
+  window.clearInterval(state.refreshTimer);
+  state.refreshTimer = window.setInterval(async () => {
+    if (!state.supervisor || state.connection === "fixture") return;
+    try {
+      const connected = await connectSupervisor(state.supervisor.baseUrl, state.supervisor.token);
+      applySupervisorSnapshot(connected);
+      state.connection = "connected";
+      state.reconnectAttempts = 0;
+      render();
+    } catch (error) {
+      scheduleSupervisorReconnect(error);
+    }
+  }, 2000);
+}
+
+function savedSupervisor() {
+  try {
+    const endpoint = window.sessionStorage.getItem("rewind.supervisor.endpoint");
+    const token = window.sessionStorage.getItem("rewind.supervisor.token");
+    return endpoint && token ? { endpoint, token } : null;
+  } catch (_) { return null; }
+}
+
+function rememberSupervisor(endpoint, token) {
+  try {
+    window.sessionStorage.setItem("rewind.supervisor.endpoint", endpoint);
+    window.sessionStorage.setItem("rewind.supervisor.token", token);
+  } catch (_) { /* private browsing may disable session storage */ }
 }
 
 function remoteRun(item) {
@@ -680,26 +729,32 @@ render();
 // so the short-lived bearer token is not retained in browser history.
 async function connectFromDashboardLaunch() {
   const raw = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
-  if (!raw) return;
   const params = new URLSearchParams(raw);
-  const endpoint = params.get("supervisor");
-  if (!endpoint) return;
-  const token = params.get("token") || "";
+  const launched = params.get("supervisor") ? { endpoint: params.get("supervisor"), token: params.get("token") || "" } : savedSupervisor();
+  if (!launched) return;
+  const { endpoint, token } = launched;
   try {
     state.connection = "connecting";
     render();
     const connected = await connectSupervisor(endpoint, token);
     applySupervisorSnapshot(connected);
+    rememberSupervisor(endpoint, token);
     state.connection = "connected";
     state.reconnectAttempts = 0;
+    startSupervisorRefresh();
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
     render();
     setToast("Local Rewind control plane connected. The protected shell is now live.", "success");
     if (connected.history.length) followConnectedEvents();
   } catch (error) {
-    state.connection = "fixture";
+    // A local dashboard must not silently become the public fixture after a
+    // reload or a transient supervisor failure. Keep the live-runtime state
+    // visible and let the bounded reconnect loop recover it.
+    state.supervisor = { baseUrl: endpoint.replace(/\/$/, ""), token: token.trim() };
+    state.connection = "disconnected";
     render();
-    setToast(`Automatic local connection failed: ${error.message}. You can connect manually from the supervisor control.`, "error");
+    setToast(`Local supervisor is unavailable: ${error.message}. Retrying without switching to fixture mode.`, "error");
+    scheduleSupervisorReconnect(error);
   }
 }
 
