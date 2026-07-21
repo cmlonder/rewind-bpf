@@ -38,7 +38,7 @@ To obtain the required ID, run `/status` in the Codex thread where most of the c
 
 | Platform | Submission claim | Judge path |
 |---|---|---|
-| Ubuntu 24.04 ARM64 in UTM | Reference Linux enforcement and rollback path | `REWIND_VM_CONFIRM=VM_ONLY make final-vm` inside the disposable VM, or follow `docs/HACKATHON_TEST_AND_DEMO_PLAN.md` |
+| Ubuntu 24.04 ARM64 in UTM | Reference Linux enforcement and rollback path | `REWIND_VM_CONFIRM=VM_ONLY make final-vm` inside the disposable VM |
 | macOS | Safe native APFS/Seatbelt staged transaction and UI bridge | `make mac-native-smoke`, `make mac-crash-smoke`, then `go run ./cmd/rewind dashboard start --workspace /Users/Shared/<fixture>` |
 | Windows | Cross-built, fail-closed native contract; signed minifilter/VHDX gate remains | Inspect `docs/platform/windows.md` and `scripts/windows_acceptance.ps1`; do not claim Linux-equivalent enforcement |
 

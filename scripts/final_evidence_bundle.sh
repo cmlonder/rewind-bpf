@@ -32,7 +32,7 @@ python3 benchmarks/plot_results.py > "$LOGS/benchmark-plot.log" 2>&1
 
 cp -- benchmarks/results_summary.csv benchmarks/results_normalized.csv benchmarks/results_chart.svg "$OUT/benchmarks/"
 cp -- benchmarks/RESULTS.md benchmarks/README.md benchmarks/COMPETITOR_MATRIX.md "$OUT/benchmarks/"
-cp -- docs/ARCHITECTURE.md docs/PHASE2_PLAN.md docs/PLATFORM_STATUS.md docs/platform/macos_manual_e2e.md "$OUT/docs/"
+cp -- docs/ARCHITECTURE.md docs/FEATURE_BACKLOG.md docs/PLATFORM_STATUS.md docs/platform/macos_manual_e2e.md "$OUT/docs/"
 GOTOOLCHAIN=local go run ./cmd/rewind platform status > "$OUT/platform-status.json"
 
 if command -v shasum >/dev/null 2>&1; then

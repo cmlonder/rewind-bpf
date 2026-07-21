@@ -23,7 +23,7 @@ run make evidence-bundle
 
 test -s README.md
 test -s docs/FEATURE_BACKLOG.md
-test -s docs/PHASE2_PLAN.md
+test -s docs/FEATURE_BACKLOG.md
 test -s site/index.html
 find dist -maxdepth 1 -type f -name 'evidence-*.tar.gz' -size +0c -print -quit | grep -q .
 

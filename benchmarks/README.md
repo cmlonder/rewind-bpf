@@ -50,7 +50,7 @@ number is checked in until it has a VM or host provenance line.
 
 ## Competitor comparison policy
 
-The feature matrix in [`docs/PHASE2_PLAN.md`](../docs/PHASE2_PLAN.md) separates direct product competitors from adjacent kernel systems and research references. Benchmark claims must preserve that distinction:
+The feature matrix and delivery context in [`docs/FEATURE_BACKLOG.md`](../docs/FEATURE_BACKLOG.md) separate direct product competitors from adjacent kernel systems and research references. Benchmark claims must preserve that distinction:
 
 | System | Comparison class | Reproducible benchmark dimensions | Do not claim |
 |---|---|---|---|

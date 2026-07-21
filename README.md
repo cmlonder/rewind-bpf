@@ -174,8 +174,8 @@ The longer acceptance run is:
 REWIND_VM_CONFIRM=VM_ONLY make final-vm
 ```
 
-The complete recording plan is in
-[`docs/HACKATHON_TEST_AND_DEMO_PLAN.md`](docs/HACKATHON_TEST_AND_DEMO_PLAN.md).
+The current delivery ledger and acceptance scope are in
+[`docs/FEATURE_BACKLOG.md`](docs/FEATURE_BACKLOG.md).
 
 ## Policy example
 
@@ -303,8 +303,6 @@ with [`benchmarks/RESULTS.md`](benchmarks/RESULTS.md).
 - [`docs/FEATURE_BACKLOG.md`](docs/FEATURE_BACKLOG.md) — current feature status
 - [`docs/PLATFORM_STATUS.md`](docs/PLATFORM_STATUS.md) — platform claims
 - [`docs/DEVPOST_SUBMISSION.md`](docs/DEVPOST_SUBMISSION.md) — submission copy
-- [`docs/HACKATHON_TEST_AND_DEMO_PLAN.md`](docs/HACKATHON_TEST_AND_DEMO_PLAN.md) —
-  judge setup and recording plan
 - [`benchmarks/COMPETITOR_MATRIX.md`](benchmarks/COMPETITOR_MATRIX.md) —
   comparison with adjacent tools
 

@@ -15,7 +15,7 @@ if git grep -n -I -E '(-----BEGIN .*PRIVATE KEY-----|sk-[A-Za-z0-9]{20,}|ghp_[A-
   fail=1
 fi
 
-personal_paths="$(git grep -n -I -E '/Users/[A-Za-z0-9._-]+/|/home/[A-Za-z0-9._-]+/Dev/' -- ':!docs/ARCHITECTURE.md' ':!README.md' ':!docs/HACKATHON_TEST_AND_DEMO_PLAN.md' || true)"
+personal_paths="$(git grep -n -I -E '/Users/[A-Za-z0-9._-]+/|/home/[A-Za-z0-9._-]+/Dev/' -- ':!docs/ARCHITECTURE.md' ':!README.md' || true)"
 personal_paths="$(printf '%s\n' "$personal_paths" | grep -v '/Users/Shared/' || true)"
 if [[ -n "$personal_paths" ]]; then
   printf '%s\n' "$personal_paths"
