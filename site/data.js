@@ -115,7 +115,7 @@ export const siteData = {
     { label: "B2 · FUSE only", read: 9143.8, write: 3915.4, readLabel: "9,144", writeLabel: "3,915", note: "COW layer · 11.52% read gap · 1.0000× storage" },
     { label: "B4 · protected run", read: 9181.7, write: 3932.6, readLabel: "9,182", writeLabel: "3,933", note: "FUSE + eBPF + helper · 1.0003× storage" },
   ],
-  telemetryBenchmark: { label: "B5 · telemetry-only", events: "16,620", bytes: "2.47 MiB", average: "148.47 B/event", note: "Direct fio PID validation · no OverlayFS protection" },
+  telemetryBenchmark: { label: "B5 · telemetry-only", events: "16,620", bytes: "2.47 MiB", average: "148.47 B/event", note: "Control sample: direct fio PID events; OverlayFS disabled." },
   evidence: [
     ["16,620", "events in direct fio telemetry smoke"],
     ["148.47 B", "average JSONL bytes per event"],
