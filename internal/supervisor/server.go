@@ -304,6 +304,7 @@ func (s Server) Handler() http.Handler {
 		writeJSON(w, http.StatusCreated, lease)
 	})
 	mux.HandleFunc("/v1/audit", s.auditLog)
+	mux.HandleFunc("/v1/run", s.runDetail)
 	mux.HandleFunc("/v1/events", s.events)
 	mux.HandleFunc("/v1/action-challenges", func(w http.ResponseWriter, r *http.Request) {
 		if !s.authorized(r) {

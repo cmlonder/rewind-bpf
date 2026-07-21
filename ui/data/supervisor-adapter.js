@@ -41,7 +41,18 @@ export async function connectSupervisor(baseUrl, token = "") {
     listRegistry: () => listRegistry(root, token.trim()),
     fetchRegistryPolicy: (value) => fetchRegistryPolicy(root, token.trim(), value),
     revokeRegistryPolicy: (value) => revokeRegistryPolicy(root, token.trim(), value),
+    runDetail: (runId) => fetchRunDetail(root, token.trim(), runId),
   };
+}
+
+export async function fetchRunDetail(baseUrl, token, runId) {
+  const root = baseUrl.replace(/\/$/, "");
+  const response = await fetch(`${root}/v1/run?run_id=${encodeURIComponent(runId)}`, {
+    headers: { Accept: "application/json", Authorization: `Bearer ${token.trim()}` },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.message || `supervisor returned HTTP ${response.status}`);
+  return payload;
 }
 
 export async function listRegistry(baseUrl, token) {

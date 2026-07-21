@@ -3,7 +3,7 @@ import { connectSupervisor, followEvents } from "./data/supervisor-adapter.js";
 import { AppShell } from "./components/layout.js";
 
 const app = document.querySelector("#app");
-const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, eventRenderTimer: null, refreshTimer: null, snapshotSignature: "", reconnectTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
+const state = { view: "overview", selectedRun: fixture.runs[0].id, selectedPolicy: fixture.policies[0].name, runFilter: "all", toast: null, supervisor: null, eventAbort: null, eventRenderTimer: null, refreshTimer: null, snapshotSignature: "", detailSignature: "", reconnectTimer: null, reconnectAttempts: 0, connection: "fixture", actionTokens: new Map() };
 let modalRestoreFocus = null;
 let toastTimer = null;
 
@@ -161,6 +161,7 @@ function openSupervisorConnector() {
     try {
       const connected = await connectSupervisor(endpoint, token);
       applySupervisorSnapshot(connected);
+      await hydrateRunDetail();
       rememberSupervisor(endpoint, token);
       state.connection = "connected";
       state.reconnectAttempts = 0;
@@ -238,9 +239,20 @@ function applySupervisorSnapshot(connected) {
       const next = existing.get(item.run_id) || remoteRun(item);
       const liveEvents = next.events || [];
       const liveEvidence = next.evidence || { count: 0, bytes: 0, dropped: 0, truncated: false, chainValid: true, recordMatch: true, segments: 1 };
+      const liveDiff = next.diff || [];
+      const liveUpperBytes = next.upperBytes || 0;
+      const liveUpperLabel = next.upperLabel || "0 bytes";
+      const liveCommand = next.command;
+      const liveBackend = next.backend;
       Object.assign(next, remoteRun(item));
       next.events = liveEvents;
       next.evidence = liveEvidence;
+      // History is intentionally small and may report upper_bytes=0 for a
+      // native APFS run. Keep the hydrated record projection while polling.
+      if (liveDiff.length) next.diff = liveDiff;
+      if (liveUpperBytes) { next.upperBytes = liveUpperBytes; next.upperLabel = liveUpperLabel; }
+      if (liveCommand) next.command = liveCommand;
+      if (liveBackend) next.backend = liveBackend;
       return next;
     });
     if (!fixture.runs.some((item) => item.id === state.selectedRun)) state.selectedRun = fixture.runs[0].id;
@@ -252,6 +264,47 @@ function applySupervisorSnapshot(connected) {
   if (connected.workspaces.length) fixture.workspaces = connected.workspaces.map(remoteWorkspace);
   if (connected.audit.length) fixture.audit = connected.audit.map((item) => [new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }), item.action, item.run_id || "supervisor", item.ok ? "supervisor" : "refused"]);
   return changed;
+}
+
+// Native macOS records keep filesystem changes in the signed record rather
+// than the event sidecar. Hydrate that projection separately so a command such
+// as `rm -rf src` appears as a real diff in the dashboard without exposing the
+// base manifest or privileged runtime paths to the browser.
+async function hydrateRunDetail() {
+  if (!state.supervisor?.runDetail || !currentRun()) return false;
+  const run = currentRun();
+  try {
+    const detail = await state.supervisor.runDetail(run.id);
+    const signature = JSON.stringify([detail.run_id, detail.state, detail.change_count, detail.staged_bytes, detail.changes]);
+    if (signature === state.detailSignature) return false;
+    state.detailSignature = signature;
+    if (detail.state) run.state = detail.state;
+    if (detail.backend) run.backend = detail.backend;
+    if (Array.isArray(detail.command) && detail.command.length) run.command = detail.command.join(" ");
+    const changes = Array.isArray(detail.changes) ? detail.changes : [];
+    run.diff = changes.map((change) => {
+      const kind = change.kind || "modified";
+      const entry = change.after || change.before || {};
+      const bytes = entry.type === "file" ? `${entry.size || 0} B` : "—";
+      return { path: change.path, kind, bytes, note: kind === "deleted" ? "staged deletion · lower layer intact" : kind === "created" ? "staged creation · visible in review view" : "staged modification · lower layer intact" };
+    });
+    const stagedBytes = Number(detail.staged_bytes || 0);
+    run.upperBytes = stagedBytes;
+    run.upperLabel = run.diff.length ? `${run.diff.length} staged change${run.diff.length === 1 ? "" : "s"}` : "0 bytes";
+    const existing = new Set((run.events || []).map((event) => `${event.operation}:${event.path}`));
+    for (const change of changes) {
+      const operation = change.kind === "deleted" ? "DELETE" : change.kind === "created" ? "CREATE" : "WRITE";
+      const key = `${operation}:${change.path}`;
+      if (existing.has(key)) continue;
+      run.events.push({ time: "staged", type: "write", operation, path: change.path, decision: "allow", risk: "high", detail: change.kind === "deleted" ? "Staged in the review view; original path remains intact" : "Staged in the review view; accept or discard explicitly" });
+      existing.add(key);
+    }
+    return true;
+  } catch (_) {
+    // A run can disappear between the history and detail requests during
+    // cleanup. Keep the live stream usable and let the next poll retry.
+    return false;
+  }
 }
 
 function followConnectedEvents() {
@@ -300,6 +353,7 @@ function scheduleSupervisorReconnect(error) {
     try {
       const connected = await connectSupervisor(state.supervisor.baseUrl, state.supervisor.token);
       applySupervisorSnapshot(connected);
+      await hydrateRunDetail();
       state.connection = "connected";
       state.reconnectAttempts = 0;
       rememberSupervisor(state.supervisor.baseUrl, state.supervisor.token);
@@ -323,7 +377,8 @@ function startSupervisorRefresh() {
       const changed = applySupervisorSnapshot(connected);
       state.connection = "connected";
       state.reconnectAttempts = 0;
-      if (changed) render();
+      const detailChanged = await hydrateRunDetail();
+      if (changed || detailChanged) render();
     } catch (error) {
       scheduleSupervisorReconnect(error);
     }
@@ -751,6 +806,7 @@ async function connectFromDashboardLaunch() {
     render();
     const connected = await connectSupervisor(endpoint, token);
     applySupervisorSnapshot(connected);
+    await hydrateRunDetail();
     rememberSupervisor(endpoint, token);
     state.connection = "connected";
     state.reconnectAttempts = 0;

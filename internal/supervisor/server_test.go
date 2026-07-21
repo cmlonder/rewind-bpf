@@ -16,7 +16,10 @@ import (
 
 	"github.com/rewindbpf/rewind/internal/controlplane"
 	"github.com/rewindbpf/rewind/internal/credentials"
+	"github.com/rewindbpf/rewind/internal/diff"
 	"github.com/rewindbpf/rewind/internal/history"
+	"github.com/rewindbpf/rewind/internal/manifest"
+	"github.com/rewindbpf/rewind/internal/platform"
 	"github.com/rewindbpf/rewind/internal/policy"
 	"github.com/rewindbpf/rewind/internal/policybundle"
 	"github.com/rewindbpf/rewind/internal/registry"
@@ -147,6 +150,38 @@ func TestHistoryPruneEndpointRequiresAuthAndKeepsNewestEntries(t *testing.T) {
 	entries, err := store.List()
 	if err != nil || len(entries) != 1 || entries[0].RunID != "new" {
 		t.Fatalf("entries=%+v err=%v", entries, err)
+	}
+}
+
+func TestRunDetailEndpointReturnsNativeFilesystemChanges(t *testing.T) {
+	dir := t.TempDir()
+	recordPath := filepath.Join(dir, "run.json")
+	historyPath := filepath.Join(dir, "history.json")
+	runID := "run_native_detail"
+	record := platform.NativeRecord{
+		RunID: runID, Platform: "darwin", Backend: "apfs-seatbelt", Workspace: filepath.Join(dir, "workspace"),
+		State: "succeeded", Changes: []diff.Change{
+			{Path: "src", Kind: diff.Deleted, Before: &manifest.Entry{Path: "src", Type: "directory", Mode: 0o755}},
+			{Path: "generated.txt", Kind: diff.Created, After: &manifest.Entry{Path: "generated.txt", Type: "file", Mode: 0o644, Size: 17}},
+		},
+	}
+	if err := platform.WriteNativeRecord(recordPath, record); err != nil {
+		t.Fatal(err)
+	}
+	if err := history.Open(historyPath).Upsert(history.Entry{RunID: runID, Backend: record.Backend, State: record.State, Workspace: record.Workspace, RecordPath: recordPath}); err != nil {
+		t.Fatal(err)
+	}
+	server := Server{History: history.Open(historyPath), AuthToken: "secret", RequireAuth: true}
+	request := httptest.NewRequest(http.MethodGet, "/v1/run?run_id="+runID, nil)
+	request.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, `"change_count":2`) || !strings.Contains(body, `"path":"generated.txt"`) || !strings.Contains(body, `"staged_bytes":17`) {
+		t.Fatalf("native detail omitted changes: %s", body)
 	}
 }
 
