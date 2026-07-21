@@ -152,6 +152,12 @@ func handleNativeRun(args []string) {
 		fatal(fmt.Sprintf("prepare macOS Seatbelt command: %v", err))
 	}
 	defer cleanup()
+	// Preserve the operator's terminal for dashboard shells and direct
+	// interactive native runs. exec.Cmd otherwise connects a nil Stdin to
+	// /dev/null, causing bash/zsh to exit before the operator can type.
+	child.Stdin = os.Stdin
+	child.Stdout = os.Stdout
+	child.Stderr = os.Stderr
 	record.State = "running"
 	_ = writeNativeRecordWithHistory(recordFile, record)
 	_ = appendNativeEvent(eventsPath, platform.NativeEvent{Operation: "execve", Path: command[0], Decision: "allow", Timestamp: time.Now().UTC().Format(time.RFC3339Nano)})
